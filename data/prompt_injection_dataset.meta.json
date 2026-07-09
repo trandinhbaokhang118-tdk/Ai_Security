@@ -1,0 +1,36 @@
+{
+  "source": "xTRam1/safe-guard-prompt-injection",
+  "seed": 42,
+  "total_rows": 10137,
+  "class_counts": {
+    "0": 7066,
+    "1": 3071
+  },
+  "label_mapping": {
+    "0": "benign",
+    "1": "malicious"
+  },
+  "splits": {
+    "prompt_injection_train.csv": {
+      "rows": 8109,
+      "class_counts": {
+        "0": 5652,
+        "1": 2457
+      }
+    },
+    "prompt_injection_validation.csv": {
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      }
+    },
+    "prompt_injection_test.csv": {
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      }
+    }
+  }
+}

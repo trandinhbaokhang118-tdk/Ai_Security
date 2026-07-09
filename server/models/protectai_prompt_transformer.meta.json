@@ -1,0 +1,20 @@
+{
+  "artifact": "protectai_prompt_transformer.onnx",
+  "architecture": "deberta-v2",
+  "base_model": "protectai/deberta-v3-base-prompt-injection-v2",
+  "purpose": "prompt-injection classification",
+  "label_mapping": {
+    "0": "benign",
+    "1": "malicious"
+  },
+  "max_length": 256,
+  "quantized_int8": false,
+  "tokenizer_dir": "protectai_prompt_tokenizer",
+  "freeze_base": false,
+  "trainable_parameters": 184423682,
+  "sha256": "5a5afce0c80ee1670b93f39722fa1043d88ef9896cc0d7fe449a856ab23ca368",
+  "dataset": {
+    "mode": "export_pretrained"
+  },
+  "metrics": {}
+}

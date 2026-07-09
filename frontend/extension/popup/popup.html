@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>AI Security Armor</title>
+  </head>
+  <body>
+    <header class="header">
+      <span class="logo">🛡</span>
+      <span class="title">AI Security Armor</span>
+    </header>
+
+    <main id="content">
+      <div id="loading" class="state">Đang tải…</div>
+
+      <section id="result" hidden>
+        <div id="badge" class="badge"></div>
+        <div id="url" class="url"></div>
+        <h3 class="section-title">Lý do chính</h3>
+        <ul id="reasons" class="reasons"></ul>
+        <h3 class="section-title">Bằng chứng</h3>
+        <ul id="evidence" class="evidence"></ul>
+      </section>
+
+      <section id="offline" class="state offline" hidden>
+        ⚠ Không kết nối được máy chủ.<br />
+        Kiểm tra Gateway tại <code>localhost:8000</code>.
+      </section>
+    </main>
+
+    <footer class="footer">
+      <a href="http://localhost:3000" target="_blank" rel="noopener">Mở Web App</a>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

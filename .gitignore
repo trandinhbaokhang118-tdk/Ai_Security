@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv*/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local agent/tooling scratch space
+.agents/
+.codex-*/
+.codex-run/
+.omni/
+
+# Trained model artifacts (produced by ai/training/*, not source)
+*.onnx
+*.pt
+*.pth
+*.safetensors
+ai/models/*.onnx
+ai/models/_ckpt/
+ai/models/_checkpoints/
+ai/models/*_tokenizer/
+server/models/*.onnx
+server/models/_ckpt/
+server/models/_checkpoints/
+server/models/*_tokenizer/
+data/*.csv
+data/**/*.csv
+data/raw/
+robustness_report.json
+
+# Large external datasets / archives
+*.zip
+
+# Node / Next.js
+node_modules/
+frontend/web/.next/
+frontend/web/out/
+frontend/web/.env.local
+
+# Extension generated icons (produced by make_icons.py)
+frontend/extension/icons/*.png
+
+# Env / secrets
+.env
+*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db

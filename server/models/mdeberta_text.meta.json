@@ -1,0 +1,92 @@
+{
+  "artifact": "mdeberta_text.onnx",
+  "architecture": "TfidfVectorizer(word 1-2, sublinear_tf) + LogisticRegression",
+  "runtime_input": "tensor(string) shape [N, 1]",
+  "runtime_outputs": [
+    "label",
+    "probabilities"
+  ],
+  "purpose": "real-data CPU text phishing classifier for gateway serving",
+  "trained_at_utc": "2026-07-07T06:45:48+00:00",
+  "label_mapping": {
+    "0": "benign",
+    "1": "phishing"
+  },
+  "dataset": {
+    "train": {
+      "path": "data\\phishing_text_train.csv",
+      "rows": 82152,
+      "class_counts": {
+        "0": 52548,
+        "1": 29604
+      }
+    },
+    "validation": {
+      "path": "data\\phishing_text_validation.csv",
+      "rows": 10269,
+      "class_counts": {
+        "0": 6569,
+        "1": 3700
+      }
+    },
+    "test": {
+      "path": "data\\phishing_text_test.csv",
+      "rows": 10270,
+      "class_counts": {
+        "0": 6569,
+        "1": 3701
+      }
+    }
+  },
+  "feature_config": {
+    "max_features": 120000,
+    "min_df": 2,
+    "max_chars": 50000,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "class_weight": "balanced",
+    "solver": "liblinear",
+    "c": 4.0
+  },
+  "metrics": {
+    "validation": {
+      "rows": 10269,
+      "class_counts": {
+        "0": 6569,
+        "1": 3700
+      },
+      "accuracy": 0.9716622845457201,
+      "precision": 0.9603024574669187,
+      "recall": 0.961081081081081,
+      "f1": 0.9606916115088477,
+      "roc_auc": 0.9941107083640194,
+      "confusion_matrix": {
+        "tn": 6422,
+        "fp": 147,
+        "fn": 144,
+        "tp": 3556
+      }
+    },
+    "test": {
+      "rows": 10270,
+      "class_counts": {
+        "0": 6569,
+        "1": 3701
+      },
+      "accuracy": 0.9698149951314509,
+      "precision": 0.952978893935346,
+      "recall": 0.9637935693055931,
+      "f1": 0.9583557227297153,
+      "roc_auc": 0.9949993972080057,
+      "confusion_matrix": {
+        "tn": 6393,
+        "fp": 176,
+        "fn": 134,
+        "tp": 3567
+      }
+    }
+  },
+  "sha256": "33315e0952c0986cd4164900084b2746ba2c4ba9be01fec5121afd8b9859e954"
+}

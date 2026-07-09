@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: armor-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./server/models:/app/server/models:ro
+      - ./data:/app/data
+    networks:
+      - armor-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: armor-web
+    ports:
+      - "3000:3000"
+    environment:
+      # Browser calls the gateway directly on the host-published port.
+      - NEXT_PUBLIC_API_MODE=real
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_BASE_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - armor-net
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: armor-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - armor-net
+    restart: unless-stopped
+    # After first run: docker exec -it armor-ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+
+networks:
+  armor-net:
+    driver: bridge
+
+volumes:
+  ollama-data:
