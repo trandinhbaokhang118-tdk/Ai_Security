@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
+from backend.db import initialize_database
 from backend.middleware import RateLimiterMiddleware
 from backend.routers import assess, auth, chat, health, admin
 from backend.routers import demo
@@ -40,3 +41,8 @@ app.include_router(admin.router)
 @app.get("/")
 def root():
     return {"name": "AI Security Armor Gateway", "docs": "/docs", "health": "/v1/health"}
+
+
+@app.on_event("startup")
+def startup() -> None:
+    initialize_database()

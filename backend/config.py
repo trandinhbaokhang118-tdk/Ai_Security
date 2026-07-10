@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
 
+    database_url: str = "sqlite:///./.aisec-data/armor.db"
+    database_auto_create: bool = True
+    database_echo: bool = False
+    api_key_pepper: str = "dev-api-key-pepper-change-in-production"
+
     api_key: str = "dev-key-change-in-production"
     rate_limit_per_min: int = 60
 

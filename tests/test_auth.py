@@ -1,9 +1,14 @@
 import secrets
+from datetime import timedelta
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
+from backend.db import SessionLocal
 from backend.main import app
+from backend.models import SessionRecord
 from backend.routers import auth
+from backend.security_utils import utcnow
 
 client = TestClient(app)
 
@@ -47,6 +52,23 @@ def test_login_allows_account_access_and_logout_revokes_token() -> None:
     assert client.get("/v1/account/plan", headers=headers).status_code == 401
 
 
+def test_authenticated_scan_persists_to_history_and_quota() -> None:
+    session = login_demo()
+    headers = bearer(session["token"])
+    before_quota = client.get("/v1/account/quota", headers=headers).json()
+
+    scan = client.post("/v1/assess/url", headers=headers, json={"url": "https://github.com"})
+    assert scan.status_code == 200
+    request_id = scan.json()["request_id"]
+
+    history = client.get("/v1/account/history", headers=headers)
+    after_quota = client.get("/v1/account/quota", headers=headers).json()
+
+    assert history.status_code == 200
+    assert any(item["id"] == request_id for item in history.json())
+    assert after_quota["usedToday"] == before_quota["usedToday"] + 1
+
+
 def test_api_keys_are_scoped_per_user_and_rotate_independently() -> None:
     demo = login_demo()
     email = f"member-{secrets.token_hex(4)}@example.com"
@@ -78,10 +100,18 @@ def test_invalid_bearer_token_is_rejected() -> None:
 def test_expired_session_is_rejected_and_removed() -> None:
     session = login_demo()
     key = auth.session_key(session["token"])
-    record = auth.SESSIONS[key]
-    auth.SESSIONS[key] = auth.SessionRecord(email=record.email, expires_at=0)
+    with SessionLocal() as db:
+        record = db.execute(
+            select(SessionRecord).where(SessionRecord.token_hash == key)
+        ).scalar_one()
+        record.expires_at = utcnow() - timedelta(seconds=1)
+        db.commit()
 
     response = client.get("/v1/account/plan", headers=bearer(session["token"]))
 
     assert response.status_code == 401
-    assert key not in auth.SESSIONS
+    with SessionLocal() as db:
+        assert (
+            db.execute(select(SessionRecord).where(SessionRecord.token_hash == key)).scalar_one_or_none()
+            is None
+        )

@@ -18,7 +18,7 @@ COPY shared/ ./shared/
 COPY mcp_server/ ./mcp_server/
 COPY server/ ./server/
 
-RUN useradd -m armor && chown -R armor /app
+RUN useradd -m armor && mkdir -p /app/.aisec-data && chown -R armor /app
 USER armor
 
 EXPOSE 8000

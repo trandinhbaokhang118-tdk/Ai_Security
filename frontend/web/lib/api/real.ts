@@ -298,26 +298,32 @@ export class RealApiClient implements ApiClient {
      *  Khớp contract gateway: body `{ url, context }`. */
     async assessUrl(url: string): Promise<AssessResult> {
         const raw = await requestJson<BackendAssessResponse>("/v1/assess/url", {
-            method: "POST",
+            ...withAuthentication({ method: "POST" }),
             body: JSON.stringify({ url, context: "" }),
         });
         return mapAssessResponse(raw, "url");
     }
 
     async sandboxUrl(url: string): Promise<SandboxResult> {
-        return requestJson<SandboxResult>("/v1/assess/url/sandbox", {
-            method: "POST",
-            body: JSON.stringify({ url }),
-        });
+        return requestJson<SandboxResult>(
+            "/v1/assess/url/sandbox",
+            withAuthentication({
+                method: "POST",
+                body: JSON.stringify({ url }),
+            }),
+        );
     }
 
     /** Đánh giá rủi ro cho văn bản/email qua REST `POST /v1/assess/text`.
      *  Khớp contract gateway: body `{ text, modality, metadata }`. */
     async browserSandboxUrl(url: string): Promise<BrowserSandboxResult> {
-        return requestJson<BrowserSandboxResult>("/v1/assess/url/browser-sandbox", {
-            method: "POST",
-            body: JSON.stringify({ url, canary_mode: "dry_run" }),
-        });
+        return requestJson<BrowserSandboxResult>(
+            "/v1/assess/url/browser-sandbox",
+            withAuthentication({
+                method: "POST",
+                body: JSON.stringify({ url, canary_mode: "dry_run" }),
+            }),
+        );
     }
 
     async assessText(
@@ -328,7 +334,7 @@ export class RealApiClient implements ApiClient {
         // Gateway chỉ nhận modality "email" | "text" | "sms" cho endpoint text.
         const modality: "email" | "text" = rawModality === "url" ? "text" : rawModality;
         const raw = await requestJson<BackendAssessResponse>("/v1/assess/text", {
-            method: "POST",
+            ...withAuthentication({ method: "POST" }),
             body: JSON.stringify({
                 text,
                 modality,

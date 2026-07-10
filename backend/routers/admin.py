@@ -1,27 +1,23 @@
-"""
-Admin API routes for task execution and model training management.
-"""
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import List, Optional, Literal
+"""Admin API routes backed by persistent admin job records."""
+
+from __future__ import annotations
+
 import asyncio
-from pathlib import Path
-import json
 import logging
+from pathlib import Path
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DbSession
+
+from backend.db import SessionLocal, get_db
+from backend.models import AdminJob, AdminJobEvent, ModelVersion
+from backend.security_utils import utcnow
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-# Global state for tracking execution status
-task_execution_status = {}
-training_status = {
-    "status": "idle",
-    "progress": 0,
-    "current_model": None,
-    "message": None,
-    "results": []
-}
 
 
 class SpecExecutionRequest(BaseModel):
@@ -31,328 +27,333 @@ class SpecExecutionRequest(BaseModel):
 
 class ModelTrainingRequest(BaseModel):
     dataPath: str
-    models: List[Literal["text", "prompt", "url"]] = ["text", "prompt", "url"]
+    models: list[Literal["text", "prompt", "url"]] = ["text", "prompt", "url"]
 
 
-class SpecInfo(BaseModel):
-    id: str
-    name: str
-    path: str
-    tasksTotal: int
-    tasksCompleted: int
-    tasksRemaining: int
+def _job_payload(job: AdminJob | None, *, spec_id: str | None = None) -> dict:
+    if job is None:
+        if spec_id is not None:
+            return {
+                "specId": spec_id,
+                "status": "idle",
+                "progress": 0,
+                "currentTask": None,
+                "message": None,
+            }
+        return {
+            "status": "idle",
+            "progress": 0,
+            "currentModel": None,
+            "message": None,
+            "results": [],
+        }
+
+    if job.job_type == "spec_execution":
+        return {
+            "jobId": job.id,
+            "specId": job.spec_id,
+            "status": "running" if job.status == "running" else job.status,
+            "currentTask": job.current_step,
+            "progress": job.progress,
+            "message": job.message or job.error,
+        }
+
+    return {
+        "jobId": job.id,
+        "status": "training" if job.status == "running" else job.status,
+        "currentModel": job.current_step,
+        "progress": job.progress,
+        "message": job.message or job.error,
+        "results": (job.result or {}).get("results", []),
+    }
 
 
-class TaskExecutionStatus(BaseModel):
-    specId: str
-    status: Literal["idle", "running", "completed", "error"]
-    currentTask: Optional[str] = None
-    progress: int = 0
-    message: Optional[str] = None
+def _update_job(job_id: str, **fields) -> None:
+    with SessionLocal() as db:
+        job = db.get(AdminJob, job_id)
+        if job is None:
+            return
+        for key, value in fields.items():
+            setattr(job, key, value)
+        job.updated_at = utcnow()
+        db.commit()
 
 
-class ModelTrainingStatus(BaseModel):
-    status: Literal["idle", "training", "completed", "error"]
-    currentModel: Optional[str] = None
-    progress: int = 0
-    message: Optional[str] = None
-    results: List[dict] = []
+def _add_job_event(job_id: str, message: str, level: str = "info", metadata: dict | None = None) -> None:
+    with SessionLocal() as db:
+        db.add(
+            AdminJobEvent(
+                job_id=job_id,
+                level=level,
+                message=message,
+                extra_metadata=metadata or {},
+            )
+        )
+        db.commit()
 
 
 @router.get("/specs")
 async def list_specs():
-    """List all specs with their task status."""
     specs_dir = Path(".kiro/specs")
-    
     if not specs_dir.exists():
         return {"specs": []}
-    
+
     specs = []
     for spec_path in specs_dir.iterdir():
         if not spec_path.is_dir():
             continue
-        
         tasks_file = spec_path / "tasks.md"
         if not tasks_file.exists():
             continue
-        
         try:
-            # Parse tasks.md to count tasks
             content = tasks_file.read_text(encoding="utf-8")
-            lines = content.split("\n")
-            
             total = 0
             completed = 0
-            
-            for line in lines:
-                # Count checkbox tasks: - [ ] or - [x]
+            for line in content.splitlines():
                 if line.strip().startswith("- ["):
                     total += 1
-                    if line.strip().startswith("- [x]") or line.strip().startswith("- [X]"):
+                    if line.strip().startswith(("- [x]", "- [X]")):
                         completed += 1
-            
-            specs.append({
-                "id": spec_path.name,
-                "name": spec_path.name.replace("-", " ").title(),
-                "path": str(spec_path),
-                "tasksTotal": total,
-                "tasksCompleted": completed,
-                "tasksRemaining": total - completed
-            })
-        except Exception as e:
-            logger.error(f"Error parsing spec {spec_path}: {e}")
-            continue
-    
+            specs.append(
+                {
+                    "id": spec_path.name,
+                    "name": spec_path.name.replace("-", " ").title(),
+                    "path": str(spec_path),
+                    "tasksTotal": total,
+                    "tasksCompleted": completed,
+                    "tasksRemaining": total - completed,
+                }
+            )
+        except Exception as exc:
+            logger.error("Error parsing spec %s: %s", spec_path, exc)
     return {"specs": specs}
 
 
 @router.post("/specs/execute")
 async def execute_spec_tasks(
     request: SpecExecutionRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    db: DbSession = Depends(get_db),
 ):
-    """Execute all remaining tasks in a spec."""
     spec_path = Path(".kiro/specs") / request.specId / "tasks.md"
-    
     if not spec_path.exists():
         raise HTTPException(status_code=404, detail="Spec not found")
-    
-    # Initialize status
-    task_execution_status[request.specId] = {
-        "specId": request.specId,
-        "status": "running",
-        "progress": 0,
-        "currentTask": "Starting execution...",
-        "message": "Initializing task runner"
-    }
-    
-    # Run tasks in background
-    background_tasks.add_task(run_spec_tasks, request.specId, str(spec_path))
-    
-    return {"message": "Execution started", "specId": request.specId}
+
+    job = AdminJob(
+        job_type="spec_execution",
+        status="running",
+        progress=0,
+        current_step="Starting execution...",
+        message="Initializing task runner",
+        spec_id=request.specId,
+        started_at=utcnow(),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    background_tasks.add_task(run_spec_tasks, job.id, request.specId, str(spec_path))
+    return {"message": "Execution started", "specId": request.specId, "jobId": job.id}
 
 
 @router.get("/specs/{spec_id}/status")
-async def get_spec_execution_status(spec_id: str):
-    """Get execution status for a specific spec."""
-    status = task_execution_status.get(spec_id, {
-        "specId": spec_id,
-        "status": "idle",
-        "progress": 0,
-        "currentTask": None,
-        "message": None
-    })
-    return status
+async def get_spec_execution_status(spec_id: str, db: DbSession = Depends(get_db)):
+    job = db.execute(
+        select(AdminJob)
+        .where(AdminJob.job_type == "spec_execution", AdminJob.spec_id == spec_id)
+        .order_by(AdminJob.created_at.desc())
+    ).scalar_one_or_none()
+    return _job_payload(job, spec_id=spec_id)
 
 
 @router.post("/models/train")
 async def train_models(
     request: ModelTrainingRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    db: DbSession = Depends(get_db),
 ):
-    """Train AI models using specified data."""
     data_path = Path(request.dataPath)
-    
     if not data_path.exists():
         raise HTTPException(status_code=404, detail="Data file not found")
-    
-    # Initialize training status
-    global training_status
-    training_status = {
-        "status": "training",
-        "progress": 0,
-        "current_model": None,
-        "message": "Initializing training pipeline",
-        "results": []
-    }
-    
-    # Run training in background
-    background_tasks.add_task(run_model_training, str(data_path), request.models)
-    
-    return {"message": "Training started", "dataPath": str(data_path)}
+
+    job = AdminJob(
+        job_type="model_training",
+        status="running",
+        progress=0,
+        current_step="Initializing training pipeline",
+        message="Initializing training pipeline",
+        data_path=str(data_path),
+        models=list(request.models),
+        result={"results": []},
+        started_at=utcnow(),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    background_tasks.add_task(run_model_training, job.id, str(data_path), list(request.models))
+    return {"message": "Training started", "dataPath": str(data_path), "jobId": job.id}
 
 
 @router.get("/models/train/status")
-async def get_training_status():
-    """Get current model training status."""
-    return training_status
+async def get_training_status(db: DbSession = Depends(get_db)):
+    job = db.execute(
+        select(AdminJob)
+        .where(AdminJob.job_type == "model_training")
+        .order_by(AdminJob.created_at.desc())
+    ).scalar_one_or_none()
+    return _job_payload(job)
 
 
-async def run_spec_tasks(spec_id: str, tasks_file_path: str):
-    """
-    Background task to execute spec tasks.
-    This is a simplified implementation - in production you would use
-    proper task orchestration tools.
-    """
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str, db: DbSession = Depends(get_db)):
+    job = db.get(AdminJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return _job_payload(job)
+
+
+async def run_spec_tasks(job_id: str, spec_id: str, tasks_file_path: str) -> None:
     try:
-        # Simulate task execution
         tasks_file = Path(tasks_file_path)
-        content = tasks_file.read_text(encoding="utf-8")
-        lines = content.split("\n")
-        
-        # Find uncompleted tasks
-        uncompleted_tasks = []
-        for i, line in enumerate(lines):
-            if line.strip().startswith("- [ ]"):
-                # Extract task description
-                task_desc = line.strip()[5:].strip()
-                uncompleted_tasks.append((i, task_desc))
-        
-        if not uncompleted_tasks:
-            task_execution_status[spec_id] = {
-                "specId": spec_id,
-                "status": "completed",
-                "progress": 100,
-                "currentTask": "All tasks completed",
-                "message": "No remaining tasks to execute"
-            }
+        lines = tasks_file.read_text(encoding="utf-8").splitlines()
+        uncompleted = [
+            (index, line.strip()[5:].strip())
+            for index, line in enumerate(lines)
+            if line.strip().startswith("- [ ]")
+        ]
+
+        if not uncompleted:
+            _update_job(
+                job_id,
+                status="completed",
+                progress=100,
+                current_step="All tasks completed",
+                message="No remaining tasks to execute",
+                completed_at=utcnow(),
+            )
             return
-        
-        total_tasks = len(uncompleted_tasks)
-        
-        for idx, (line_num, task_desc) in enumerate(uncompleted_tasks, 1):
-            # Update status
-            progress = int((idx / total_tasks) * 100)
-            task_execution_status[spec_id] = {
-                "specId": spec_id,
-                "status": "running",
-                "progress": progress,
-                "currentTask": task_desc[:100],  # Limit length
-                "message": f"Executing task {idx} of {total_tasks}"
-            }
-            
-            # Simulate task execution (in real implementation, this would
-            # invoke actual task execution logic)
+
+        total = len(uncompleted)
+        for idx, (line_num, task_desc) in enumerate(uncompleted, 1):
+            progress = int((idx / total) * 100)
+            _update_job(
+                job_id,
+                status="running",
+                progress=progress,
+                current_step=task_desc[:100],
+                message=f"Executing task {idx} of {total}",
+            )
+            _add_job_event(job_id, f"Executing task {idx} of {total}", metadata={"task": task_desc})
             await asyncio.sleep(2)
-            
-            # Mark task as complete
             lines[line_num] = lines[line_num].replace("- [ ]", "- [x]", 1)
-            tasks_file.write_text("\n".join(lines), encoding="utf-8")
-        
-        # Mark as completed
-        task_execution_status[spec_id] = {
-            "specId": spec_id,
-            "status": "completed",
-            "progress": 100,
-            "currentTask": "All tasks completed",
-            "message": f"Successfully completed {total_tasks} tasks"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error executing tasks for {spec_id}: {e}")
-        task_execution_status[spec_id] = {
-            "specId": spec_id,
-            "status": "error",
-            "progress": 0,
-            "currentTask": None,
-            "message": str(e)
-        }
+            tasks_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        _update_job(
+            job_id,
+            status="completed",
+            progress=100,
+            current_step="All tasks completed",
+            message=f"Successfully completed {total} tasks",
+            completed_at=utcnow(),
+        )
+    except Exception as exc:
+        logger.error("Error executing tasks for %s: %s", spec_id, exc)
+        _update_job(job_id, status="failed", progress=0, error=str(exc), completed_at=utcnow())
+        _add_job_event(job_id, str(exc), level="error")
 
 
-async def run_model_training(data_path: str, models: List[str]):
-    """
-    Background task to train AI models.
-    """
-    global training_status
-    
+async def run_model_training(job_id: str, data_path: str, models: list[str]) -> None:
     try:
         import subprocess
         import sys
-        
+
         training_scripts = {
             "text": "ai/training/train_real_text_classifier.py",
             "prompt": "ai/training/train_real_prompt_classifier.py",
-            "url": "ai/training/train_url_lgbm.py"
+            "url": "ai/training/train_url_lgbm.py",
         }
-        
-        results = []
-        total_models = len(models)
-        
+
+        results: list[dict] = []
+        total = len(models)
         for idx, model_name in enumerate(models, 1):
             script_path = training_scripts.get(model_name)
             if not script_path or not Path(script_path).exists():
-                logger.warning(f"Training script for {model_name} not found")
+                results.append({"model": model_name, "status": "missing_script"})
                 continue
-            
-            # Update status
-            progress = int(((idx - 1) / total_models) * 100)
-            training_status = {
-                "status": "training",
-                "progress": progress,
-                "current_model": f"Training {model_name} model...",
-                "message": f"Running training script: {script_path}",
-                "results": results
-            }
-            
+
+            _update_job(
+                job_id,
+                status="running",
+                progress=int(((idx - 1) / total) * 100),
+                current_step=f"Training {model_name} model...",
+                message=f"Running training script: {script_path}",
+                result={"results": results},
+            )
+            _add_job_event(job_id, f"Training {model_name}", metadata={"script": script_path})
+
             try:
-                # Run training script
                 result = subprocess.run(
                     [sys.executable, script_path, "--data", data_path],
                     capture_output=True,
                     text=True,
-                    timeout=1800  # 30 minute timeout
+                    timeout=1800,
                 )
-                
                 if result.returncode == 0:
-                    # Parse results from stdout (expecting JSON or similar)
-                    try:
-                        # Try to extract metrics from output
-                        output_lines = result.stdout.split("\n")
-                        metrics = {}
-                        for line in output_lines:
-                            if "f1" in line.lower() or "accuracy" in line.lower():
-                                # Simple parsing - in real implementation, use proper JSON output
-                                parts = line.split(":")
-                                if len(parts) == 2:
-                                    key = parts[0].strip().lower().replace(" ", "_")
-                                    value = float(parts[1].strip().rstrip("%")) / 100
-                                    metrics[key] = value
-                        
-                        results.append({
-                            "model": model_name,
-                            **metrics
-                        })
-                    except Exception as e:
-                        logger.warning(f"Could not parse metrics for {model_name}: {e}")
-                        results.append({"model": model_name, "status": "completed"})
+                    metrics: dict = {}
+                    for line in result.stdout.splitlines():
+                        if "f1" in line.lower() or "accuracy" in line.lower():
+                            parts = line.split(":")
+                            if len(parts) == 2:
+                                key = parts[0].strip().lower().replace(" ", "_")
+                                try:
+                                    metrics[key] = float(parts[1].strip().rstrip("%")) / 100
+                                except ValueError:
+                                    pass
+                    results.append({"model": model_name, "status": "completed", **metrics})
+                    with SessionLocal() as db:
+                        db.add(
+                            ModelVersion(
+                                model_name=model_name,
+                                modality="url" if model_name == "url" else "text",
+                                status="candidate",
+                                artifact_uri=f"server/models/{model_name}",
+                                training_dataset_uri=data_path,
+                                metrics=metrics,
+                                f1=metrics.get("f1_score") or metrics.get("f1"),
+                                accuracy=metrics.get("accuracy"),
+                                trained_by_job_id=job_id,
+                            )
+                        )
+                        db.commit()
                 else:
-                    logger.error(f"Training failed for {model_name}: {result.stderr}")
-                    results.append({"model": model_name, "status": "error", "error": result.stderr[:200]})
-                
+                    results.append(
+                        {"model": model_name, "status": "error", "error": result.stderr[:500]}
+                    )
             except subprocess.TimeoutExpired:
-                logger.error(f"Training timeout for {model_name}")
                 results.append({"model": model_name, "status": "timeout"})
-            except Exception as e:
-                logger.error(f"Training error for {model_name}: {e}")
-                results.append({"model": model_name, "status": "error", "error": str(e)})
-            
-            # Update progress
-            progress = int((idx / total_models) * 100)
-            training_status = {
-                "status": "training",
-                "progress": progress,
-                "current_model": f"{model_name} model completed",
-                "message": f"Completed {idx} of {total_models} models",
-                "results": results
-            }
-            
+            except Exception as exc:
+                results.append({"model": model_name, "status": "error", "error": str(exc)})
+
+            _update_job(
+                job_id,
+                progress=int((idx / total) * 100),
+                current_step=f"{model_name} model completed",
+                message=f"Completed {idx} of {total} models",
+                result={"results": results},
+            )
             await asyncio.sleep(1)
-        
-        # Mark as completed
-        training_status = {
-            "status": "completed",
-            "progress": 100,
-            "current_model": "All models trained",
-            "message": f"Successfully trained {len(results)} models",
-            "results": results
-        }
-        
-    except Exception as e:
-        logger.error(f"Model training error: {e}")
-        training_status = {
-            "status": "error",
-            "progress": 0,
-            "current_model": None,
-            "message": str(e),
-            "results": []
-        }
+
+        _update_job(
+            job_id,
+            status="completed",
+            progress=100,
+            current_step="All models trained",
+            message=f"Successfully trained {len(results)} models",
+            result={"results": results},
+            completed_at=utcnow(),
+        )
+    except Exception as exc:
+        logger.error("Model training error: %s", exc)
+        _update_job(job_id, status="failed", progress=0, error=str(exc), completed_at=utcnow())
+        _add_job_event(job_id, str(exc), level="error")

@@ -38,6 +38,14 @@
 
 ## 🚀 Quick Start
 
+### Portable note
+
+The default build is local-first and does not require a PostgreSQL server.
+Backend state is stored in the embedded SQLite file `.aisec-data/armor.db`,
+which is created automatically on first start. See
+[`docs/portable-local-deployment.md`](docs/portable-local-deployment.md) for the
+copy-to-another-machine workflow.
+
 ### Yêu cầu hệ thống
 - Python 3.10+ 
 - Node.js 18+

@@ -4,6 +4,7 @@
 - [Live URL sandbox](./url-sandbox.md)
 - [Advanced browser sandbox](./browser-sandbox.md)
 - [Account authentication](./authentication.md)
+- [Portable local deployment](./portable-local-deployment.md)
 - [PostgreSQL production design](./postgresql-production-design.md)
 
 Thư mục này gom tài liệu dự án theo hướng dễ đọc hơn các file `.md` rải ở thư mục gốc.

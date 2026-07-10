@@ -1,5 +1,9 @@
 # PostgreSQL Production Design
 
+> Current default: the portable/local product uses embedded SQLite and does not
+> require a PostgreSQL server. This document remains the optional path for SaaS
+> or larger multi-user production deployments.
+
 Tai lieu nay thiet ke tang du lieu production cho AI Security Armor khi chuyen tu
 demo/local sang he thong nhieu nguoi dung. Muc tieu la thay cac store tam thoi
 trong memory va `localStorage` bang PostgreSQL, trong khi van giu core AI

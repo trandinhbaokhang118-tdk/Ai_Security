@@ -8,9 +8,12 @@ services:
       - "8000:8000"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=sqlite:////app/.aisec-data/armor.db
+      - DATABASE_AUTO_CREATE=true
     volumes:
       - ./server/models:/app/server/models:ro
       - ./data:/app/data
+      - armor-data:/app/.aisec-data
     networks:
       - armor-net
     restart: unless-stopped
@@ -56,4 +59,5 @@ networks:
     driver: bridge
 
 volumes:
+  armor-data:
   ollama-data:
