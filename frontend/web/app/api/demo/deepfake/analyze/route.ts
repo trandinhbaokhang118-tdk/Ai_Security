@@ -1,0 +1,23 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND_URL =
+    process.env.BACKEND_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "http://localhost:8001";
+
+export async function POST(request: NextRequest) {
+    try {
+        const response = await fetch(`${BACKEND_URL}/v1/demo/deepfake/analyze`, {
+            method: "POST",
+            body: await request.formData(),
+        });
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
+    } catch (error) {
+        console.error("Error analyzing deepfake image:", error);
+        return NextResponse.json(
+            { detail: "Không thể phân tích ảnh" },
+            { status: 500 },
+        );
+    }
+}

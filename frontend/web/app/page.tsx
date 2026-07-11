@@ -37,7 +37,7 @@ import { isAppError, looksLikeUrl, quickScan } from "@/lib/quick-scan";
 import type { AppError, AssessResult, BrowserSandboxResult, SandboxResult } from "@/lib/types";
 
 /** Đường dẫn cài Chrome Extension (placeholder — sẽ trỏ Web Store khi phát hành). */
-const EXTENSION_URL = "#cai-extension";
+const DEMO_URL = "/demo";
 
 function buildBrowserSandboxError(url: string, error: unknown): BrowserSandboxResult {
     return {
@@ -154,10 +154,10 @@ interface TrustMetric {
 
 /** Số liệu tin cậy (giá trị placeholder cho bản demo). */
 const TRUST_METRICS: TrustMetric[] = [
-    { label: "F1-score", value: "0.94" },
-    { label: "Latency p95", value: "180ms" },
-    { label: "Số URL đã quét", value: "1.2M+" },
-    { label: "Uptime", value: "99.9%" },
+    { label: "Bộ phát hiện", value: "4" },
+    { label: "Chế độ xử lý", value: "Local" },
+    { label: "Cơ sở dữ liệu", value: "Không bắt buộc" },
+    { label: "Demo bảo mật", value: "Trước / Sau" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -288,10 +288,10 @@ export default function HomePage() {
                                         Nâng cấp gói
                                     </Link>
                                     <a
-                                        href={EXTENSION_URL}
+                                        href={DEMO_URL}
                                         className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-100"
                                     >
-                                        ▶ Cài Extension
+                                        Mở demo bảo mật
                                     </a>
                                 </div>
                             )}
@@ -337,10 +337,10 @@ export default function HomePage() {
                             {/* CTA "Cài Extension" (Requirement 6.5) */}
                             <div>
                                 <a
-                                    href={EXTENSION_URL}
+                                    href={DEMO_URL}
                                     className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
                                 >
-                                    ▶ Cài Extension
+                                    Xem demo trước / sau
                                 </a>
                             </div>
                         </div>

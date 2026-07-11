@@ -23,6 +23,11 @@ htmlcov/
 *.pth
 *.safetensors
 ai/models/*.onnx
+# Ship the three lightweight inference models with the portable application.
+!ai/models/mdeberta_text.onnx
+!ai/models/protectai_prompt.onnx
+!ai/models/url_lgbm.onnx
+!ai/models/deepfake_image_q4.onnx
 ai/models/_ckpt/
 ai/models/_checkpoints/
 ai/models/*_tokenizer/

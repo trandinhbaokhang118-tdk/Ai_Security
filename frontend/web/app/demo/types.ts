@@ -55,6 +55,21 @@ export interface URLAnalysisResponse {
   sandbox_report?: SandboxReport;
 }
 
+export interface DeepfakeImageResponse {
+  filename: string;
+  width: number;
+  height: number;
+  image_format: string;
+  real_probability: number;
+  fake_probability: number;
+  verdict: "likely_real" | "likely_fake" | "uncertain";
+  decision: "ALLOW" | "WARN" | "REVIEW";
+  analysis_time_ms: number;
+  model_version: string;
+  evidence: string[];
+  limitations: string[];
+}
+
 export interface ChatMessageRequest {
   message: string;
   protection_enabled: boolean;
@@ -67,6 +82,41 @@ export interface ChatMessageResponse {
   injection_detected: boolean;
   risk_score: number;
   analysis_time_ms: number;
+  model_version: string;
+  evidence: Evidence[];
+  downstream_reached: boolean;
+  canary_exposed: boolean;
+  simulated_action?: string;
+  trace: string[];
+}
+
+export type TrainingScenario = "label_flip" | "instruction_injection";
+
+export interface TrainingStageResult {
+  accepted: number;
+  quarantined: number;
+  poisoned_records_in_training: number;
+  outcome: string;
+}
+
+export interface TrainingRecordResult {
+  record_id: string;
+  label: number;
+  preview: string;
+  text_risk: number;
+  prompt_risk: number;
+  decision: "accept" | "quarantine";
+  reason: string;
+}
+
+export interface TrainingDataDemoResponse {
+  scenario: TrainingScenario;
+  title: string;
+  total_records: number;
+  before: TrainingStageResult;
+  after: TrainingStageResult;
+  records: TrainingRecordResult[];
+  detector_version: string;
 }
 
 export interface SimulateAttackRequest {

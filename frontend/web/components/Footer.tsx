@@ -22,11 +22,11 @@ export interface FooterProps {
 
 /** Bộ liên kết chân trang mặc định (tiếng Việt/nhãn ngắn khớp nav). */
 const DEFAULT_LINKS: FooterLink[] = [
-    { label: "Home", href: "/" },
-    { label: "Pricing", href: "/pricing" },
-    { label: "About", href: "/about" },
-    { label: "Privacy", href: "/privacy" },
-    { label: "Contact", href: "/contact" },
+    { label: "Trang chủ", href: "/" },
+    { label: "Demo", href: "/demo" },
+    { label: "Chat AI", href: "/chat" },
+    { label: "Giới thiệu", href: "/about" },
+    { label: "Gói dịch vụ", href: "/pricing" },
 ];
 
 export default function Footer({ links = DEFAULT_LINKS }: FooterProps) {
@@ -34,7 +34,7 @@ export default function Footer({ links = DEFAULT_LINKS }: FooterProps) {
 
     return (
         <footer className="mt-auto w-full border-t border-neutral-200 bg-neutral-50">
-            <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
+            <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 px-4 py-8 sm:px-6 lg:flex-row lg:px-8">
                 {/* Logo nhỏ */}
                 <Link
                     href="/"

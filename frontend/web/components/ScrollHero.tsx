@@ -553,21 +553,21 @@ function QuickScanBox({
     );
 }
 
-/** Cụm CTA: Cài Chrome Extension + Xem Demo 90 giây. */
+/** Cụm CTA dẫn vào hai luồng demo chính của sản phẩm. */
 function HeroCtas() {
     return (
         <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-3">
             <a
-                href="#cai-extension"
+                href="/demo"
                 className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-200"
             >
-                ▶ Cài Chrome Extension
+                Mở demo trực tiếp
             </a>
             <a
-                href="#demo-90-giay"
+                href="/about"
                 className="rounded-full border border-white/40 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
-                Xem Demo 90 giây
+                Tìm hiểu giải pháp
             </a>
         </div>
     );

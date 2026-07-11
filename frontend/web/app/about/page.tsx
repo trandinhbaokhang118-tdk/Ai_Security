@@ -191,10 +191,10 @@ export default function AboutPage() {
                 </ul>
                 <div className="mt-10 text-center">
                     <a
-                        href="/docs"
+                        href="/demo"
                         className="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-700"
                     >
-                        Đọc tài liệu kỹ thuật
+                        Mở demo kỹ thuật
                     </a>
                 </div>
             </section>

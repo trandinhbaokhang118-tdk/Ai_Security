@@ -16,10 +16,11 @@
 - **File Analysis** - Quét file đính kèm (đang phát triển)
 
 ### 🧠 AI Models
-- **URL Detection**: LightGBM (78% F1) - ~500KB ONNX
-- **Text Phishing**: mDeBERTa-v3-base (93% F1) - ~700KB ONNX
-- **Prompt Injection**: ProtectAI DeBERTa (96% F1) - ~700KB ONNX
-- **Total size**: ~2MB (cực kỳ nhẹ!)
+- **URL Detection**: LightGBM (84.3% test F1) - ~1.1MB ONNX
+- **Text Phishing**: TF-IDF Logistic Regression (92.0% validation F1) - ~260KB ONNX
+- **Prompt Injection**: Character TF-IDF Logistic Regression (99.2% validation F1) - ~168KB ONNX
+- **AI-generated Image Screening**: Quantized ViT - ~56.8MB ONNX
+- **Total packaged model size**: ~59MB
 
 ### 🎨 3 Giao diện
 1. **Web App** (Next.js 14) - Dashboard chính
@@ -33,6 +34,13 @@
 - ✅ **Admin Panel** - Quản lý và retrain models
 - ✅ **WebSocket** - Cập nhật real-time
 - ✅ **Multi-language** - Hỗ trợ tiếng Việt
+
+### Demo cho ban giám khảo
+
+- Mở `/demo` để chạy so sánh A/B cho hai đề tài: **Deepfake & Phishing Detection** và **AI Security & Robustness**.
+- Luồng demo dùng detector thật cho phishing, prompt injection và training-data poisoning; canary/tool call chỉ chạy trong sandbox.
+- Deepfake dùng model ViT ONNX cục bộ để sàng lọc ảnh tĩnh/ảnh AI-generated. Chưa hỗ trợ video, audio và không xem xác suất model là bằng chứng pháp y tuyệt đối.
+- Kịch bản thuyết trình chi tiết: [`docs/judge-demo.md`](docs/judge-demo.md).
 
 ---
 

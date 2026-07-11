@@ -1,307 +1,361 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Search, Shield, AlertTriangle, Loader2 } from 'lucide-react';
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import {
+    AlertTriangle,
+    ArrowRight,
+    CheckCircle2,
+    Eye,
+    Fingerprint,
+    ImageIcon,
+    Link2,
+    Loader2,
+    Play,
+    ScanSearch,
+    ShieldCheck,
+    Upload,
+    XCircle,
+} from "lucide-react";
 
-interface URLAnalysisTabProps {
-    sessionId: string;
-    protectionEnabled: boolean;
-}
+import type { DeepfakeImageResponse, URLAnalysisResponse } from "../types";
 
-interface AnalysisResult {
-    url: string;
-    risk_score: number;
-    threat_level: 'safe' | 'low' | 'medium' | 'high' | 'critical';
-    analysis_time_ms: number;
-    traditional_detection: {
-        detected: boolean;
-        methods: string[];
-    };
-    ai_detection: {
-        detected: boolean;
-        confidence: number;
-        model_version: string;
-    };
-    evidence: Array<{
-        source: string;
-        message: string;
-        severity: string;
-        feature: string;
-        contribution: number;
-    }>;
-    sandbox_report?: {
-        behaviors: any[];
-        redirects: any[];
-        scripts_executed: string[];
-        network_calls: string[];
-        error?: string;
-    };
-}
+const URL_EXAMPLES = [
+    {
+        label: "Giả mạo Facebook",
+        value: "https://facebook.com.security-login-check.xyz/verify",
+    },
+    {
+        label: "Giả mạo PayPal",
+        value: "http://paypa1-secure-verify.tk/login",
+    },
+    { label: "URL an toàn", value: "https://github.com" },
+];
 
-export default function URLAnalysisTab({ sessionId, protectionEnabled }: URLAnalysisTabProps) {
-    const [url, setUrl] = useState('');
-    const [deepAnalysis, setDeepAnalysis] = useState(false);
+export default function URLAnalysisTab() {
+    const [url, setUrl] = useState(URL_EXAMPLES[0].value);
+    const [result, setResult] = useState<URLAnalysisResponse | null>(null);
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<AnalysisResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [deepfakeResult, setDeepfakeResult] = useState<DeepfakeImageResponse | null>(null);
+    const [deepfakeLoading, setDeepfakeLoading] = useState(false);
 
-    const analyzeURL = async () => {
-        if (!url.trim()) {
-            setError('Please enter a URL');
+    useEffect(() => {
+        if (!imageFile) {
+            setImagePreview(null);
             return;
         }
+        const preview = URL.createObjectURL(imageFile);
+        setImagePreview(preview);
+        return () => URL.revokeObjectURL(preview);
+    }, [imageFile]);
 
+    async function analyze() {
+        if (!url.trim()) return;
         setLoading(true);
         setError(null);
-        setResult(null);
-
         try {
-            const response = await fetch('/api/demo/url/analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    url: url.trim(),
-                    deep_analysis: deepAnalysis,
-                    session_id: sessionId,
-                    protection_enabled: protectionEnabled
-                })
+            const response = await fetch("/api/demo/url/analyze", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, deep_analysis: false }),
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Analysis failed');
-            }
-
             const data = await response.json();
-            setResult(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Analysis failed');
+            if (!response.ok) throw new Error(data.detail || "Analysis failed");
+            setResult(data as URLAnalysisResponse);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Không thể phân tích URL");
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const getThreatLevelColor = (level: string) => {
-        switch (level) {
-            case 'safe': return 'text-green-400 bg-green-900/30 border-green-500';
-            case 'low': return 'text-blue-400 bg-blue-900/30 border-blue-500';
-            case 'medium': return 'text-yellow-400 bg-yellow-900/30 border-yellow-500';
-            case 'high': return 'text-orange-400 bg-orange-900/30 border-orange-500';
-            case 'critical': return 'text-red-400 bg-red-900/30 border-red-500';
-            default: return 'text-slate-400 bg-slate-800 border-slate-700';
+    async function analyzeDeepfake(file: File) {
+        setImageFile(file);
+        setDeepfakeLoading(true);
+        setDeepfakeResult(null);
+        setError(null);
+        try {
+            const form = new FormData();
+            form.append("image", file);
+            const response = await fetch("/api/demo/deepfake/analyze", {
+                method: "POST",
+                body: form,
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || "Deepfake analysis failed");
+            setDeepfakeResult(data as DeepfakeImageResponse);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Không thể phân tích ảnh");
+        } finally {
+            setDeepfakeLoading(false);
         }
-    };
+    }
 
-    const exampleURLs = [
-        { label: 'Typosquatting', url: 'http://paypa1.com/verify' },
-        { label: 'Deceptive Subdomain', url: 'https://secure-account.apple.com-verify.xyz/login' },
-        { label: 'Homoglyph Attack', url: 'https://www.аmazon.com/ap/signin' },
-        { label: 'Legitimate', url: 'https://www.paypal.com/signin' }
-    ];
+    async function loadBuiltInAiImage() {
+        const response = await fetch("/hero-demo-fallback.png");
+        const blob = await response.blob();
+        await analyzeDeepfake(new File([blob], "ai-generated-demo.png", { type: "image/png" }));
+    }
+
+    const armorBlocked = result ? result.risk_score >= 0.5 : false;
 
     return (
         <div className="space-y-6">
-            {/* Input Section */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <h3 className="text-xl font-bold mb-4">Analyze URL for Phishing</h3>
-
-                <div className="space-y-4">
+            <section>
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <label className="block text-sm font-medium mb-2">URL to Analyze</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && analyzeURL()}
-                                placeholder="https://example.com"
-                                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 text-white"
-                                disabled={loading}
-                            />
-                            <button
-                                onClick={analyzeURL}
-                                disabled={loading || !url.trim()}
-                                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-colors font-semibold"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Analyzing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Search className="w-5 h-5" />
-                                        Analyze
-                                    </>
-                                )}
-                            </button>
+                        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-cyan-800">
+                            <Fingerprint className="h-4 w-4" /> Demo 1 · Deepfake & Phishing Detection
                         </div>
+                        <h2 className="text-2xl font-bold text-zinc-950">Phát hiện trang giả mạo và lừa đảo</h2>
+                        <p className="mt-1 max-w-3xl text-sm text-zinc-600">
+                            So sánh blacklist truyền thống với bộ phân tích URL học máy + tín hiệu giả mạo thương hiệu của Armor.
+                        </p>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="deepAnalysis"
-                            checked={deepAnalysis}
-                            onChange={(e) => setDeepAnalysis(e.target.checked)}
-                            disabled={loading}
-                            className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
-                        />
-                        <label htmlFor="deepAnalysis" className="text-sm text-slate-300">
-                            Enable Deep Analysis (Sandbox - slower but more thorough)
-                        </label>
-                    </div>
-
-                    {/* Example URLs */}
-                    <div>
-                        <p className="text-sm text-slate-400 mb-2">Try example:</p>
-                        <div className="flex flex-wrap gap-2">
-                            {exampleURLs.map((example) => (
-                                <button
-                                    key={example.url}
-                                    onClick={() => setUrl(example.url)}
-                                    disabled={loading}
-                                    className="px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded border border-slate-600 transition-colors"
-                                >
-                                    {example.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-900">
+                        Live inference · Không gọi cloud API
+                    </span>
                 </div>
-            </div>
 
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-900/30 border border-red-500 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
-                        <AlertTriangle className="w-5 h-5 text-red-400" />
-                        <p className="text-red-400">{error}</p>
-                    </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <Capability icon={<Link2 className="h-4 w-4" />} label="Phishing URL" status="LIVE" tone="green" />
+                    <Capability icon={<ScanSearch className="h-4 w-4" />} label="Phishing email/text" status="LIVE" tone="green" />
+                    <Capability icon={<Eye className="h-4 w-4" />} label="Deepfake ảnh tĩnh" status="LIVE" tone="green" />
                 </div>
-            )}
+                <p className="mt-2 text-xs text-zinc-500">
+                    Deepfake hiện sàng lọc ảnh tĩnh/ảnh AI-generated bằng model ViT cục bộ. Video, audio và kết luận pháp y tuyệt đối không nằm trong phạm vi.
+                </p>
+            </section>
 
-            {/* Results Display */}
+            <section className="rounded-lg border border-zinc-200 bg-white p-4">
+                <div className="mb-3 flex flex-wrap gap-2">
+                    {URL_EXAMPLES.map((example) => (
+                        <button
+                            key={example.label}
+                            type="button"
+                            onClick={() => {
+                                setUrl(example.value);
+                                setResult(null);
+                            }}
+                            className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-zinc-400"
+                        >
+                            {example.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
+                        onKeyDown={(event) => event.key === "Enter" && void analyze()}
+                        className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-3 font-mono text-sm text-zinc-900 outline-none focus:border-cyan-700 focus:ring-2 focus:ring-cyan-100"
+                        aria-label="URL cần phân tích"
+                    />
+                    <button
+                        type="button"
+                        onClick={analyze}
+                        disabled={loading || !url.trim()}
+                        className="flex items-center justify-center gap-2 rounded-md bg-cyan-800 px-4 py-3 text-sm font-semibold text-white hover:bg-cyan-900 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        Chạy so sánh A/B
+                    </button>
+                </div>
+            </section>
+
             {result && (
-                <div className="space-y-4">
-                    {/* Threat Level Card */}
-                    <div className={`p-6 rounded-xl border-2 ${getThreatLevelColor(result.threat_level)}`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-2xl font-bold uppercase">{result.threat_level}</h3>
-                                <p className="text-sm opacity-75">Threat Level</p>
+                <section className="space-y-4">
+                    <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">
+                        <article className="rounded-lg border border-red-300 bg-red-50 p-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-red-700">Trước · Blacklist tĩnh</p>
+                                    <h3 className="mt-1 text-lg font-bold text-zinc-950">Không tìm thấy chữ ký</h3>
+                                </div>
+                                <XCircle className="h-7 w-7 text-red-700" />
                             </div>
-                            <div className="text-right">
-                                <p className="text-3xl font-bold">{(result.risk_score * 100).toFixed(1)}%</p>
-                                <p className="text-sm opacity-75">Risk Score</p>
+                            <div className="mt-5 space-y-3 text-sm">
+                                <StatusRow label="URL có trong blacklist" value="KHÔNG" />
+                                <StatusRow label="Phân tích tên miền" value="KHÔNG" />
+                                <StatusRow label="Quyết định" value="ALLOW" danger />
                             </div>
+                            <div className="mt-5 rounded-md bg-red-100 px-3 py-3 text-sm font-semibold text-red-900">
+                                URL mới chưa có chữ ký đi thẳng tới người dùng.
+                            </div>
+                        </article>
+
+                        <div className="hidden items-center text-zinc-400 lg:flex">
+                            <ArrowRight className="h-6 w-6" />
                         </div>
-                        <p className="text-sm opacity-75">Analysis time: {result.analysis_time_ms}ms</p>
+
+                        <article className={`rounded-lg border p-5 ${armorBlocked ? "border-emerald-300 bg-emerald-50" : "border-cyan-300 bg-cyan-50"}`}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className={`text-xs font-bold uppercase tracking-wide ${armorBlocked ? "text-emerald-700" : "text-cyan-800"}`}>Sau · Armor ON</p>
+                                    <h3 className="mt-1 text-lg font-bold text-zinc-950">
+                                        {armorBlocked ? "Phát hiện và chặn" : "Xác nhận rủi ro thấp"}
+                                    </h3>
+                                </div>
+                                {armorBlocked ? <ShieldCheck className="h-7 w-7 text-emerald-700" /> : <CheckCircle2 className="h-7 w-7 text-cyan-800" />}
+                            </div>
+                            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                                <Metric label="Risk score" value={`${(result.risk_score * 100).toFixed(1)}%`} />
+                                <Metric label="Threat level" value={result.threat_level.toUpperCase()} />
+                                <Metric label="Decision" value={armorBlocked ? "BLOCK" : "ALLOW"} />
+                                <Metric label="Latency" value={`${result.analysis_time_ms} ms`} />
+                            </div>
+                            <div className={`mt-5 rounded-md px-3 py-3 text-sm font-semibold ${armorBlocked ? "bg-emerald-100 text-emerald-900" : "bg-cyan-100 text-cyan-950"}`}>
+                                {armorBlocked ? "Mối đe dọa bị dừng trước khi người dùng mở trang." : "URL an toàn không bị chặn nhầm."}
+                            </div>
+                            <p className="mt-3 text-[11px] text-zinc-500">{result.ai_detection.model_version}</p>
+                        </article>
                     </div>
 
-                    {/* Detection Comparison */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Traditional Detection */}
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                            <h4 className="font-bold mb-3 flex items-center gap-2">
-                                <Shield className="w-5 h-5" />
-                                Traditional Detection
-                            </h4>
-                            <div className="space-y-2">
-                                <p className={`text-lg font-semibold ${result.traditional_detection.detected ? 'text-red-400' : 'text-green-400'}`}>
-                                    {result.traditional_detection.detected ? '⚠️ Detected' : '✓ Not Detected'}
-                                </p>
-                                {result.traditional_detection.methods.length > 0 ? (
-                                    <ul className="text-sm text-slate-400 space-y-1">
-                                        {result.traditional_detection.methods.map((method, idx) => (
-                                            <li key={idx}>• {method}</li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-sm text-slate-400">No traditional methods detected this threat</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* AI Detection */}
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                            <h4 className="font-bold mb-3 flex items-center gap-2">
-                                <Shield className="w-5 h-5" />
-                                AI Detection
-                            </h4>
-                            <div className="space-y-2">
-                                <p className={`text-lg font-semibold ${result.ai_detection.detected ? 'text-red-400' : 'text-green-400'}`}>
-                                    {result.ai_detection.detected ? '⚠️ Detected' : '✓ Not Detected'}
-                                </p>
-                                <p className="text-sm text-slate-400">
-                                    Confidence: <span className="font-semibold">{(result.ai_detection.confidence * 100).toFixed(1)}%</span>
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    Model: {result.ai_detection.model_version}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Evidence */}
                     {result.evidence.length > 0 && (
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                            <h4 className="font-bold mb-4">Evidence ({result.evidence.length})</h4>
-                            <div className="space-y-2">
-                                {result.evidence.slice(0, 5).map((item, idx) => (
-                                    <div key={idx} className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
-                                        <span className={`
-                                            px-2 py-1 text-xs rounded font-semibold
-                                            ${item.severity === 'critical' ? 'bg-red-900 text-red-300' : ''}
-                                            ${item.severity === 'high' ? 'bg-orange-900 text-orange-300' : ''}
-                                            ${item.severity === 'medium' ? 'bg-yellow-900 text-yellow-300' : ''}
-                                            ${item.severity === 'low' ? 'bg-blue-900 text-blue-300' : ''}
-                                            ${item.severity === 'info' ? 'bg-slate-700 text-slate-300' : ''}
-                                        `}>
-                                            {item.severity}
-                                        </span>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-medium">{item.message}</p>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                Source: {item.source} | Feature: {item.feature}
-                                            </p>
+                        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                            <div className="border-b border-zinc-200 px-4 py-3">
+                                <h3 className="font-semibold text-zinc-900">Bằng chứng phát hiện</h3>
+                            </div>
+                            <div className="grid gap-px bg-zinc-200 sm:grid-cols-2 lg:grid-cols-3">
+                                {result.evidence.slice(0, 6).map((item) => (
+                                    <div key={`${item.source}-${item.feature}-${item.message}`} className="bg-white p-4">
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                            <span className="font-mono text-xs font-semibold text-cyan-800">{item.feature || item.source}</span>
+                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.severity === "high" || item.severity === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
+                                                {item.severity}
+                                            </span>
                                         </div>
+                                        <p className="text-sm text-zinc-700">{item.message}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
+                </section>
+            )}
 
-                    {/* Sandbox Report */}
-                    {result.sandbox_report && !result.sandbox_report.error && (
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                            <h4 className="font-bold mb-4">Sandbox Analysis</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {result.sandbox_report.behaviors.length > 0 && (
-                                    <div>
-                                        <h5 className="text-sm font-semibold mb-2">Suspicious Behaviors</h5>
-                                        <ul className="text-sm text-slate-400 space-y-1">
-                                            {result.sandbox_report.behaviors.map((behavior, idx) => (
-                                                <li key={idx}>⚠️ {behavior.type} ({behavior.count})</li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-                                {result.sandbox_report.scripts_executed.length > 0 && (
-                                    <div>
-                                        <h5 className="text-sm font-semibold mb-2">Scripts Loaded ({result.sandbox_report.scripts_executed.length})</h5>
-                                        <ul className="text-xs text-slate-400 space-y-1 max-h-32 overflow-y-auto">
-                                            {result.sandbox_report.scripts_executed.slice(0, 5).map((script, idx) => (
-                                                <li key={idx} className="truncate">• {script}</li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
+            <section className="border-t border-zinc-200 pt-6">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-fuchsia-800">
+                            <ImageIcon className="h-4 w-4" /> Demo 1B · Ảnh AI-generated / deepfake tĩnh
                         </div>
-                    )}
+                        <h2 className="text-2xl font-bold text-zinc-950">Pixel forensics trước và sau Armor</h2>
+                        <p className="mt-1 max-w-3xl text-sm text-zinc-600">
+                            Kiểm tra file thông thường chỉ biết định dạng. Armor đọc đặc trưng pixel bằng ViT ONNX và trả xác suất REAL/FAKE.
+                        </p>
+                    </div>
+                    <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-900">
+                        57 MB · CPU · Local
+                    </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md bg-fuchsia-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fuchsia-900">
+                        <Upload className="h-4 w-4" /> Chọn ảnh để phân tích
+                        <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="sr-only"
+                            onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (file) void analyzeDeepfake(file);
+                            }}
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => void loadBuiltInAiImage()}
+                        disabled={deepfakeLoading}
+                        className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                    >
+                        {deepfakeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        Dùng ảnh AI demo có sẵn
+                    </button>
+                    <span className="self-center text-xs text-zinc-500">PNG, JPG hoặc WebP · tối đa 15 MB</span>
+                </div>
+
+                {deepfakeResult && imagePreview && (
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr_auto_1fr]">
+                        <div className="relative aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
+                            <Image src={imagePreview} alt="Ảnh đang được phân tích" fill unoptimized className="object-cover" />
+                        </div>
+                        <article className="rounded-lg border border-red-300 bg-red-50 p-5">
+                            <p className="text-xs font-bold uppercase tracking-wide text-red-700">Trước · Kiểm tra file</p>
+                            <h3 className="mt-1 text-lg font-bold text-zinc-950">Không xác minh được nội dung</h3>
+                            <div className="mt-5 space-y-3 text-sm">
+                                <StatusRow label="Định dạng hợp lệ" value="CÓ" />
+                                <StatusRow label="Phân tích pixel" value="KHÔNG" />
+                                <StatusRow label="Quyết định" value="ALLOW" danger />
+                            </div>
+                            <div className="mt-5 rounded-md bg-red-100 px-3 py-3 text-sm font-semibold text-red-900">
+                                Ảnh giả vẫn vượt qua vì file hoàn toàn hợp lệ.
+                            </div>
+                        </article>
+
+                        <div className="hidden items-center text-zinc-400 lg:flex"><ArrowRight className="h-6 w-6" /></div>
+
+                        <article className={`rounded-lg border p-5 ${deepfakeResult.verdict === "likely_fake" ? "border-amber-300 bg-amber-50" : "border-emerald-300 bg-emerald-50"}`}>
+                            <p className={`text-xs font-bold uppercase tracking-wide ${deepfakeResult.verdict === "likely_fake" ? "text-amber-800" : "text-emerald-700"}`}>Sau · Armor ON</p>
+                            <h3 className="mt-1 text-lg font-bold text-zinc-950">
+                                {deepfakeResult.verdict === "likely_fake" ? "Nghi ngờ ảnh AI/deepfake" : deepfakeResult.verdict === "likely_real" ? "Có khả năng là ảnh thật" : "Cần kiểm tra thêm"}
+                            </h3>
+                            <div className="mt-5 grid grid-cols-2 gap-3">
+                                <Metric label="FAKE" value={`${(deepfakeResult.fake_probability * 100).toFixed(1)}%`} />
+                                <Metric label="REAL" value={`${(deepfakeResult.real_probability * 100).toFixed(1)}%`} />
+                                <Metric label="Decision" value={deepfakeResult.decision} />
+                                <Metric label="Latency" value={`${deepfakeResult.analysis_time_ms} ms`} />
+                            </div>
+                            <div className="mt-4 space-y-1 border-t border-black/10 pt-3">
+                                {deepfakeResult.evidence.map((item) => <p key={item} className="text-xs text-zinc-700">· {item}</p>)}
+                            </div>
+                            <p className="mt-3 text-[11px] text-zinc-500">{deepfakeResult.model_version}</p>
+                        </article>
+                    </div>
+                )}
+
+                {deepfakeResult && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        <strong>Giới hạn:</strong> {deepfakeResult.limitations.join(" ")}
+                    </div>
+                )}
+            </section>
+
+            {error && (
+                <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <AlertTriangle className="h-4 w-4" /> {error}
                 </div>
             )}
+        </div>
+    );
+}
+
+function Capability({ icon, label, status, tone }: { icon: React.ReactNode; label: string; status: string; tone: "green" | "amber" }) {
+    return (
+        <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800">{icon}{label}</div>
+            <span className={`text-[10px] font-bold ${tone === "green" ? "text-emerald-700" : "text-amber-700"}`}>{status}</span>
+        </div>
+    );
+}
+
+function StatusRow({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
+    return (
+        <div className="flex items-center justify-between border-b border-red-200 pb-2">
+            <span className="text-zinc-600">{label}</span>
+            <span className={danger ? "font-bold text-red-800" : "font-semibold text-zinc-900"}>{value}</span>
+        </div>
+    );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-xs text-zinc-500">{label}</p>
+            <p className="mt-0.5 font-bold text-zinc-950">{value}</p>
         </div>
     );
 }

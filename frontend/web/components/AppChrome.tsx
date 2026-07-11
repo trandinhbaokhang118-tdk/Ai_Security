@@ -38,6 +38,11 @@ export default function AppChrome({ children }: AppChromeProps): JSX.Element {
     const [authOpen, setAuthOpen] = useState(false);
     const [authMode, setAuthMode] = useState<AuthMode>("login");
 
+    // The operations console uses a separate shell from the public website.
+    if (pathname === "/armor-console") {
+        return <>{children}</>;
+    }
+
     // Mở modal ở chế độ tương ứng khi bấm "Đăng nhập"/"Dùng thử ▶".
     function handleOpenAuth(mode: AuthMode): void {
         setAuthMode(mode);

@@ -9,11 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.config import settings
 from backend.models import DailyQuotaUsage
 from backend.routers.auth import ActorContext, build_plan_info
 from backend.security_utils import hash_metadata, utcnow
-
-FREE_ANONYMOUS_DAILY_LIMIT = 50
 
 
 def _identity(actor: ActorContext, request: Request) -> tuple[str | None, str | None, str | None]:
@@ -29,7 +28,7 @@ def _identity(actor: ActorContext, request: Request) -> tuple[str | None, str | 
 
 def _daily_limit(db: Session, actor: ActorContext) -> int | None:
     if actor.user is None:
-        return FREE_ANONYMOUS_DAILY_LIMIT
+        return settings.anonymous_daily_scan_limit
     plan = build_plan_info(db, actor.user.id)
     return None if plan.dailyScanLimit >= 999_999 else plan.dailyScanLimit
 

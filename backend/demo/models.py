@@ -20,9 +20,7 @@ class Evidence(BaseModel):
     feature: str | None = Field(
         default=None, description="Technical feature name that triggered detection"
     )
-    contribution: float | None = Field(
-        default=None, description="SHAP-like contribution score"
-    )
+    contribution: float | None = Field(default=None, description="SHAP-like contribution score")
 
 
 # ------------------------------------------------------------- Sandbox Models
@@ -45,9 +43,7 @@ class SandboxReport(BaseModel):
     dom_modifications: list[dict] = Field(
         default_factory=list, description="DOM changes detected during execution"
     )
-    cookies_set: list[dict] = Field(
-        default_factory=list, description="Cookies set by the page"
-    )
+    cookies_set: list[dict] = Field(default_factory=list, description="Cookies set by the page")
     storage_access: list[dict] = Field(
         default_factory=list, description="LocalStorage/SessionStorage access"
     )
@@ -111,6 +107,24 @@ class URLAnalysisResponse(BaseModel):
     )
 
 
+# ---------------------------------------------------- Deepfake Image Endpoint
+class DeepfakeImageResponse(BaseModel):
+    """Local still-image authenticity screening result."""
+
+    filename: str
+    width: int
+    height: int
+    image_format: str
+    real_probability: float = Field(..., ge=0.0, le=1.0)
+    fake_probability: float = Field(..., ge=0.0, le=1.0)
+    verdict: Literal["likely_real", "likely_fake", "uncertain"]
+    decision: Literal["ALLOW", "WARN", "REVIEW"]
+    analysis_time_ms: int
+    model_version: str
+    evidence: list[str]
+    limitations: list[str]
+
+
 # ---------------------------------------------------- Chat Protection Endpoints
 class ChatMessageRequest(BaseModel):
     """Request to process a chatbot message with optional protection."""
@@ -129,15 +143,63 @@ class ChatMessageResponse(BaseModel):
 
     response: str = Field(..., description="Chatbot response to the user message")
     blocked: bool = Field(..., description="Whether the message was blocked due to injection")
-    injection_detected: bool = Field(
-        ..., description="Whether prompt injection was detected"
+    injection_detected: bool = Field(..., description="Whether prompt injection was detected")
+    risk_score: float = Field(..., ge=0.0, le=1.0, description="Prompt injection risk score")
+    analysis_time_ms: int = Field(..., description="Time taken to analyze prompt (milliseconds)")
+    model_version: str = Field(default="", description="Detector used for the decision")
+    evidence: list[Evidence] = Field(
+        default_factory=list, description="Signals that caused the prompt decision"
     )
-    risk_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Prompt injection risk score"
+    downstream_reached: bool = Field(
+        default=False, description="Whether the request reached the demo chatbot"
     )
-    analysis_time_ms: int = Field(
-        ..., description="Time taken to analyze prompt (milliseconds)"
+    canary_exposed: bool = Field(
+        default=False, description="Whether the sandbox canary was exposed"
     )
+    simulated_action: str | None = Field(
+        default=None, description="Sandbox-only action attempted by the vulnerable bot"
+    )
+    trace: list[str] = Field(default_factory=list, description="Human-readable processing trace")
+
+
+# ----------------------------------------------- Training Data Guard Demo
+class TrainingDataDemoRequest(BaseModel):
+    """Run a deterministic training-data poisoning comparison."""
+
+    scenario: Literal["label_flip", "instruction_injection"] = "label_flip"
+
+
+class TrainingRecordResult(BaseModel):
+    """Inspection result for one training record."""
+
+    record_id: str
+    label: int
+    preview: str
+    text_risk: float
+    prompt_risk: float
+    decision: Literal["accept", "quarantine"]
+    reason: str
+
+
+class TrainingStageResult(BaseModel):
+    """Before/after state of the training ingestion pipeline."""
+
+    accepted: int
+    quarantined: int
+    poisoned_records_in_training: int
+    outcome: str
+
+
+class TrainingDataDemoResponse(BaseModel):
+    """A/B result for an unsafe and protected training-data pipeline."""
+
+    scenario: Literal["label_flip", "instruction_injection"]
+    title: str
+    total_records: int
+    before: TrainingStageResult
+    after: TrainingStageResult
+    records: list[TrainingRecordResult]
+    detector_version: str
 
 
 # -------------------------------------------------- Attack Simulation Endpoints
@@ -150,9 +212,7 @@ class SimulateAttackRequest(BaseModel):
     attack_type: Literal["url", "prompt", "mixed"] = Field(
         ..., description="Type of attacks to simulate"
     )
-    count: int = Field(
-        default=10, ge=1, le=100, description="Number of attacks to simulate"
-    )
+    count: int = Field(default=10, ge=1, le=100, description="Number of attacks to simulate")
     protection_enabled: bool = Field(
         ..., description="Whether protection should be enabled during simulation"
     )

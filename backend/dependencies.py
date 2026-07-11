@@ -6,6 +6,7 @@ from functools import lru_cache
 
 from ai.inference.engine import InferenceEngine
 from backend.config import settings
+from backend.services.deepfake_service import DeepfakeImageService
 from backend.services.explanation_service import ExplanationService
 from backend.services.inference_service import InferenceService
 from security.policy_engine import PolicyEngine
@@ -25,3 +26,8 @@ def get_inference_service() -> InferenceService:
 @lru_cache
 def get_explanation_service() -> ExplanationService:
     return ExplanationService(model=settings.ollama_model, base_url=settings.ollama_base_url)
+
+
+@lru_cache
+def get_deepfake_service() -> DeepfakeImageService:
+    return DeepfakeImageService(model_path=settings.deepfake_model_path)

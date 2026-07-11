@@ -8,7 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    model_dir: str = "server/models"
+    # Lightweight ONNX artifacts are committed with the portable source package.
+    model_dir: str = "ai/models"
+    deepfake_model_path: str = "ai/models/deepfake_image_q4.onnx"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
 
@@ -19,6 +21,7 @@ class Settings(BaseSettings):
 
     api_key: str = "dev-key-change-in-production"
     rate_limit_per_min: int = 60
+    anonymous_daily_scan_limit: int = 50
 
     risk_threshold_block: float = 0.85
     risk_threshold_warn: float = 0.50
