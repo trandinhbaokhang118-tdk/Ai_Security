@@ -1,0 +1,14 @@
+@@ -80,11 +80,11 @@
+             created_at=created_at,
+             registrar=registrar,
+             reputation_status="listed" if listed else "not_listed" if listed is False else "unavailable",
+-            reputation_source="URLhaus",
++            reputation_source="urlscan.io",
+             listed=listed,
+             score=min(1.0, score),
+             reasons=tuple(reasons),
+-            available=bool(rdap or reputation),
++            available=bool(rdap or certificates or reputation),
+         )
+         with self._lock:
+             self._cache[key] = (time.monotonic(), result)

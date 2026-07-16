@@ -1,0 +1,10 @@
+@@ -133,6 +133,9 @@
+         "credential_lure_cluster": 29,
+         "url_obfuscation": 18,
+         "at_symbol": 18,
++        "embedded_credentials": 18,
++        "nonstandard_port": 18,
++        "excessive_query_parameters": 18,
+     }
+     checked = {5, 6, 7, 8, 16, 17, 18, 29}
+     obs.clean(*checked)

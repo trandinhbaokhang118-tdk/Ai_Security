@@ -1,0 +1,19 @@
+@@ -149,8 +149,16 @@
+             self.scripts.append(values["src"])
+         elif tag == "iframe" and values.get("src"):
+             self.iframes.append(values["src"])
+-        elif tag == "meta" and values.get("http-equiv", "").lower() == "refresh":
+-            self.meta_refresh.append(values.get("content", ""))
++        elif tag == "meta":
++            if values.get("http-equiv", "").lower() == "refresh":
++                self.meta_refresh.append(values.get("content", ""))
++            key = values.get("name") or values.get("property")
++            if key:
++                self.meta[key.lower()] = values.get("content", "")[:500]
++        elif tag == "a" and values.get("href"):
++            self.links.append((values["href"], values.get("aria-label", "")))
++        elif tag == "link" and "icon" in values.get("rel", "").lower():
++            self.favicons.append(values.get("href", ""))
+ 
+     def handle_endtag(self, tag: str) -> None:
+         if tag.lower() == "title":

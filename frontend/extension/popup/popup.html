@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>AI Security Armor</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="../icons/icon48.png" alt="" /><div><strong>AI Security Armor</strong><span id="gateway-status" class="connection">Đang kiểm tra kết nối…</span></div></div>
+    <label class="switch" title="Bật hoặc tắt bảo vệ"><input id="protection-enabled" type="checkbox" aria-describedby="privacy-note" /><span aria-hidden="true"></span></label>
+  </header>
+
+  <main>
+    <p id="privacy-note" class="privacy">Khi bật, URL và email đang mở được gửi tới Gateway đã cấu hình để phân tích.</p>
+
+    <section id="disabled" class="empty" hidden>
+      <div class="empty-icon">🛡️</div><h2>Bảo vệ đang tắt</h2><p>Bật công tắc phía trên để kiểm tra trang và cảnh báo liên kết nguy hiểm.</p>
+    </section>
+
+    <section id="loading" class="loading-card" aria-live="polite">
+      <div class="loading-head"><div class="spinner"></div><div><h2 id="loading-title">Đang chuẩn bị kiểm tra</h2><p id="loading-detail">Đang đọc thông tin trang hiện tại…</p></div><strong id="loading-elapsed">0.0s</strong></div>
+      <div class="progress-track"><span id="loading-progress"></span></div>
+      <ol class="scan-steps">
+        <li id="step-page"><span>1</span><div><strong>Đọc trang hiện tại</strong><small>Xác định URL và trạng thái tab</small></div></li>
+        <li id="step-gateway"><span>2</span><div><strong>Kết nối Gateway</strong><small>Gửi yêu cầu qua kênh bảo vệ</small></div></li>
+        <li id="step-analysis"><span>3</span><div><strong>Phân tích rủi ro</strong><small>Chờ mô hình đánh giá URL</small></div></li>
+        <li id="step-result"><span>4</span><div><strong>Hoàn thiện kết quả</strong><small>Chuẩn hóa lý do và bằng chứng</small></div></li>
+      </ol>
+      <p id="loading-warning" class="loading-warning" hidden>Yêu cầu đang chậm hơn bình thường nhưng chưa bị treo.</p>
+    </section>
+
+    <section id="unsupported" class="empty" hidden>
+      <div class="empty-icon">ℹ️</div><h2>Không thể quét trang này</h2><p>Trình duyệt không cho phép tiện ích truy cập trang hệ thống hoặc tab đặc biệt.</p>
+    </section>
+
+    <section id="offline" class="empty error" hidden>
+      <div class="empty-icon">⚠️</div><h2 id="error-title">Không thể kết nối Gateway</h2><p id="error-message">Kiểm tra cấu hình hoặc thử lại sau.</p><button id="retry-error" class="button primary">Thử lại</button>
+    </section>
+
+    <section id="result" hidden aria-live="polite">
+      <div id="risk-card" class="risk-card">
+        <div class="score-ring"><strong id="score">0</strong><span>/100</span></div>
+        <div class="risk-copy"><span id="risk-label" class="risk-label">ĐANG KIỂM TRA</span><h1 id="risk-summary">Kết quả trang hiện tại</h1><p id="scan-time"></p></div>
+      </div>
+      <div class="site-row"><div><span>Website</span><strong id="hostname"></strong><small id="url"></small></div><button id="copy-url" class="icon-button" title="Sao chép URL" aria-label="Sao chép URL">⧉</button></div>
+      <div id="recommendation" class="recommendation"></div>
+      <section id="reasons-section" class="details"><h2>Lý do chính</h2><ul id="reasons"></ul></section>
+      <section id="evidence-section" class="details"><h2>Bằng chứng</h2><ul id="evidence"></ul></section>
+      <div class="actions"><button id="leave-page" class="button danger" hidden>Rời khỏi trang</button><button id="rescan" class="button primary">Quét lại</button></div>
+    </section>
+  </main>
+
+  <footer><button id="open-settings" class="link-button">⚙ Cài đặt</button><a href="http://localhost:3000" target="_blank" rel="noopener">Mở Web App ↗</a></footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

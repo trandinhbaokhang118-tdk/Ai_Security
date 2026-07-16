@@ -1,0 +1,9 @@
+@@ -97,6 +97,8 @@
+             score=min(1.0, score),
+             reasons=tuple(reasons),
+             available=bool(whoisxml or whois or rdap or certificates or reputation),
++            expiry_days=expiry_days,
++            certificate_age_days=certificate_age_days,
+         )
+         with self._lock:
+             self._cache[key] = (time.monotonic(), result)

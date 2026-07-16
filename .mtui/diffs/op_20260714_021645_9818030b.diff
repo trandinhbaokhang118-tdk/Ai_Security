@@ -1,0 +1,36 @@
+@@ -399,6 +399,35 @@
+     unauthorized()
+ 
+ 
++@router.get("/auth/extension/verify", response_model=ExtensionActivation)
++def verify_extension_key(
++    credentials: BearerCredentials,
++    request: Request,
++    db: DbSession = Depends(get_db),
++) -> ExtensionActivation:
++    actor = resolve_actor(credentials, db, request)
++    if actor.user is None or actor.api_key is None:
++        unauthorized()
++    plan = build_plan_info(db, actor.user.id)
++    today = date.today()
++    usage = db.execute(
++        select(DailyQuotaUsage).where(
++            DailyQuotaUsage.api_key_id == actor.api_key.id,
++            DailyQuotaUsage.usage_day == today,
++        )
++    ).scalar_one_or_none()
++    used = usage.scan_count if usage is not None else 0
++    limit = plan.dailyScanLimit
++    remaining = max(0, limit - used) if limit < 999_999 else 999_999
++    return ExtensionActivation(
++        valid=True,
++        user=UserProfile(id=actor.user.id, email=actor.user.email, displayName=actor.user.display_name),
++        plan=plan,
++        quota=QuotaInfo(usageDay=today.isoformat(), usedToday=used, dailyScanLimit=limit, remaining=remaining),
++        keyPrefix=actor.api_key.key_prefix,
++    )
++
++
+ @router.post("/auth/login", response_model=Session)
+ def login(
+     cred: Credentials,

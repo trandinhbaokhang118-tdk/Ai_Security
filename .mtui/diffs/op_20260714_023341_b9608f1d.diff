@@ -1,0 +1,6 @@
+@@ -26,4 +26,4 @@
+   openGraph: { type: "website", locale: "vi_VN", alternateLocale: "en_US", siteName: "Prewise", title: "Prewise — See the risk before it is too late", description: "Explainable scam analysis for websites, emails and messages." },
+   robots: { index: true, follow: true },
+ };
+-export default function RootLayout({children}:{children:React.ReactNode}) {return <html lang="vi" suppressHydrationWarning><body suppressHydrationWarning><AuthProvider><AppChrome>{children}</AppChrome></AuthProvider></body></html>}
++export default function RootLayout({children}:{children:React.ReactNode}) {return <html lang="vi" suppressHydrationWarning><body suppressHydrationWarning><LanguageProvider><AuthProvider><AppChrome>{children}</AppChrome></AuthProvider></LanguageProvider></body></html>}

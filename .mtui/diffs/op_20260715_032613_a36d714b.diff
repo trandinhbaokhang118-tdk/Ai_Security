@@ -1,0 +1,8 @@
+@@ -24,6 +24,7 @@
+     add_offline_url_findings,
+     build_criteria_evidence,
+ )
++from security.risk_core.external_adapters import collect_external
+ from shared.schemas import (
+     AgentContext,
+     AgentRiskResponse,

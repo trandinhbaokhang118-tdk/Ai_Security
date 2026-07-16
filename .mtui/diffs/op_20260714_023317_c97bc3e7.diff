@@ -1,0 +1,8 @@
+@@ -4,6 +4,7 @@
+ import { Download, Eye, FlaskConical, History, KeyRound, ScanSearch } from "lucide-react";
+ import { usePathname } from "next/navigation";
+ import { ReactNode, useEffect, useRef, useState } from "react";
++import { useLanguage } from "@/context/LanguageContext";
+ 
+ export function LanguageSwitcher(){
+  const [language,setLanguage]=useState<"vi"|"en">("vi");

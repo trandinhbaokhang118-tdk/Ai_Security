@@ -1,0 +1,9 @@
+{
+  "source": "pirocheto/phishing-url (fallback ealvaradob/phishing-dataset[urls])",
+  "total_rows": 11429,
+  "class_counts": {
+    "0": 5715,
+    "1": 5714
+  },
+  "format": "url,label (1=phishing,0=benign)"
+}

@@ -1,0 +1,15 @@
+@@ -20,8 +20,14 @@
+     database_url: str = "sqlite:///./.aisec-data/armor.db"
+     database_auto_create: bool = True
+     database_echo: bool = False
++    database_pool_size: int = 10
++    database_max_overflow: int = 20
++    database_pool_timeout: int = 30
++    database_pool_recycle: int = 1800
++    database_require_tls: bool = True
+     seed_demo_user: bool = True
+     api_key_pepper: str = "dev-api-key-pepper-change-in-production"
++    api_key_last_used_write_interval_seconds: int = 300
+ 
+     api_key: str = "dev-key-change-in-production"
+     rate_limit_per_min: int = 60

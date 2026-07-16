@@ -1,0 +1,13 @@
+@@ -516,9 +516,12 @@
+ 
+   useEffect(() => {
+     let scheduled = false;
++    let applyingTranslation = false;
+     const apply = () => {
+       scheduled = false;
++      applyingTranslation = true;
+       translateDocument(language);
++      queueMicrotask(() => { applyingTranslation = false; });
+     };
+     const schedule = () => {
+       if (scheduled) return;

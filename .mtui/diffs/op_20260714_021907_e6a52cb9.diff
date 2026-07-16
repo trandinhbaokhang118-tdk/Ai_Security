@@ -1,0 +1,9 @@
+@@ -144,7 +144,7 @@
+     render(entry, currentTab);
+   } catch { showError({ type: "runtime", message: "Tiện ích gặp lỗi khi đọc trạng thái. Hãy tải lại extension." }); }
+ }
+-$("protection-enabled").addEventListener("change", async (e) => { const requested = e.target.checked; e.target.disabled = true; try { const saved = await send({ type: "SET_PROTECTION_STATE", enabled: requested }, 3000); e.target.checked = saved?.enabled === true; if (saved?.enabled) init(); else { loadingToken += 1; show("disabled"); } } catch { e.target.checked = !requested; showError({ type: "runtime", message: "Không thể lưu trạng thái bảo vệ. Hãy tải lại extension." }); } finally { e.target.disabled = false; } });
++$("protection-enabled").addEventListener("change", async (e) => { const requested = e.target.checked; e.target.disabled = true; try { const saved = await send({ type: "SET_PROTECTION_STATE", enabled: requested }, 6000); e.target.checked = saved?.enabled === true; if (saved?.error) { if (saved.error.status === 401) { $("error-title").textContent = "Cần kích hoạt API key"; $("error-message").textContent = "Mở Cài đặt, nhập API key từ Web App và xác minh trước khi bật bảo vệ."; show("offline"); } else showError(saved.error); } else if (saved?.enabled) init(); else { loadingToken += 1; show("disabled"); } } catch { e.target.checked = !requested; showError({ type: "runtime", message: "Không thể lưu trạng thái bảo vệ. Hãy tải lại extension." }); } finally { e.target.disabled = false; } });
+ $("rescan").addEventListener("click", () => scan(true));
+ $("retry-error").addEventListener("click", () => scan(true));
+ $("copy-url").addEventListener("click", async () => { try { if (currentTab?.url) { await navigator.clipboard.writeText(currentTab.url); $("copy-url").textContent = "✓"; setTimeout(() => $("copy-url").textContent = "⧉", 1200); } } catch { showError({ type: "clipboard", message: "Không thể sao chép URL vào clipboard." }); } });

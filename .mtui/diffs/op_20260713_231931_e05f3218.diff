@@ -1,0 +1,11 @@
+@@ -604,6 +604,10 @@
+         };
+     }
+ 
++    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
++        return { ok: false, execution_status: "failed", filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để chạy Windows Sandbox thật."], processes: [], files_created: [], network_attempts: [], elapsed_ms: 0 };
++    }
++
+     async assessText(
+         text: string,
+         _metadata?: AssessMetadata,

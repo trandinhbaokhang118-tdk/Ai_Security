@@ -1,0 +1,16 @@
+@@ -99,6 +99,15 @@
+         case "ASSESS_URL": return sendResponse(await handleAssessUrl(message.url, tabId, message.force));
+         case "GET_PROTECTION_STATE": { const current = await settings(); return sendResponse({ enabled: current.protectionEnabled === true, linkProtection: current.linkProtection, gmailProtection: current.gmailProtection }); }
+         case "SET_PROTECTION_STATE": {
++          if (message.enabled === true) {
++            try {
++              const activation = await verifyExtensionKey();
++              await chrome.storage.local.set({ extensionActivation: activation });
++            } catch (error) {
++              await chrome.storage.local.set({ protectionEnabled: false });
++              return sendResponse({ enabled: false, error: { ...errorInfo(error), message: error?.status === 401 ? "API key không hợp lệ hoặc đã bị thu hồi." : error?.message } });
++            }
++          }
+           await chrome.storage.local.set({ protectionEnabled: message.enabled === true });
+           const current = await settings(); const tabs = await chrome.tabs.query({});
+           await Promise.all(tabs.filter((tab) => tab.id != null).map((tab) => chrome.tabs.sendMessage(tab.id, { type: "PROTECTION_STATE_CHANGED", enabled: current.protectionEnabled, linkProtection: current.linkProtection }).catch(() => null)));

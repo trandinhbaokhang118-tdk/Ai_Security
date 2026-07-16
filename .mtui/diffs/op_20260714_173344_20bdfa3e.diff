@@ -1,0 +1,10 @@
+@@ -18,7 +18,8 @@
+  async function refresh(){try{const value=await cloudRequest<CloudStatus>("/status");setCloud(value);if(value.session)setSelected(value.session.tier)}catch(e){setError(e instanceof Error?e.message:String(e))}}
+  useEffect(()=>{if(view==="sandbox")void refresh()},[view]);
+  useEffect(()=>{if(!cloud?.session||!["provisioning"].includes(cloud.session.status))return;const timer=setInterval(()=>void refresh(),3000);return()=>clearInterval(timer)},[cloud?.session?.status]);
+- async function startSession(){setBusy(true);setError("");try{await cloudRequest("/sessions",{method:"POST",body:JSON.stringify({tier:selected})});await refresh()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
++ async function startSession(){setBusy(true);setError("");try{const created=await cloudRequest<CloudSession>("/sessions",{method:"POST",body:JSON.stringify({tier:selected})});await refresh();if(created.tier==="free")setFreeBrowser(await cloudRequest<FreeBrowser>(`/sessions/${created.id}/browser`))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
++ async function freeAction(path:string,body:object){if(!session)return;setBusy(true);try{setFreeBrowser(await cloudRequest<FreeBrowser>(`/sessions/${session.id}/browser/${path}`,{method:"POST",body:JSON.stringify(body)}))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+  async function stopSession(){if(!cloud?.session)return;setBusy(true);try{await cloudRequest(`/sessions/${cloud.session.id}`,{method:"DELETE"});await refresh()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+  async function scanUrl(){setBusy(true);setError("");try{setWeb(await getApiClient().browserSandboxUrl(url))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+  async function scanExe(file?:File){if(!file)return;setBusy(true);setError("");try{setExe(await getApiClient().sandboxExecutable(file))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}

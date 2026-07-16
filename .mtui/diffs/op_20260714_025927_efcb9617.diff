@@ -1,0 +1,8 @@
+@@ -54,6 +54,7 @@
+ 
+ def _canon(value: str) -> str:
+     value = html.unescape(unquote(unicodedata.normalize("NFKC", value).translate(_ZERO_WIDTH)))
++    value = _collapse_separated_words(value)
+     return re.sub(r"\s+", " ", value).strip().lower()
+ 
+ 

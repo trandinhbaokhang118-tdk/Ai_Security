@@ -1,0 +1,11 @@
+@@ -50,7 +50,9 @@
+     decoded = unquote(signals.parts.normalized_url).lower()
+     query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
+     evidence: list[Evidence] = []
+-    lexical = 0.02
++    # A clean URL has no risk evidence.  Keep the score at zero so every displayed
++    # L1/L2 point can be traced to a criterion rather than a hidden baseline.
++    lexical = 0.0
+     intent = 0.0
+     evasion = 0.0
+ 

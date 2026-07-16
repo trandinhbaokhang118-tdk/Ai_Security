@@ -1,0 +1,8 @@
+@@ -11,6 +11,7 @@
+ type CriterionDetail = { criterion?: string; value?: string; triggered?: boolean; contribution?: number; reason?: string };
+ type SandboxReport = { behaviors?: unknown[]; redirects?: unknown[]; scripts_executed?: string[]; network_calls?: string[]; dom_modifications?: unknown[]; analysis_time_ms?: number; error?: string | null };
+ type StoredRecord = {
++  id?: string;
+   score?: number;
+   content?: string;
+   isDemo?: boolean;

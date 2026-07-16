@@ -1,0 +1,9 @@
+@@ -10,7 +10,7 @@
+ from sqlalchemy.orm import Session
+ 
+ from backend.config import settings
+-from backend.models import DailyQuotaUsage
++from backend.models import DailyQuotaUsage, uuid_str
+ from backend.routers.auth import ActorContext, build_plan_info
+ from backend.security_utils import hash_metadata, utcnow
+ 

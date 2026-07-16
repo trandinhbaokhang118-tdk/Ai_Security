@@ -1,0 +1,9 @@
+@@ -15,7 +15,7 @@
+ 
+ const NAV_LINKS = [
+     { label: "Trang chủ", href: "/" },
+-    { label: "Demo", href: "/demo" },
++    { label: "Phân tích", href: "/analyze" },
+     { label: "Chat AI", href: "/chat" },
+     { label: "Giới thiệu", href: "/about" },
+     { label: "Gói dịch vụ", href: "/pricing" },

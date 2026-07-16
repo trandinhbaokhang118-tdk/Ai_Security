@@ -1,0 +1,15 @@
+@@ -160,6 +160,14 @@
+     remaining: int
+ 
+ 
++class ExtensionActivation(BaseModel):
++    valid: bool
++    user: UserProfile
++    plan: PlanInfo
++    quota: QuotaInfo
++    keyPrefix: str
++
++
+ @dataclass(frozen=True)
+ class AuthenticatedSession:
+     token: str

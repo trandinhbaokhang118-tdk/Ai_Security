@@ -1,0 +1,22 @@
+@@ -92,12 +92,16 @@
+   $("leave-page").hidden = level.key !== "danger"; show("result"); return true;
+ }
+ async function waitForTabResult(token) {
+-  for (let count = 0; count < 30 && token === loadingToken; count += 1) {
+-    await new Promise((resolve) => setTimeout(resolve, 250));
+-    const entry = await send({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url }, 1500);
+-    if (entry && entry.status !== "loading") { render(entry, currentTab); return; }
++  try {
++    for (let count = 0; count < 30 && token === loadingToken; count += 1) {
++      await new Promise((resolve) => setTimeout(resolve, 250));
++      const entry = await send({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url }, 1500);
++      if (entry && entry.status !== "loading") { render(entry, currentTab); return; }
++    }
++    if (token === loadingToken) showError({ type: "timeout", message: "Không nhận được trạng thái hoàn tất từ tiến trình nền. Hãy thử quét lại." });
++  } catch {
++    if (token === loadingToken) showError({ type: "runtime", message: "Tiến trình nền không phản hồi. Hãy tải lại extension rồi thử lại." });
+   }
+-  if (token === loadingToken) showError({ type: "timeout", message: "Không nhận được trạng thái hoàn tất từ tiến trình nền. Hãy thử quét lại." });
+ }
+ async function scan(force = false) {
+   if (!currentTab || !validPage(currentTab.url)) return show("unsupported");

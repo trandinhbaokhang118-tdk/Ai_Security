@@ -1,0 +1,29 @@
+@@ -161,11 +161,26 @@
+                            Severity.MEDIUM, "high_entropy_domain", 0.10))
+ 
+     rule_score = _clip(lexical + intent + evasion)
+-    # ML augments the deterministic score but cannot reduce a strong rule verdict.
+-    score = _clip(max(rule_score, float(model_score or 0.0), (rule_score * 0.75) + (float(model_score or 0.0) * 0.25)))
++    model_value = _clip(float(model_score or 0.0))
++    # Không để một dự đoán ML không có bằng chứng hiển thị được tự đẩy URL lên
++    # mức cao: điều đó tạo mâu thuẫn giữa tổng điểm và checklist L1/L2. Khi model
++    # không được quy tắc nào xác nhận, giữ nó ở mức cần xem xét và đề xuất sandbox.
++    uncorroborated_model = rule_score == 0.0 and model_value > 0.0
++    if uncorroborated_model:
++        score = min(model_value, 0.35)
++    else:
++        # ML augments the deterministic score but cannot reduce a strong rule verdict.
++        score = _clip(max(rule_score, model_value, (rule_score * 0.75) + (model_value * 0.25)))
+     uncertain = 0.30 <= score < 0.70
+     high_impact = bool(matched_sensitive or signals.shortlink or signals.brand_mismatch)
+     requires_deep = uncertain or signals.shortlink or (high_impact and score >= 0.45)
++    if uncorroborated_model:
++        evidence.append(_e(
++            "Model nhận thấy mẫu cần xem xét nhưng chưa có tín hiệu URL xác thực; không nâng lên mức rủi ro cao nếu chưa chạy sandbox hoặc đối chiếu danh tiếng.",
++            Severity.INFO,
++            "model_review_recommended",
++            0.0,
++        ))
+     if requires_deep:
+         evidence.append(_e("Khuyến nghị sandbox cô lập: mở trang bằng canary tổng hợp, chặn submit và theo dõi redirect/exfiltration.",
+                            Severity.INFO, "deep_analysis_recommended", 0.0))

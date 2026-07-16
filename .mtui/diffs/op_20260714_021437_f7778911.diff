@@ -1,0 +1,8 @@
+@@ -43,6 +43,7 @@
+ app.include_router(assess.router)
+ app.include_router(chat.router)
+ app.include_router(auth.router)
++app.include_router(sandbox_cloud.router)
+ app.include_router(demo.router)
+ app.include_router(admin.router)
+ 

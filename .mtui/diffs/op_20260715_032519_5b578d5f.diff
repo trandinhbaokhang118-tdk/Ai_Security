@@ -1,0 +1,84 @@
+@@ -182,6 +182,83 @@
+         )
+ 
+ 
++def add_structured_observations(obs: ScanObservations, values: dict[str, Any]) -> None:
++    """Map validated adapter observations to every CoreGuide criterion.
++
++    Adapters supply booleans/numbers plus provenance; absent keys remain not_checked.
++    A truthy risk key activates its criterion, while an explicit false completes it cleanly.
++    This keeps detection semantics centralized without pretending unavailable data is safe.
++    """
++    specs: dict[int, tuple[str, str, float, float]] = {
++        2: ("domain_lifecycle_abnormal", "abnormal_domain_lifecycle", .75, .8),
++        3: ("owner_identity_conflict", "owner_identity_conflict", .75, .8),
++        4: ("registrar_abuse_rate_high", "registrar_abuse_rate_high", .75, .8),
++        9: ("tls_configuration_abnormal", "tls_configuration_abnormal", .75, 1.0),
++        10: ("certificate_invalid", "certificate_invalid", 1.0, 1.0),
++        12: ("domain_reputation_low", "domain_reputation_low", .75, .8),
++        13: ("ip_reputation_low", "ip_reputation_low", .75, .8),
++        14: ("server_location_conflict", "server_location_conflict", .75, .8),
++        15: ("malicious_hosting_density", "malicious_hosting_density", .75, .8),
++        19: ("brand_content_impersonation", "brand_content_impersonation", 1.0, .8),
++        20: ("contact_information_invalid", "contact_information_invalid", .75, .8),
++        21: ("business_email_mismatch", "business_email_mismatch", .75, .8),
++        22: ("business_address_invalid", "business_address_invalid", .75, .8),
++        23: ("legal_identity_conflict", "legal_identity_conflict", 1.0, 1.0),
++        24: ("privacy_policy_missing", "privacy_policy_missing", .5, 1.0),
++        25: ("terms_refund_missing", "terms_refund_missing", .5, 1.0),
++        26: ("content_identity_conflict", "content_identity_conflict", .75, .8),
++        27: ("price_outlier", "price_outlier", .75, .8),
++        28: ("coercive_content", "coercive_content", .75, 1.0),
++        29: ("sensitive_data_request", "sensitive_data_request", 1.0, 1.0),
++        30: ("untrusted_sensitive_form", "untrusted_sensitive_form", 1.0, 1.0),
++        31: ("irreversible_payment_risk", "irreversible_payment_risk", .75, .8),
++        32: ("payee_identity_mismatch", "payee_identity_mismatch", 1.0, 1.0),
++        33: ("unnecessary_browser_permission", "unnecessary_browser_permission", .75, 1.0),
++        34: ("dangerous_download", "dangerous_download", 1.0, 1.0),
++        35: ("malicious_javascript_behavior", "malicious_javascript_behavior", 1.0, 1.0),
++        36: ("risky_third_party_script", "risky_third_party_script", .75, 1.0),
++        37: ("deceptive_popup", "deceptive_popup", .75, 1.0),
++        38: ("malvertising_behavior", "malvertising_behavior", 1.0, 1.0),
++        39: ("impersonating_copied_content", "impersonating_copied_content", .75, .8),
++        40: ("forged_image_asset", "forged_image_asset", .75, .8),
++        41: ("social_identity_conflict", "social_identity_conflict", .75, .8),
++        42: ("historical_abuse", "historical_abuse", 1.0, .8),
++        43: ("abrupt_content_repurpose", "abrupt_content_repurpose", .75, .8),
++        44: ("abnormal_dns_churn", "abnormal_dns_churn", .75, .8),
++        45: ("email_security_conflict", "email_security_conflict", .75, 1.0),
++        46: ("brand_metadata_mismatch", "brand_metadata_mismatch", .75, 1.0),
++        47: ("support_channel_invalid", "support_channel_invalid", .75, .8),
++        48: ("verified_user_complaints", "verified_user_complaints", .75, .8),
++        49: ("review_manipulation", "review_manipulation", .75, .8),
++    }
++    source = str(values.get("source", "structured_adapter"))
++    incident = str(values.get("incident", "structured_scan"))
++    summaries = values.get("summaries", {})
++    for cid, (key, finding, default_severity, default_quality) in specs.items():
++        if key not in values:
++            continue
++        value = values[key]
++        obs.clean(cid)
++        if value is False or value is None or value == 0:
++            continue
++        detail = value if isinstance(value, dict) else {}
++        severity = float(detail.get("severity", default_severity))
++        quality = float(detail.get("quality", default_quality))
++        summary = str(detail.get("summary") or summaries.get(key) or finding.replace("_", " "))
++        metadata = {k: v for k, v in detail.items() if k not in {"severity", "quality", "summary"}}
++        obs.risk(cid, finding, severity, quality, summary, source=source,
++                 incident=str(detail.get("incident", incident)), metadata=metadata)
++
++
++def mark_context_applicability(obs: ScanObservations, *, commercial: bool | None = None,
++                               uses_business_email: bool | None = None) -> None:
++    if commercial is False:
++        for cid in (20, 21, 22, 23, 24, 25, 47):
++            obs.not_applicable[cid] = "Verified non-commercial website context."
++    if uses_business_email is False:
++        obs.not_applicable[45] = "No business-email use was observed."
++
++
+ def add_http_sandbox(obs: ScanObservations, report: Any) -> None:
+     covered = {8, 9, 10, 16, 20, 24, 25, 28, 29, 30, 33, 35, 36, 37, 46, 47}
+     if not report.ok:

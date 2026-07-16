@@ -1,0 +1,21 @@
+@@ -145,8 +145,16 @@
+ $("protection-enabled").addEventListener("change", async (e) => { try { await send({ type: "SET_PROTECTION_STATE", enabled: e.target.checked }, 3000); if (e.target.checked) init(); else { loadingToken += 1; show("disabled"); } } catch { showError({ type: "runtime", message: "Không thể liên lạc với tiến trình nền. Hãy tải lại extension." }); } });
+ $("rescan").addEventListener("click", () => scan(true));
+ $("retry-error").addEventListener("click", () => scan(true));
+-$("copy-url").addEventListener("click", async () => { if (currentTab?.url) { await navigator.clipboard.writeText(currentTab.url); $("copy-url").textContent = "✓"; setTimeout(() => $("copy-url").textContent = "⧉", 1200); } });
+-$("leave-page").addEventListener("click", () => { if (currentTab?.id) chrome.tabs.update(currentTab.id, { url: "chrome://newtab" }); });
+-$("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
++$("copy-url").addEventListener("click", async () => { try { if (currentTab?.url) { await navigator.clipboard.writeText(currentTab.url); $("copy-url").textContent = "✓"; setTimeout(() => $("copy-url").textContent = "⧉", 1200); } } catch { showError({ type: "clipboard", message: "Không thể sao chép URL vào clipboard." }); } });
++$("leave-page").addEventListener("click", () => { if (currentTab?.id) chrome.tabs.update(currentTab.id, { url: "chrome://newtab" }, () => void chrome.runtime.lastError); });
++$("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage(() => void chrome.runtime.lastError));
++window.addEventListener("error", (event) => {
++  showError({ type: "runtime", message: `Lỗi giao diện: ${event.message || "không xác định"}. Hãy tải lại extension.` });
++});
++window.addEventListener("unhandledrejection", (event) => {
++  event.preventDefault();
++  const message = event.reason?.message || String(event.reason || "Promise bị từ chối");
++  showError({ type: "runtime", message: `Lỗi tiến trình: ${message}` });
++});
+ startLoading();
+-init();
++init().catch((error) => showError({ type: "runtime", message: error?.message || "Không thể khởi tạo popup." }));

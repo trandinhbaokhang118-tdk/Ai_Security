@@ -1,0 +1,15 @@
+@@ -85,9 +85,11 @@
+   $(id + "-section")?.toggleAttribute("hidden", !ul.children.length);
+ }
+ function showError(error) {
+-  setConnection(false, error?.type === "timeout" ? "Gateway phản hồi quá chậm" : "Gateway không khả dụng");
+-  $("error-title").textContent = error?.type === "timeout" ? "Gateway phản hồi quá chậm" : "Không thể kiểm tra trang";
+-  $("error-message").textContent = error?.message || "Kiểm tra cấu hình Gateway và thử lại.";
++  const limited = error?.type === "http" && error?.status === 429;
++  const timedOut = error?.type === "timeout";
++  setConnection(false, limited ? "Gateway đang giới hạn lượt quét" : timedOut ? "Gateway phản hồi quá chậm" : "Gateway không khả dụng");
++  $("error-title").textContent = limited ? "Đã quét quá nhiều lần" : timedOut ? "Gateway phản hồi quá chậm" : "Không thể kiểm tra trang";
++  $("error-message").textContent = limited ? "Gateway đang tạm giới hạn yêu cầu để bảo vệ hệ thống. Bảo vệ vẫn đang bật; vui lòng chờ khoảng một phút rồi thử lại." : error?.message || "Kiểm tra cấu hình Gateway và thử lại.";
+   show("offline");
+ }
+ function render(entry, tab) {

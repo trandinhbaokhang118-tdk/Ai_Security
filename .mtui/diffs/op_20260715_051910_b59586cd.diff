@@ -1,0 +1,8 @@
+@@ -23,6 +23,7 @@
+     ScanObservations,
+     add_browser_sandbox,
+     add_domain_intelligence,
++    add_dns_intelligence,
+     add_http_sandbox,
+     add_offline_url_findings,
+     build_criteria_evidence,

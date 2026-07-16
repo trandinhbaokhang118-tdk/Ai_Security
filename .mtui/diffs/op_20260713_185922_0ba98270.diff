@@ -1,0 +1,129 @@
+@@ -1,128 +0,0 @@
+-from __future__ import annotations
+-
+-from pathlib import Path
+-
+-import numpy as np
+-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+-
+-ROOT = Path(__file__).resolve().parents[1]
+-SOURCE = ROOT / "logo-removebg.png"
+-OUTPUT = ROOT / "frontend" / "web" / "public" / "prewise-icon-512.png"
+-
+-CANVAS_SIZE = 512
+-SUPERSAMPLE = 2
+-BACKGROUND = (5, 21, 21, 255)
+-CYAN = (0, 214, 238, 255)
+-
+-
+-def _find_symbol_crop(image: Image.Image) -> Image.Image:
+-    """Extract the standalone symbol positioned left of the PREWISE wordmark."""
+-    rgba = image.convert("RGBA")
+-    alpha = np.asarray(rgba.getchannel("A"))
+-    ys, xs = np.where(alpha > 8)
+-    if xs.size == 0 or ys.size == 0:
+-        raise ValueError("Logo source does not contain visible pixels")
+-
+-    x0, x1 = int(xs.min()), int(xs.max()) + 1
+-    y0, y1 = int(ys.min()), int(ys.max()) + 1
+-    content_alpha = alpha[y0:y1, x0:x1]
+-    occupied = np.any(content_alpha > 8, axis=0)
+-
+-    gaps: list[tuple[int, int, int]] = []
+-    gap_start: int | None = None
+-    for index, value in enumerate(occupied):
+-        if not value and gap_start is None:
+-            gap_start = index
+-        elif value and gap_start is not None:
+-            gaps.append((gap_start, index, index - gap_start))
+-            gap_start = None
+-    if gap_start is not None:
+-        gaps.append((gap_start, len(occupied), len(occupied) - gap_start))
+-
+-    width = x1 - x0
+-    candidates = [
+-        gap
+-        for gap in gaps
+-        if int(width * 0.12) <= gap[0] <= int(width * 0.48) and gap[2] >= 2
+-    ]
+-    split = max(candidates, key=lambda gap: gap[2])[0] if candidates else int(width * 0.31)
+-
+-    rough = rgba.crop((x0, y0, x0 + split, y1))
+-    tight = rough.getchannel("A").getbbox()
+-    if tight is None:
+-        raise ValueError("Unable to isolate the symbol from the wordmark")
+-    return rough.crop(tight)
+-
+-
+-def _rounded_mask(size: int, radius: int) -> Image.Image:
+-    mask = Image.new("L", (size, size), 0)
+-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
+-    return mask
+-
+-
+-def build_icon() -> None:
+-    source = Image.open(SOURCE).convert("RGBA")
+-    symbol = _find_symbol_crop(source)
+-
+-    scale = SUPERSAMPLE
+-    canvas_px = CANVAS_SIZE * scale
+-    canvas = Image.new("RGBA", (canvas_px, canvas_px), (0, 0, 0, 0))
+-    rounded = _rounded_mask(canvas_px, 112 * scale)
+-
+-    background = Image.new("RGBA", (canvas_px, canvas_px), BACKGROUND)
+-
+-    glow = Image.new("RGBA", (canvas_px, canvas_px), (0, 0, 0, 0))
+-    glow_alpha = Image.new("L", (canvas_px, canvas_px), 0)
+-    glow_draw = ImageDraw.Draw(glow_alpha)
+-    glow_draw.ellipse(
+-        (88 * scale, 84 * scale, 424 * scale, 420 * scale),
+-        fill=118,
+-    )
+-    glow_alpha = glow_alpha.filter(ImageFilter.GaussianBlur(86 * scale))
+-    glow_layer = Image.new("RGBA", (canvas_px, canvas_px), (0, 194, 213, 0))
+-    glow_layer.putalpha(glow_alpha)
+-    background = Image.alpha_composite(background, glow_layer)
+-
+-    border = Image.new("RGBA", (canvas_px, canvas_px), (0, 0, 0, 0))
+-    border_draw = ImageDraw.Draw(border)
+-    border_draw.rounded_rectangle(
+-        (3 * scale, 3 * scale, canvas_px - 4 * scale, canvas_px - 4 * scale),
+-        radius=109 * scale,
+-        outline=(29, 88, 88, 150),
+-        width=2 * scale,
+-    )
+-    background = Image.alpha_composite(background, border)
+-    background.putalpha(rounded)
+-    canvas = Image.alpha_composite(canvas, background)
+-
+-    target_box = 318 * scale
+-    resize_ratio = min(target_box / symbol.width, target_box / symbol.height)
+-    symbol = symbol.resize(
+-        (
+-            max(1, round(symbol.width * resize_ratio)),
+-            max(1, round(symbol.height * resize_ratio)),
+-        ),
+-        Image.Resampling.LANCZOS,
+-    )
+-
+-    x = (canvas_px - symbol.width) // 2
+-    y = (canvas_px - symbol.height) // 2
+-
+-    halo_alpha = Image.new("L", (canvas_px, canvas_px), 0)
+-    halo_alpha.paste(symbol.getchannel("A"), (x, y))
+-    halo_alpha = halo_alpha.filter(ImageFilter.GaussianBlur(11 * scale))
+-    halo = Image.new("RGBA", (canvas_px, canvas_px), CYAN)
+-    halo.putalpha(halo_alpha.point(lambda value: int(value * 0.28)))
+-    canvas = Image.alpha_composite(canvas, halo)
+-    canvas.alpha_composite(symbol, (x, y))
+-
+-    canvas = canvas.resize((CANVAS_SIZE, CANVAS_SIZE), Image.Resampling.LANCZOS)
+-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+-    canvas.save(OUTPUT, format="PNG", optimize=True)
+-    print(f"created={OUTPUT}")
+-    print(f"size={canvas.size[0]}x{canvas.size[1]}")
+-    print(f"source_symbol={symbol.width // scale}x{symbol.height // scale}")
+-
+-
+-if __name__ == "__main__":
+-    build_icon()

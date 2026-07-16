@@ -1,0 +1,8 @@
+@@ -16,6 +16,7 @@
+     deepfake_model_path: str = "ai/models/deepfake_image_q4.onnx"
+     ollama_base_url: str = "http://localhost:11434"
+     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
++    ip2whois_api_key: str = ""
+ 
+     database_url: str = "sqlite:///./.aisec-data/armor.db"
+     database_auto_create: bool = True

@@ -1,0 +1,104 @@
+@@ -1,80 +1,28 @@
+-"use client";
+-
+-/**
+- * AppChrome — lớp "khung" client bọc mọi trang.
+- *
+- * `app/layout.tsx` là Server Component (giữ <html>/<body>/metadata) nên không
+- * thể dùng hook. AppChrome là Client Component nối AuthContext với các
+- * component trình bày (presentational) điều khiển bằng props:
+- *   - `useAuth()` → session + logout.
+- *   - `usePathname()` → currentPath cho NavigationBar (đánh dấu link active).
+- *   - Quản lý trạng thái mở/đóng + chế độ của AuthModal bằng useState.
+- *
+- * Bố cục: NavigationBar (trên) → {children} (nội dung trang) → Footer (dưới),
+- * đảm bảo Nav/Footer hiển thị trên MỌI trang (Requirements 17.1, 17.5).
+- * AuthModal được gắn ở đây để bất kỳ trang nào cũng có thể yêu cầu đăng nhập
+- * qua nút trên NavigationBar.
+- *
+- * _Requirements: 17.1, 17.5_
+- */
+-
+-import { useState, type ReactNode } from "react";
+-import { usePathname } from "next/navigation";
+-
+-import { useAuth } from "@/context/AuthContext";
+-import { EyeScrollbar } from "@/components/PrewiseUI";
+-import NavigationBar from "@/components/NavigationBar";
+-import Footer from "@/components/Footer";
+-import AuthModal, { type AuthMode } from "@/components/AuthModal";
+-
+-export interface AppChromeProps {
+-    children: ReactNode;
+-}
+-
++"use client";
++
++/**
++ * Root application chrome.
++ *
++ * Legacy global NavigationBar and Footer were retired. Each active product
++ * surface now owns its own navigation (for example PrewiseShell's work rail),
++ * so no old header/footer can reappear around a new analysis experience.
++ */
++import { type ReactNode } from "react";
++import { usePathname } from "next/navigation";
++
++import { EyeScrollbar } from "@/components/PrewiseUI";
++
++export interface AppChromeProps {
++    children: ReactNode;
++}
++
+ export default function AppChrome({ children }: AppChromeProps): JSX.Element {
+-    const { session, logout } = useAuth();
+-    const pathname = usePathname();
+-
+-    // Trạng thái modal xác thực (mở/đóng + chế độ login|register).
+-    const [authOpen, setAuthOpen] = useState(false);
+-    const [authMode, setAuthMode] = useState<AuthMode>("login");
++    const pathname = usePathname();
+ 
+-    // Các trải nghiệm Prewise mới sử dụng shell riêng, tập trung và không kế thừa UI cũ.
++    // The landing page retains only its dedicated visual scrollbar, not legacy chrome.
+     if (pathname === "/") {
+-        return <>{children}<EyeScrollbar topOffset={88} bottomOffset={20}/></>;
+-    }
+-
+-    if (pathname === "/armor-console" || pathname?.startsWith("/analyze") || pathname?.startsWith("/result") || pathname === "/history" || pathname === "/methodology" || pathname === "/settings" || pathname?.startsWith("/account") || pathname === "/downloads" || pathname === "/sandbox" || pathname === "/pricing") {
+-        return <>{children}</>;
++        return <>{children}<EyeScrollbar topOffset={88} bottomOffset={20} /></>;
+     }
+ 
+-    // Mở modal ở chế độ tương ứng khi bấm "Đăng nhập"/"Dùng thử ▶".
+-    function handleOpenAuth(mode: AuthMode): void {
+-        setAuthMode(mode);
+-        setAuthOpen(true);
+-    }
+-
+-    return (
+-        <div className="flex min-h-screen flex-col">
+-            <NavigationBar
+-                currentPath={pathname ?? "/"}
+-                session={session}
+-                onOpenAuth={handleOpenAuth}
+-                onLogout={() => {
+-                    void logout();
+-                }}
+-            />
+-
+-            <main className="flex flex-1 flex-col">{children}</main>
+-
+-            <Footer />
+-
+-            <AuthModal
+-                open={authOpen}
+-                mode={authMode}
+-                onClose={() => setAuthOpen(false)}
+-                onModeChange={setAuthMode}
+-            />
+-        </div>
+-    );
+-}
++    return <>{children}</>;
++}

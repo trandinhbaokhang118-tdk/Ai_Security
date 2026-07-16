@@ -1,0 +1,9 @@
+@@ -29,6 +29,8 @@
+     score: float
+     reasons: tuple[str, ...]
+     available: bool
++    expiry_days: int | None = None
++    certificate_age_days: int | None = None
+ 
+ 
+ class DomainIntelligenceService:

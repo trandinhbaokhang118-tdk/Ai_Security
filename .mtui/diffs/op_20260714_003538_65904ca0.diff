@@ -1,0 +1,25 @@
+@@ -308,16 +308,19 @@
+                 model_version="heuristic-url-2-error"
+             )
+ 
++        model_score: float | None = None
+         if self.url_session is not None:  # pragma: no cover - needs model
+             try:
+                 model_score = self._run_lgbm(self.url_session, features)
+-                score = max(model_score, rule_score)
+-                version = "url_lgbm.onnx+url-rules-2"
+             except Exception:
+-                score, version = rule_score, "heuristic-url-2"
++                model_score = None
++
++        core = assess_url_risk(url, model_score=model_score)
++        if model_score is not None:
++            version = "url_lgbm.onnx+multilayer-url-core-3"
+         else:
+-            score, version = rule_score, "heuristic-url-2"
+-        return PredictionResult(_clip01(score), self._url_evidence(url, features), version)
++            version = "multilayer-url-core-3"
++        return PredictionResult(_clip01(core.score), core.evidence, version)
+ 
+     def _heuristic_url(self, url: str, features: list[float]) -> float:
+         signals = analyze_url_signals(url)

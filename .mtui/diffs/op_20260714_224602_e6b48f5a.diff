@@ -1,0 +1,64 @@
+@@ -95,6 +95,63 @@
+             self._cache[key] = (time.monotonic(), result)
+         return result
+ 
++    def _query_ip2whois(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
++        if not settings.ip2whois_api_key:
++            return None, "IP2WHOIS_API_KEY chưa cấu hình"
++        try:
++            response = httpx.get(
++                "https://api.ip2whois.com/v2",
++                params={"key": settings.ip2whois_api_key, "domain": domain},
++                timeout=max(self.timeout_seconds, 8.0),
++                headers={"Accept": "application/json", "User-Agent": "Prewise/0.2"},
++            )
++            if response.status_code != 200:
++                return None, f"IP2WHOIS HTTP {response.status_code}"
++            data = response.json()
++            if data.get("error") or data.get("error_code"):
++                return None, f"IP2WHOIS {data.get('error_message') or data.get('error') or data.get('error_code')}"
++            return data, None
++        except Exception as exc:
++            return None, f"IP2WHOIS {type(exc).__name__}"
++
++    @staticmethod
++    def _parse_date(raw: object) -> datetime | None:
++        if not raw:
++            return None
++        value = str(raw).strip()
++        candidates = (value, value.replace("Z", "+00:00"))
++        for candidate in candidates:
++            try:
++                parsed = datetime.fromisoformat(candidate)
++                return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
++            except ValueError:
++                pass
++        for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%d-%b-%Y", "%Y-%m-%d %H:%M:%S"):
++            try:
++                return datetime.strptime(value, pattern).replace(tzinfo=UTC)
++            except ValueError:
++                pass
++        return None
++
++    @classmethod
++    def _ip2whois_age(cls, data: dict[str, Any] | None) -> tuple[int | None, str | None]:
++        if not data:
++            return None, None
++        raw = data.get("create_date") or data.get("created_date") or data.get("createdDate")
++        created = cls._parse_date(raw)
++        if created is None:
++            return None, str(raw) if raw else None
++        return max(0, (datetime.now(UTC) - created).days), str(raw)
++
++    @staticmethod
++    def _ip2whois_registrar(data: dict[str, Any] | None) -> str | None:
++        if not data:
++            return None
++        registrar = data.get("registrar")
++        if isinstance(registrar, dict):
++            return str(registrar.get("name") or registrar.get("organization") or "") or None
++        return str(registrar) if registrar else None
++
+     def _query_rdap(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
+         try:
+             response = httpx.get(

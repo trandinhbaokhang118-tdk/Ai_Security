@@ -1,0 +1,9 @@
+@@ -120,7 +120,7 @@
+     render(entry, currentTab);
+   } catch { showError({ type: "runtime", message: "Tiện ích gặp lỗi khi đọc trạng thái. Hãy tải lại extension." }); }
+ }
+-$("protection-enabled").addEventListener("change", async (e) => { await chrome.runtime.sendMessage({ type: "SET_PROTECTION_STATE", enabled: e.target.checked }); if (e.target.checked) init(); else { loadingToken += 1; show("disabled"); } });
++$("protection-enabled").addEventListener("change", async (e) => { try { await send({ type: "SET_PROTECTION_STATE", enabled: e.target.checked }, 3000); if (e.target.checked) init(); else { loadingToken += 1; show("disabled"); } } catch { showError({ type: "runtime", message: "Không thể liên lạc với tiến trình nền. Hãy tải lại extension." }); } });
+ $("rescan").addEventListener("click", () => scan(true));
+ $("retry-error").addEventListener("click", () => scan(true));
+ $("copy-url").addEventListener("click", async () => { if (currentTab?.url) { await navigator.clipboard.writeText(currentTab.url); $("copy-url").textContent = "✓"; setTimeout(() => $("copy-url").textContent = "⧉", 1200); } });

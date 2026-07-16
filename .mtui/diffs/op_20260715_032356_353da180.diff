@@ -1,0 +1,9 @@
+@@ -105,7 +105,7 @@
+         observations = ScanObservations(url)
+         add_offline_url_findings(observations, pred.evidence)
+         try:
+-            domain = default_config().criteria and __import__("urllib.parse").parse.urlsplit(url if "://" in url else f"https://{url}").hostname
++            domain = urlsplit(url if "://" in url else f"https://{url}").hostname
+             if domain:
+                 add_domain_intelligence(observations, domain_intelligence_service.inspect(domain, url))
+         except Exception as exc:

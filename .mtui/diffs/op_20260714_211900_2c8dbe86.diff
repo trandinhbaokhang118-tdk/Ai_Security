@@ -1,0 +1,9 @@
+@@ -160,7 +160,7 @@
+             "criterion": "Tuổi domain và danh tiếng nguồn ngoài",
+             "value": (
+                 f"Tuổi: {intelligence.age_days} ngày · Đăng ký: {intelligence.created_at or 'không rõ'} · "
+-                f"Registrar: {intelligence.registrar or 'không rõ'} · URLhaus: {intelligence.reputation_status}"
++                f"Registrar: {intelligence.registrar or 'không rõ'} · {intelligence.reputation_source}: {intelligence.reputation_status}"
+                 if intelligence.available
+                 else "Không thể truy vấn RDAP/URLhaus"
+             ),

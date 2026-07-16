@@ -1,0 +1,14 @@
+@@ -108,8 +108,11 @@
+             if response.status_code != 200:
+                 return None, f"IP2WHOIS HTTP {response.status_code}"
+             data = response.json()
+-            if data.get("error") or data.get("error_code"):
+-                return None, f"IP2WHOIS {data.get('error_message') or data.get('error') or data.get('error_code')}"
++            error = data.get("error")
++            if isinstance(error, dict):
++                return None, f"IP2WHOIS {error.get('error_message') or error.get('error_code') or 'unknown error'}"
++            if error or data.get("error_code"):
++                return None, f"IP2WHOIS {data.get('error_message') or error or data.get('error_code')}"
+             return data, None
+         except Exception as exc:
+             return None, f"IP2WHOIS {type(exc).__name__}"

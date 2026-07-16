@@ -1,0 +1,9 @@
+@@ -286,7 +286,5 @@
+ }
+ 
+ export function useLanguage(): LanguageContextValue {
+-  const context = useContext(LanguageContext);
+-  if (!context) throw new Error("useLanguage must be used inside LanguageProvider");
+-  return context;
++  return useContext(LanguageContext);
+ }

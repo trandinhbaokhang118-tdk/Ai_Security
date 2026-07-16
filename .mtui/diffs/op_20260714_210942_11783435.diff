@@ -1,0 +1,12 @@
+@@ -254,7 +254,10 @@
+         order.paid_at = utcnow()
+         order.provider_transaction_id = transaction_id or None
+         order.provider_payload = payload.model_dump()
+-        wallet_for(db, order.user_id).credits += order.credits
++        if order.plan_tier:
++            activate_subscription(db, order)
++        else:
++            wallet_for(db, order.user_id).credits += order.credits
+         db.commit()
+     return {"success": True}
+ 

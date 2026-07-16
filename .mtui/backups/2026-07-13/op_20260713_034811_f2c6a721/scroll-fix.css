@@ -1,0 +1,2 @@
+/* Loại bỏ spacer scrollytelling chưa có animation để không tạo khoảng đen chết. */
+@media(min-width:801px){.mail-act{height:auto;min-height:900px}.mail-sticky{position:relative;top:auto;height:auto;min-height:900px}.url-scene{height:auto;min-height:900px}.url-sticky{position:relative;top:auto;height:auto;min-height:900px}.ledger{min-height:0;padding-bottom:180px}.paper-wrap{height:auto}.paper{position:relative;top:auto}.decision{min-height:900px}}

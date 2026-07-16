@@ -1,0 +1,8 @@
+@@ -1,5 +1,7 @@
+ from datetime import timedelta
+ 
++from fastapi.security import HTTPAuthorizationCredentials
++
+ from backend.config import Settings, settings
+ from backend.db import SessionLocal
+ from backend.models import ApiKey

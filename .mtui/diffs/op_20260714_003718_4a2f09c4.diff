@@ -1,0 +1,9 @@
+@@ -61,7 +61,7 @@
+             const response = await fetch("/api/demo/url/analyze", {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+-                body: JSON.stringify({ url, deep_analysis: false }),
++                body: JSON.stringify({ url, deep_analysis: advancedAnalysis, advanced_analysis: advancedAnalysis }),
+             });
+             const data = await response.json();
+             if (!response.ok) throw new Error(data.detail || "Analysis failed");

@@ -1,0 +1,20 @@
+@@ -21,12 +21,16 @@
+             and settings.aws_sandbox_security_group_id
+         )
+ 
+-    def provision(self, session_id: str, user_id: str, expires_iso: str) -> tuple[str, str]:
++    def provision(self, session_id: str, user_id: str, expires_iso: str, tier: str = "pro") -> tuple[str, str]:
+         if not self.configured():
+             raise RuntimeError("AWS sandbox chưa được cấu hình đầy đủ")
++        is_max = tier == "max"
++        image_id = settings.aws_sandbox_max_ami_id if is_max else settings.aws_sandbox_ami_id
++        if not image_id:
++            raise RuntimeError(f"AMI cho Sandbox {tier.upper()} chưa được cấu hình")
+         params = {
+-            "ImageId": settings.aws_sandbox_ami_id,
+-            "InstanceType": settings.aws_sandbox_instance_type,
++            "ImageId": image_id,
++            "InstanceType": settings.aws_sandbox_max_instance_type if is_max else settings.aws_sandbox_instance_type,
+             "MinCount": 1,
+             "MaxCount": 1,
+             "SubnetId": settings.aws_sandbox_subnet_id,

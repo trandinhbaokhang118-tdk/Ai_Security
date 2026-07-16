@@ -1,0 +1,9 @@
+@@ -9,7 +9,7 @@
+ export function LanguageSwitcher(){
+  const {language,toggleLanguage}=useLanguage();
+  const nextLanguage=language==="vi"?"tiếng Anh":"tiếng Việt";
+- return <button type="button" className="language-switcher" onClick={toggleLanguage} aria-label={`Ngôn ngữ hiện tại: ${language==="vi"?"Tiếng Việt":"English"}. Chuyển sang ${nextLanguage}`} title={`Chuyển sang ${nextLanguage}`}><svg className="language-icon" viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="8.5"/><path d="M3.8 12h16.4M12 3.5c2.2 2.3 3.3 5.1 3.3 8.5S14.2 18.2 12 20.5C9.8 18.2 8.7 15.4 8.7 12S9.8 5.8 12 3.5Z"/></svg><span className="language-code" aria-hidden>{language==="vi"?"VI":"EN"}</span><svg className="language-chevron" viewBox="0 0 12 12" aria-hidden><path d="m3.5 4.5 2.5 2.5 2.5-2.5"/></svg></button>
++ return <button type="button" className="language-switcher" data-i18n-ignore onClick={toggleLanguage} aria-label={`Ngôn ngữ hiện tại: ${language==="vi"?"Tiếng Việt":"English"}. Chuyển sang ${nextLanguage}`} title={`Chuyển sang ${nextLanguage}`}><svg className="language-icon" viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="8.5"/><path d="M3.8 12h16.4M12 3.5c2.2 2.3 3.3 5.1 3.3 8.5S14.2 18.2 12 20.5C9.8 18.2 8.7 15.4 8.7 12S9.8 5.8 12 3.5Z"/></svg><span className="language-code" aria-hidden>{language==="vi"?"VI":"EN"}</span><svg className="language-chevron" viewBox="0 0 12 12" aria-hidden><path d="m3.5 4.5 2.5 2.5 2.5-2.5"/></svg></button>
+ }
+ 
+ export function EyeScrollbar({topOffset=8,bottomOffset=8}:{topOffset?:number;bottomOffset?:number}={}){

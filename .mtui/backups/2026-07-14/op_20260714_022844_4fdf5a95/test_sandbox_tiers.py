@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from backend.models import CloudSandboxSession, Subscription
+from backend.routers.sandbox_cloud import TIER_CAPABILITIES, TIER_RANK, account_tier
+
+
+def test_tier_capabilities_are_ordered_and_safe() -> None:
+    assert TIER_RANK == {"free": 0, "pro": 1, "max": 2}
+    assert TIER_CAPABILITIES["free"]["web"] is True
+    assert TIER_CAPABILITIES["free"]["exe"] is False
+    assert TIER_CAPABILITIES["pro"]["exe"] is True
+    assert TIER_CAPABILITIES["pro"]["gpu"] is False
+    assert TIER_CAPABILITIES["max"]["gpu"] is True
+
+
+def test_account_tier_defaults_to_free(db_session, create_test_user) -> None:
+    user = create_test_user(email="tier-free@example.com")
+    for row in db_session.query(Subscription).filter(Subscription.user_id == user.id).all():
+        db_session.delete(row)
+    db_session.commit()
+    assert account_tier(db_session, user.id) == "free"
+
+
+def test_cloud_session_persists_selected_tier(db_session, create_test_user) -> None:
+    user = create_test_user(email="tier-max@example.com")
+    row = CloudSandboxSession(
+        user_id=user.id,
+        sandbox_tier="max",
+        provider="aws",
+        status="provisioning",
+        expires_at=__import__("backend.security_utils", fromlist=["utcnow"]).utcnow(),
+    )
+    db_session.add(row)
+    db_session.commit()
+    db_session.refresh(row)
+    assert row.sandbox_tier == "max"

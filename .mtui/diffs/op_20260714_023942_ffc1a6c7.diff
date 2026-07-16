@@ -1,0 +1,25 @@
+@@ -102,6 +102,24 @@
+         mod = Modality(modality) if modality in Modality._value2member_map_ else Modality.TEXT
+         return self._build(score, decision, pred.evidence, mod, pred.model_version, t0)
+ 
++    def assess_untrusted_content(
++        self, text: str, modality: str = "text", metadata: dict | None = None
++    ) -> AssessResponse:
++        """Gate external data before it enters an agent's instruction context."""
++        t0 = time.perf_counter()
++        enriched_metadata = dict(metadata or {})
++        enriched_metadata.setdefault("modality", modality)
++        text_pred = self.engine.predict_text(text, enriched_metadata)
++        prompt_pred = self.engine.predict_prompt(text)
++        evidence = [*text_pred.evidence, *prompt_pred.evidence]
++        score = self._finalize_score(max(text_pred.risk_score, prompt_pred.risk_score), evidence)
++        decision = self.policy.evaluate_human(score)
++        mod = Modality(modality) if modality in Modality._value2member_map_ else Modality.TEXT
++        return self._build(
++            score, decision, evidence, mod,
++            f"untrusted-content[{text_pred.model_version}+{prompt_pred.model_version}]", t0,
++        )
++
+     # ---------------------------------------------------------------- prompt
+     def assess_prompt(self, text: str) -> AssessResponse:
+         t0 = time.perf_counter()

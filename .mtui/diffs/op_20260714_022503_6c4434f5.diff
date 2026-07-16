@@ -1,0 +1,10 @@
+@@ -12,7 +12,8 @@
+ def test_production_accepts_explicit_safe_configuration() -> None:
+     settings = Settings(
+         app_env="production",
+-        api_key_pepper="a-production-pepper-value",
++        database_url="postgresql+psycopg://armor:secret@db.example/armor?sslmode=verify-full",
++        api_key_pepper="a-production-pepper-value-that-is-long-enough",
+         api_key="a-production-api-key-value",
+         seed_demo_user=False,
+         database_auto_create=False,

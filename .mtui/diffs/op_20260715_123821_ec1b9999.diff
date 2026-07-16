@@ -1,0 +1,18 @@
+@@ -105,7 +105,16 @@
+     if (!id) return;
+     try {
+       const raw = localStorage.getItem(`prewise-result:${id}`);
+-      if (raw) setRecord(JSON.parse(raw) as StoredRecord);
++      if (raw) {
++        setRecord(JSON.parse(raw) as StoredRecord);
++        return;
++      }
++      const history = JSON.parse(localStorage.getItem("prewise-history") || "[]") as StoredRecord[];
++      const historyRecord = Array.isArray(history) ? history.find((item) => item?.id === id) : undefined;
++      if (historyRecord) {
++        setRecord(historyRecord);
++        localStorage.setItem(`prewise-result:${id}`, JSON.stringify(historyRecord));
++      }
+     } catch { /* Result query fallback remains available. */ }
+   }, [id]);
+ 

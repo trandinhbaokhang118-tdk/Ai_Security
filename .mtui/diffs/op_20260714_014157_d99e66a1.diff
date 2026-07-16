@@ -1,0 +1,26 @@
+@@ -482,16 +482,16 @@
+             except Exception:
+                 transformer_score = None
+         score = self._hybrid_score(transformer_score, lightweight_score, heuristic_score)
+-        version = self._hybrid_version("text", transformer_score, lightweight_score)
+-        return PredictionResult(
+-            score,
+-            self._text_evidence(
+-                clean,
+-                lightweight_score=lightweight_score,
+-                transformer_score=transformer_score,
+-            ),
+-            version,
++        # The phishing core contributes independent explainable signals from sender
++        # metadata, social-engineering language and embedded URLs.
++        core = assess_text_risk(
++            clean,
++            modality=str((metadata or {}).get("modality", "email")),
++            metadata=metadata,
++            model_score=score,
+         )
++        version = self._hybrid_version("text", transformer_score, lightweight_score) + "+phishing-core-1"
++        return PredictionResult(core.score, core.evidence, version)
+ 
+     def _heuristic_text(self, text: str) -> float:
+         lower = normalize_for_detection(text)

@@ -1,0 +1,24 @@
+@@ -36,6 +36,23 @@
+     tier: str = "free"
+ 
+ 
++class FreeNavigateInput(BaseModel):
++    url: str = Field(min_length=1, max_length=2048)
++
++
++class FreeClickInput(BaseModel):
++    x: float = Field(ge=0, le=1280)
++    y: float = Field(ge=0, le=720)
++
++
++class FreeKeyInput(BaseModel):
++    key: str = Field(min_length=1, max_length=40)
++
++
++class FreeTypeInput(BaseModel):
++    text: str = Field(max_length=500)
++
++
+ class SePayWebhook(BaseModel):
+     id: str | int | None = None
+     transferAmount: int | float = 0

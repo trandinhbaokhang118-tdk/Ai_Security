@@ -1,0 +1,8 @@
+@@ -115,6 +115,7 @@
+                 add_domain_intelligence(
+                     observations, domain_intelligence_service.inspect(domain, url)
+                 )
++                add_dns_intelligence(observations, dns_intelligence_service.inspect(domain))
+         except Exception as exc:
+             for criterion_id in (1, 3, 4, 11, 12):
+                 observations.unavailable[criterion_id] = (

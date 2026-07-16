@@ -1,0 +1,9 @@
+@@ -600,7 +600,7 @@
+         # weak/stale classifier. Conversely the ML ensemble still catches novel
+         # semantic attacks not covered by fixed signatures.
+         prob = _clip01(max(model_prob, firewall.score))
+-        version = self._hybrid_version("prompt", transformer_score, lightweight_score) + "+firewall-1"
++        version = self._hybrid_version("prompt", transformer_score, lightweight_score)
+         ev: list[Evidence] = list(firewall.evidence)
+         if transformer_score is not None and transformer_score >= 0.5:
+             ev.append(Evidence(source="prompt_transformer",

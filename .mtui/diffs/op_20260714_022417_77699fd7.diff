@@ -1,0 +1,8 @@
+@@ -42,6 +42,7 @@
+                 {"Key": "Name", "Value": f"prewise-sandbox-{session_id[:8]}"},
+                 {"Key": "PrewiseSession", "Value": session_id},
+                 {"Key": "PrewiseUser", "Value": user_id},
++                {"Key": "SandboxTier", "Value": tier},
+                 {"Key": "ExpiresAt", "Value": expires_iso},
+             ]}],
+         }

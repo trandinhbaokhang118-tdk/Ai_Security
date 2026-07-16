@@ -1,0 +1,91 @@
+{
+  "artifact": "protectai_prompt.onnx",
+  "architecture": "TfidfVectorizer(word 1-2, sublinear_tf) + LogisticRegression",
+  "runtime_input": "tensor(string) shape [N, 1]",
+  "runtime_outputs": [
+    "label",
+    "probabilities"
+  ],
+  "purpose": "real-data CPU prompt-injection classifier for gateway serving",
+  "trained_at_utc": "2026-07-07T06:46:56+00:00",
+  "label_mapping": {
+    "0": "benign",
+    "1": "malicious"
+  },
+  "dataset": {
+    "train": {
+      "path": "data\\prompt_injection_train.csv",
+      "rows": 8109,
+      "class_counts": {
+        "0": 5652,
+        "1": 2457
+      }
+    },
+    "validation": {
+      "path": "data\\prompt_injection_validation.csv",
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      }
+    },
+    "test": {
+      "path": "data\\prompt_injection_test.csv",
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      }
+    }
+  },
+  "feature_config": {
+    "max_features": 80000,
+    "min_df": 2,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "class_weight": "balanced",
+    "solver": "liblinear",
+    "c": 4.0
+  },
+  "metrics": {
+    "validation": {
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      },
+      "accuracy": 0.9960552268244576,
+      "precision": 1.0,
+      "recall": 0.9869706840390879,
+      "f1": 0.9934426229508196,
+      "roc_auc": 0.9996360268879377,
+      "confusion_matrix": {
+        "tn": 707,
+        "fp": 0,
+        "fn": 4,
+        "tp": 303
+      }
+    },
+    "test": {
+      "rows": 1014,
+      "class_counts": {
+        "0": 707,
+        "1": 307
+      },
+      "accuracy": 0.9901380670611439,
+      "precision": 0.9933554817275747,
+      "recall": 0.9739413680781759,
+      "f1": 0.9835526315789473,
+      "roc_auc": 0.9995623108146087,
+      "confusion_matrix": {
+        "tn": 705,
+        "fp": 2,
+        "fn": 8,
+        "tp": 299
+      }
+    }
+  },
+  "sha256": "d7e1bdd64366e5e2f75d0d181c745ee4649f51da8cbfde6d1de63624babb3432"
+}

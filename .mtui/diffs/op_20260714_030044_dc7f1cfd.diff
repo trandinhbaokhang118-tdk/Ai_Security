@@ -1,0 +1,18 @@
+@@ -108,7 +108,16 @@
+     families: list[str] = []
+     def hit(terms: tuple[str, ...]) -> list[str]: return [term for term in terms if term in joined]
+     override, privilege, exfiltration, tools, delimiters = hit(OVERRIDE), hit(PRIVILEGE), hit(EXFILTRATION), hit(TOOL_COERCION), hit(DELIMITER)
+-    if override:
++    memory, policy = hit(MEMORY_POISONING), hit(POLICY_TAMPERING)
++    if suspicious_scramble:
++        score += .10; families.append("typoglycemia_evasion")
++        evidence.append(_e("Phát hiện từ khóa bảo mật bị đảo ký tự bên trong để né bộ lọc.", Severity.HIGH, "typoglycemia_evasion", .10))
++    if memory:
++        score += .18; families.append("memory_poisoning")
++        evidence.append(_e("Nội dung cố cài chỉ dẫn lâu dài vào bộ nhớ/ngữ cảnh tương lai của agent.", Severity.CRITICAL, "memory_poisoning", .18))
++    if policy:
++        score += .18; families.append("policy_tampering")
++        evidence.append(_e("Nội dung cố thay đổi policy, trust hoặc allowlist của agent.", Severity.CRITICAL, "policy_tampering", .18))
+         score += .35; families.append("instruction_override")
+         evidence.append(_e("Phát hiện lệnh ghi đè/chống lại chỉ dẫn ưu tiên.", Severity.CRITICAL, "instruction_override", .35))
+     if privilege:

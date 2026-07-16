@@ -1,0 +1,13 @@
+@@ -84,6 +84,12 @@
+     final_score = core.score
+     run_sandbox = request.deep_analysis or request.advanced_analysis
+     signals = analyze_url_signals(request.url)
++    intelligence = await asyncio.to_thread(
++        domain_intelligence_service.inspect,
++        signals.parts.registrable_domain,
++        request.url,
++    )
++    final_score = min(1.0, final_score + intelligence.score)
+     evidence_by_feature = {item.feature: item for item in core.evidence if item.feature}
+     l1_details = _build_l1_details(signals, evidence_by_feature)
+     l2_details = _build_l2_details(signals, evidence_by_feature)

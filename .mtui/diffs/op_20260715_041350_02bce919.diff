@@ -1,0 +1,8 @@
+@@ -230,6 +230,7 @@
+ 
+ 
+ class SandboxURLResponse(BaseModel):
++    risk_core: RiskCoreTrace | None = None
+     ok: bool
+     execution_status: Literal["completed", "failed"]
+     url: str

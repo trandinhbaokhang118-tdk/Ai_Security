@@ -1,0 +1,9 @@
+@@ -99,7 +99,7 @@
+     # without fuzzy-editing every token in arbitrary user content.
+     signature_terms = {_word_signature(word) for term in marker_terms for word in term.split() if len(word) >= 4}
+     suspicious_scramble = any(
+-        _word_signature(word) in signature_terms and word not in joined
++        _word_signature(word) in signature_terms and word not in marker_terms
+         for word in re.findall(r"[a-zA-Z]{4,}", raw_canon)
+     )
+     joined = " ".join(views[:10])

@@ -1,0 +1,36 @@
+@@ -1,2 +1,33 @@
+-/* Loại bỏ spacer scrollytelling chưa có animation để không tạo khoảng đen chết. */
+-@media(min-width:801px){.mail-act{height:auto;min-height:900px}.mail-sticky{position:relative;top:auto;height:auto;min-height:900px}.url-scene{height:auto;min-height:900px}.url-sticky{position:relative;top:auto;height:auto;min-height:900px}.ledger{min-height:0;padding-bottom:180px}.paper-wrap{height:auto}.paper{position:relative;top:auto}.decision{min-height:900px}}
++/* Nhịp cuộn landing: bỏ các spacer scrollytelling không có animation và nối section có chủ đích. */
++.witness main>section{scroll-margin-top:76px}
++@media(min-width:801px){
++  .cold-open{height:100vh;min-height:680px}
++  .mail-act{height:auto;min-height:clamp(760px,88vh,900px)}
++  .mail-sticky{position:relative;top:auto;height:auto;min-height:clamp(760px,88vh,900px);padding-top:90px;padding-bottom:90px}
++  .layers{min-height:0;padding-top:110px;padding-bottom:110px}
++  .layers header{max-width:1150px;margin:0 auto}
++  .case-stack{margin-top:80px;margin-bottom:20px}
++  .case-stack article{position:relative;top:auto;margin-bottom:34px}
++  .url-scene{height:auto;min-height:clamp(700px,84vh,860px)}
++  .url-sticky{position:relative;top:auto;height:auto;min-height:clamp(700px,84vh,860px);padding-top:90px;padding-bottom:90px}
++  .ledger{min-height:0;padding-top:120px;padding-bottom:120px}
++  .ledger-copy{padding-bottom:70px}
++  .paper-wrap{height:auto}
++  .paper{position:relative;top:auto}
++  .decision{min-height:clamp(720px,88vh,900px);padding-top:100px;padding-bottom:100px}
++  .landing-scanner{min-height:clamp(680px,82vh,820px);padding-top:100px;padding-bottom:100px}
++}
++@media(max-width:800px){
++  .cold-open{height:auto;min-height:760px;padding-bottom:70px}
++  .mail-act{height:auto;min-height:0}
++  .mail-sticky{min-height:0;padding-top:90px;padding-bottom:90px}
++  .layers{min-height:0;padding-top:90px;padding-bottom:90px}
++  .case-stack{margin-top:80px;margin-bottom:0}
++  .url-scene{height:auto;min-height:720px}
++  .url-sticky{position:relative;top:auto;height:auto;min-height:720px;padding-top:80px;padding-bottom:80px}
++  .ledger{min-height:0;padding-top:90px;padding-bottom:90px}
++  .ledger-copy{padding-bottom:60px}
++  .paper-wrap{height:auto}
++  .decision{min-height:0;padding-top:90px;padding-bottom:90px;gap:70px}
++  .landing-scanner{min-height:680px;padding-top:90px;padding-bottom:90px}
++}

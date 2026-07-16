@@ -1,0 +1,9 @@
+@@ -300,6 +300,8 @@
+         raise HTTPException(404, "Không tìm thấy phiên")
+     if row.provider_instance_id:
+         await asyncio.to_thread(cloud_sandbox_service.terminate, row.provider_instance_id)
++    if row.sandbox_tier == "free":
++        await asyncio.to_thread(free_web_sandbox.close, row.id)
+     row.status = "terminated"
+     row.terminated_at = utcnow()
+     db.commit()

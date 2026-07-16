@@ -1,0 +1,8 @@
+@@ -7,7 +7,6 @@
+ from backend.models import ApiKey
+ from backend.routers.auth import resolve_actor
+ from backend.security_utils import create_api_key_value, hash_api_key, utcnow
+-from fastapi.security import HTTPAuthorizationCredentials
+ 
+ 
+ def test_production_rejects_sqlite_and_unsafe_secrets() -> None:

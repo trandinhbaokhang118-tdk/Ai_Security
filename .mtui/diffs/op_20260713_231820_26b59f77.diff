@@ -1,0 +1,10 @@
+@@ -42,6 +42,9 @@
+     sandboxUrl(url: string): Promise<SandboxResult>;
+ 
+     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
++
++    /** Chạy tệp EXE trong Windows Sandbox thật, không chạy trực tiếp trên máy chủ. */
++    sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+ 
+     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
+     assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;

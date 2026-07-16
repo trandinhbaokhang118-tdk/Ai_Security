@@ -1,0 +1,9 @@
+@@ -114,7 +114,7 @@
+     score = _clip(max(rule_score, float(model_score or 0.0), (rule_score * 0.75) + (float(model_score or 0.0) * 0.25)))
+     uncertain = 0.30 <= score < 0.70
+     high_impact = bool(matched_sensitive or signals.shortlink or signals.brand_mismatch)
+-    requires_deep = uncertain or (high_impact and score >= 0.45)
++    requires_deep = uncertain or signals.shortlink or (high_impact and score >= 0.45)
+     if requires_deep:
+         evidence.append(_e("Khuyến nghị sandbox cô lập: mở trang bằng canary tổng hợp, chặn submit và theo dõi redirect/exfiltration.",
+                            Severity.INFO, "deep_analysis_recommended", 0.0))

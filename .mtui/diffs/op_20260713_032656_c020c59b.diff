@@ -1,0 +1,9 @@
+@@ -1,6 +1,6 @@
+ "use client";
+-import {useState} from "react";
+-import {useRouter} from "next/navigation";
++import {useEffect,useState} from "react";
++import {useRouter,useSearchParams} from "next/navigation";
+ import {PrewiseShell,demoFindings} from "@/components/PrewiseUI";
+ 
+ type Mode="url"|"email"|"sms";

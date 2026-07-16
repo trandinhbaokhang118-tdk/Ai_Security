@@ -1,0 +1,25 @@
+@@ -103,7 +103,23 @@
+         sandbox_report = await sandbox_runner.analyze_url(request.url)
+         response.sandbox_report = sandbox_report
+         sandbox_score = min(1.0, sum({"critical": 0.30, "high": 0.18, "medium": 0.10, "low": 0.04}.get(item.get("severity"), 0.0) for item in sandbox_report.behaviors))
+-        layers[-1] = URLScoreLayer(layer="L3 · Sandbox trình duyệt cô lập", score=sandbox_score, status="completed" if not sandbox_report.error else "unavailable", summary="Quan sát hành vi live trong browser cô lập; không dùng dữ liệu thật.", signals=len(sandbox_report.behaviors))
++        layers[-1] = URLScoreLayer(
++            layer="L3 · Sandbox trình duyệt cô lập",
++            score=sandbox_score,
++            status="completed" if not sandbox_report.error else "unavailable",
++            summary="Quan sát live trong sandbox cô lập; khi browser engine chưa sẵn sàng, dùng HTTP sandbox an toàn để kiểm tra redirect, HTML, form và security headers.",
++            signals=len(sandbox_report.behaviors),
++            details=[
++                {
++                    "criterion": behavior.get("code", "sandbox_signal"),
++                    "value": behavior.get("category", "sandbox"),
++                    "triggered": True,
++                    "contribution": {"critical": 0.30, "high": 0.18, "medium": 0.10, "low": 0.04}.get(behavior.get("severity"), 0.0),
++                    "reason": behavior.get("message", "Sandbox phát hiện tín hiệu cần xem xét."),
++                }
++                for behavior in sandbox_report.behaviors
++            ],
++        )
+         response.risk_score = max(response.risk_score, sandbox_score)
+         response.threat_level = _map_risk_to_threat_level(response.risk_score)
+         response.ai_detection.detected = response.risk_score >= 0.5

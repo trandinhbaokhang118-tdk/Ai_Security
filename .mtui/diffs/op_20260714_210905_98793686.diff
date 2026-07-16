@@ -1,0 +1,62 @@
+@@ -75,6 +75,61 @@
+     return wallet
+ 
+ 
++def make_sepay_qr_url(amount_vnd: int, reference: str) -> str:
++    """Create a bank-transfer QR URL without exposing any SePay secret."""
++    if not settings.sepay_bank_account or not settings.sepay_bank_name:
++        return ""
++    base = settings.sepay_qr_base_url.rstrip("/")
++    account = quote(settings.sepay_bank_account, safe="")
++    bank = quote(settings.sepay_bank_name, safe="")
++    content = quote(reference, safe="")
++    name = quote(settings.sepay_account_name, safe="")
++    return f"{base}?acc={account}&bank={bank}&amount={amount_vnd}&des={content}&template=compact&accountName={name}"
++
++
++def subscription_payment_dict(order: PaymentOrder) -> dict:
++    return {
++        "orderId": order.id,
++        "reference": order.reference,
++        "amountVnd": order.amount_vnd,
++        "planTier": order.plan_tier,
++        "billingPeriod": order.billing_period,
++        "expiresAt": order.expires_at.isoformat() if order.expires_at else None,
++        "bankAccount": settings.sepay_bank_account,
++        "bankName": settings.sepay_bank_name,
++        "accountName": settings.sepay_account_name,
++        "transferContent": order.reference,
++        "qrUrl": make_sepay_qr_url(order.amount_vnd, order.reference),
++        "status": order.status,
++    }
++
++
++def activate_subscription(db: DbSession, order: PaymentOrder) -> None:
++    """Idempotently replace the active plan only after an exact paid order."""
++    if not order.plan_tier or not order.billing_period:
++        return
++    now = utcnow()
++    db.execute(
++        Subscription.__table__.update()
++        .where(
++            Subscription.user_id == order.user_id,
++            Subscription.status.in_(("trialing", "active")),
++        )
++        .values(status="canceled", canceled_at=now)
++    )
++    days = 365 if order.billing_period == "yearly" else 30
++    db.add(
++        Subscription(
++            user_id=order.user_id,
++            plan_tier=order.plan_tier,
++            status="active",
++            provider="sepay",
++            provider_subscription_id=order.id,
++            renews_at=now + timedelta(days=days),
++        )
++    )
++
++
+ def account_tier(db: DbSession, user_id: str) -> str:
+     row = db.execute(
+         select(Subscription).where(

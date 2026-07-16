@@ -1,0 +1,30 @@
+@@ -427,14 +427,10 @@
+   for (const node of textNodes) {
+     const element = node.parentElement;
+     if (!element) continue;
+-    if (language === "en") {
+-      if (!node.parentElement?.dataset.i18nOriginalText) node.parentElement!.dataset.i18nOriginalText = node.nodeValue || "";
+-      const translated = translateText(node.nodeValue || "");
+-      if (translated) node.nodeValue = translated;
+-    } else if (element.dataset.i18nOriginalText !== undefined) {
+-      node.nodeValue = element.dataset.i18nOriginalText;
+-      delete element.dataset.i18nOriginalText;
+-    }
++    const original = node.__prewiseOriginalText ?? node.nodeValue ?? "";
++    if (node.__prewiseOriginalText === undefined) node.__prewiseOriginalText = original;
++    if (language === "en") node.nodeValue = translateText(original) ?? original;
++    else node.nodeValue = original;
+   }
+ 
+   for (const element of root.querySelectorAll<HTMLElement>("[placeholder], [title], [aria-label]")) {
+@@ -444,8 +440,8 @@
+       const backup = `i18nOriginal${attribute.replace("-", "")}`;
+       if (language === "en") {
+         if (!element.dataset[backup]) element.dataset[backup] = value;
+-        const translated = translateText(value);
+-        if (translated) element.setAttribute(attribute, translated);
++        const original = element.dataset[backup] || value;
++        element.setAttribute(attribute, translateText(original) ?? original);
+       } else if (element.dataset[backup]) {
+         element.setAttribute(attribute, element.dataset[backup]);
+         delete element.dataset[backup];

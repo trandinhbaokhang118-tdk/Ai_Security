@@ -1,0 +1,27 @@
+@@ -159,6 +159,26 @@
+             obs.unavailable[cid] = "Domain intelligence providers unavailable."
+         return
+     obs.clean(1, 11)
++    if intelligence.expiry_days is None:
++        obs.unavailable[2] = "Domain expiry was not present in registration intelligence."
++    else:
++        obs.clean(2)
++        if intelligence.expiry_days < 0:
++            obs.risk(2, "expired_domain_registration", 1.0, 0.8,
++                     f"Domain registration expired {-intelligence.expiry_days} days ago.",
++                     source="domain_intelligence")
++        elif intelligence.expiry_days <= 30:
++            obs.risk(2, "domain_expiring_soon", 0.75, 0.8,
++                     f"Domain registration expires in {intelligence.expiry_days} days.",
++                     source="domain_intelligence")
++    if intelligence.certificate_age_days is None:
++        obs.unavailable[9] = "Certificate issuance history was unavailable."
++    else:
++        obs.clean(9)
++        if intelligence.certificate_age_days < 7 and (intelligence.age_days or 9999) < 30:
++            obs.risk(9, "new_domain_new_certificate", 0.5, 0.8,
++                     "A newly registered domain also has a newly issued certificate.",
++                     source="certificate_transparency")
+     for cid in (3, 4, 12):
+         obs.unavailable[cid] = "Provider response does not contain enough data for this check."
+     if intelligence.age_days is not None and intelligence.age_days < 180:

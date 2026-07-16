@@ -1,0 +1,8 @@
+@@ -24,6 +24,7 @@
+     is_ip_host,
+ )
+ from security.url_risk_core import assess_url as assess_url_risk
++from security.text_risk_core import assess_text_risk
+ from shared.constants import HIGH_RISK_TLDS, URGENCY_KEYWORDS_VI
+ from shared.schemas import Evidence, Severity
+ 

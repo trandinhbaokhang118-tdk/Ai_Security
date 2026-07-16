@@ -1,0 +1,13 @@
+@@ -116,6 +116,12 @@
+     evidence: list[Evidence] = Field(
+         default_factory=list, description="Evidence supporting the threat assessment"
+     )
++    score_layers: list[URLScoreLayer] = Field(
++        default_factory=list, description="Independent scoring layers used for the verdict"
++    )
++    deep_analysis_recommended: bool = Field(
++        default=False, description="Whether isolated browser inspection is recommended"
++    )
+     sandbox_report: SandboxReport | None = Field(
+         default=None, description="Detailed sandbox analysis report (if deep_analysis=True)"
+     )

@@ -1,0 +1,58 @@
+@@ -118,6 +118,57 @@
+         except Exception as exc:
+             return None, f"URLhaus {type(exc).__name__}"
+ 
++    def _query_certificates(self, domain: str) -> tuple[list[dict[str, Any]] | None, str | None]:
++        try:
++            response = httpx.get(
++                "https://crt.sh/",
++                params={"q": f"%.{domain}", "output": "json"},
++                timeout=max(self.timeout_seconds, 8.0),
++                headers={"User-Agent": "Prewise/0.2"},
++            )
++            if response.status_code == 200:
++                return response.json(), None
++            return None, f"crt.sh HTTP {response.status_code}"
++        except Exception as exc:
++            return None, f"crt.sh {type(exc).__name__}"
++
++    def _query_reputation(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
++        try:
++            response = httpx.get(
++                "https://urlscan.io/api/v1/search/",
++                params={"q": f"domain:{domain}", "size": 20},
++                timeout=max(self.timeout_seconds, 8.0),
++                headers={"User-Agent": "Prewise/0.2"},
++            )
++            if response.status_code == 200:
++                return response.json(), None
++            return None, f"urlscan HTTP {response.status_code}"
++        except Exception as exc:
++            return None, f"urlscan {type(exc).__name__}"
++
++    @staticmethod
++    def _certificate_age(data: list[dict[str, Any]] | None) -> tuple[int | None, str | None]:
++        dates: list[datetime] = []
++        for item in data or []:
++            raw = item.get("not_before") or item.get("entry_timestamp")
++            if not raw:
++                continue
++            try:
++                dates.append(datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(UTC))
++            except ValueError:
++                continue
++        if not dates:
++            return None, None
++        earliest = min(dates)
++        return max(0, (datetime.now(UTC) - earliest).days), earliest.isoformat()
++
++    @staticmethod
++    def _reputation_listed(data: dict[str, Any] | None) -> bool | None:
++        if not data:
++            return None
++        results = data.get("results", [])
++        return any(bool(item.get("verdicts", {}).get("overall", {}).get("malicious")) for item in results)
++
+     @staticmethod
+     def _domain_age(data: dict[str, Any] | None) -> tuple[int | None, str | None]:
+         if not data:

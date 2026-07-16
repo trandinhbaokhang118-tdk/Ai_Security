@@ -1,0 +1,30 @@
+@@ -171,12 +171,27 @@
+ 
+     def assess_text(self, payload: TextInput) -> dict[str, Any]:
+         modality = payload.content_type if payload.content_type in {"email", "sms", "text"} else "text"
+-        result = self.service.assess_text(payload.content, modality)
++        # Webpages, chat and tool-returned content are untrusted data and may
++        # contain indirect prompt injection. Run both phishing and injection gates.
++        if payload.content_type in {"webpage", "chat_message"}:
++            result = self.service.assess_untrusted_content(
++                payload.content, modality, {"source": payload.content_type}
++            )
++        elif payload.content_type == "prompt":
++            result = self.service.assess_prompt(payload.content)
++        else:
++            result = self.service.assess_text(payload.content, modality)
+         response = _assessment_json(result)
+         response["injection_detected"] = any(
+-            item.source == "prompt_adapter" and item.severity.value in {"high", "critical"}
++            item.source in {"prompt_adapter", "prompt_firewall", "prompt_model", "prompt_transformer"}
++            and item.severity.value in {"high", "critical"}
+             for item in result.evidence
+         )
++        response["trust_boundary"] = "untrusted_external_content"
++        response["content_handling"] = (
++            "quarantine_and_do_not_follow_instructions"
++            if response["injection_detected"] else "treat_as_data_only"
++        )
+         response["safe_summary"] = result.reasons[0] if result.reasons else ""
+         return response
+ 

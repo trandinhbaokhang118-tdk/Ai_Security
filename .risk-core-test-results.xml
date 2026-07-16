@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="10" time="2.403" timestamp="2026-07-15T01:31:55.558451+07:00" hostname="DESKTOP-FBAD9JJ"><testcase classname="tests.test_risk_core_v2" name="test_default_config_invariants" time="0.002"><failure message="ValueError: criteria 1..49 must total exactly 80">def test_default_config_invariants():
+&gt;       cfg = default_config()
+              ^^^^^^^^^^^^^^^^
+
+tests\test_risk_core_v2.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+security\risk_core\config.py:81: in default_config
+    cfg.validate()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = RiskConfig(criteria=(CriterionConfig(criterion_id=1, name='criterion_01', max_weight=2.0, coverage_weight=1.0), Criter...community': 3.0}, internal_cap=80.0, external_cap=20.0, rules_version='coreguide-v2', weights_version='64-criteria-v1')
+
+    def validate(self) -&gt; None:
+        ids = [c.criterion_id for c in self.criteria]
+        if ids != list(range(1, 51)) or len(set(ids)) != 50:
+            raise ValueError("criteria must contain unique, ordered ids 1..50")
+        for c in self.criteria:
+            if not (0 &lt;= c.max_weight &lt;= self.internal_cap) or c.coverage_weight &lt; 0:
+                raise ValueError(f"invalid criterion weights: {c.criterion_id}")
+        if self.criteria[49].max_weight != 0:
+            raise ValueError("criterion 50 must have zero risk weight")
+        if not isclose(sum(c.max_weight for c in self.criteria[:49]), self.internal_cap, abs_tol=1e-9):
+&gt;           raise ValueError("criteria 1..49 must total exactly 80")
+E           ValueError: criteria 1..49 must total exactly 80
+
+security\risk_core\config.py:55: ValueError</failure></testcase><testcase classname="tests.test_risk_core_v2" name="test_url_normalization" time="0.007" /><testcase classname="tests.test_risk_core_v2" name="test_order_and_retry_dedup_invariance" time="0.002"><failure message="ValueError: criteria 1..49 must total exactly 80">def test_order_and_retry_dedup_invariance():
+        a = ev("a", finding="same")
+        b = replace(a, evidence_id="b", evidence_quality=.5)
+&gt;       r1, r2 = assess([a, b]), assess([b, a])
+                 ^^^^^^^^^^^^^^
+
+tests\test_risk_core_v2.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+security\risk_core\engine.py:21: in assess
+    cfg = config or default_config()
+                    ^^^^^^^^^^^^^^^^
+security\risk_core\config.py:81: in default_config
+    cfg.validate()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = RiskConfig(criteria=(CriterionConfig(criterion_id=1, name='criterion_01', max_weight=2.0, coverage_weight=1.0), Criter...community': 3.0}, internal_cap=80.0, external_cap=20.0, rules_version='coreguide-v2', weights_version='64-criteria-v1')
+
+    def validate(self) -&gt; None:
+        ids = [c.criterion_id for c in self.criteria]
+        if ids != list(range(1, 51)) or len(set(ids)) != 50:
+            raise ValueError("criteria must contain unique, ordered ids 1..50")
+        for c in self.criteria:
+            if not (0 &lt;= c.max_weight &lt;= self.internal_cap) or c.coverage_weight &lt; 0:
+                raise ValueError(f"invalid criterion weights: {c.criterion_id}")
+        if self.criteria[49].max_weight != 0:
+            raise ValueError("criterion 50 must have zero risk weight")
+        if not isclose(sum(c.max_weight for c in self.criteria[:49]), self.internal_cap, abs_tol=1e-9):
+&gt;           raise ValueError("criteria 1..49 must total exactly 80")
+E           ValueError: criteria 1..49 must total exactly 80
+
+security\risk_core\config.py:55: ValueError</failure></testcase><testcase classname="tests.test_risk_core_v2" name="test_no_hit_and_clean_do_not_add_risk" time="0.001"><failure message="ValueError: criteria 1..49 must total exactly 80">def test_no_hit_and_clean_do_not_add_risk():
+        nohit = replace(ev(), status=CriterionStatus.CLEAN, provider_verdict=ProviderVerdict.NO_HIT)
+        clean = replace(ev("e2", finding="f2"), status=CriterionStatus.CLEAN, provider_verdict=ProviderVerdict.CLEAN)
+&gt;       assert assess([nohit, clean]).risk_score == 0
+               ^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_risk_core_v2.py:44: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+security\risk_core\engine.py:21: in assess
+    cfg = config or default_config()
+                    ^^^^^^^^^^^^^^^^
+security\risk_core\config.py:81: in default_config
+    cfg.validate()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = RiskConfig(criteria=(CriterionConfig(criterion_id=1, name='criterion_01', max_weight=2.0, coverage_weight=1.0), Criter...community': 3.0}, internal_cap=80.0, external_cap=20.0, rules_version='coreguide-v2', weights_version='64-criteria-v1')
+
+    def validate(self) -&gt; None:
+        ids = [c.criterion_id for c in self.criteria]
+        if ids != list(range(1, 51)) or len(set(ids)) != 50:
+            raise ValueError("criteria must contain unique, ordered ids 1..50")
+        for c in self.criteria:
+            if not (0 &lt;= c.max_weight &lt;= self.internal_cap) or c.coverage_weight &lt; 0:
+                raise ValueError(f"invalid criterion weights: {c.criterion_id}")
+        if self.criteria[49].max_weight != 0:
+            raise ValueError("criterion 50 must have zero risk weight")
+        if not isclose(sum(c.max_weight for c in self.criteria[:49]), self.internal_cap, abs_tol=1e-9):
+&gt;           raise ValueError("criteria 1..49 must total exactly 80")
+E           ValueError: criteria 1..49 must total exactly 80
+
+security\risk_core\config.py:55: ValueError</failure></testcase><testcase classname="tests.test_risk_core_v2" name="test_external_family_cap_and_internal_exclusion" time="0.002"><failure message="ValueError: criteria 1..49 must total exactly 80">def test_external_family_cap_and_internal_exclusion():
+        external = [replace(ev(str(i), f"source_{51+i}", None, f"f{i}", f"i{i}"), organization_id=f"o{i}") for i in range(4)]
+&gt;       result = assess(external)
+                 ^^^^^^^^^^^^^^^^
+
+tests\test_risk_core_v2.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+security\risk_core\engine.py:21: in assess
+    cfg = config or default_config()
+                    ^^^^^^^^^^^^^^^^
+security\risk_core\config.py:81: in default_config
+    cfg.validate()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = RiskConfig(criteria=(CriterionConfig(criterion_id=1, name='criterion_01', max_weight=2.0, coverage_weight=1.0), Criter...community': 3.0}, internal_cap=80.0, external_cap=20.0, rules_version='coreguide-v2', weights_version='64-criteria-v1')
+
+    def validate(self) -&gt; None:
+        ids = [c.criterion_id for c in self.criteria]
+        if ids != list(range(1, 51)) or len(set(ids)) != 50:
+            raise ValueError("criteria must contain unique, ordered ids 1..50")
+        for c in self.criteria:
+            if not (0 &lt;= c.max_weight &lt;= self.internal_cap) or c.coverage_weight &lt; 0:
+                raise ValueError(f"invalid criterion weights: {c.criterion_id}")
+        if self.criteria[49].max_weight != 0:
+            raise ValueError("criterion 50 must have zero risk weight")
+        if not isclose(sum(c.max_weight for c in self.criteria[:49]), self.internal_cap, abs_tol=1e-9):
+&gt;           raise ValueError("criteria 1..49 must total exactly 80")
+E           ValueError: criteria 1..49 must total exactly 80
+
+security\risk_core\config.py:55: ValueError</failure></testcase><testcase classname="tests.test_risk_core_v2" name="test_override_is_floor_not_addition" time="0.001"><failure message="ValueError: criteria 1..49 must total exactly 80">def test_override_is_floor_not_addition():
+        rule = OverrideRule("r1", frozenset({"malware"}), 70, "soft_block", "confirmed")
+&gt;       result = assess([ev()], override_rules=(rule,))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_risk_core_v2.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+security\risk_core\engine.py:21: in assess
+    cfg = config or default_config()
+                    ^^^^^^^^^^^^^^^^
+security\risk_core\config.py:81: in default_config
+    cfg.validate()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = RiskConfig(criteria=(CriterionConfig(criterion_id=1, name='criterion_01', max_weight=2.0, coverage_weight=1.0), Criter...community': 3.0}, internal_cap=80.0, external_cap=20.0, rules_version='coreguide-v2', weights_version='64-criteria-v1')
+
+    def validate(self) -&gt; None:
+        ids = [c.criterion_id for c in self.criteria]
+        if ids != list(range(1, 51)) or len(set(ids)) != 50:
+            raise ValueError("criteria must contain unique, ordered ids 1..50")
+        for c in self.criteria:
+            if not (0 &lt;= c.max_weight &lt;= self.internal_cap) or c.coverage_weight &lt; 0:
+                raise ValueError(f"invalid criterion weights: {c.criterion_id}")
+        if self.criteria[49].max_weight != 0:
+            raise ValueError("criterion 50 must have zero risk weight")
+        if not isclose(sum(c.max_weight for c in self.criteria[:49]), self.internal_cap, abs_tol=1e-9):
+&gt;           raise ValueError("criteria 1..49 must total exactly 80")
+E           ValueError: criteria 1..49 must total exactly 80
+
+security\risk_core\config.py:55: ValueError</failure></testcase><testcase classname="tests.test_api_v2_compat" name="test_legacy_assess_response_remains_valid_without_v2_payload" time="0.002" /><testcase classname="tests.test_api_v2_compat" name="test_v2_payload_has_explicit_independent_score_scale" time="0.002" /><testcase classname="tests.test_api_v2_compat" name="test_v2_audit_metadata_is_additive_and_serializable" time="0.001" /><testcase classname="tests.test_api_v2_compat" name="test_mapper_populates_stable_score_aliases" time="0.001" /></testsuite></testsuites>

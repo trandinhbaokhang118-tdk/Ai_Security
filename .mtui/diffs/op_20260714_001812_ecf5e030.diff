@@ -1,0 +1,16 @@
+@@ -109,12 +109,12 @@
+ }
+ async function init() {
+   try {
+-    const state = await chrome.runtime.sendMessage({ type: "GET_PROTECTION_STATE" });
++    const state = await send({ type: "GET_PROTECTION_STATE" }, 2000);
+     $("protection-enabled").checked = state?.enabled === true;
+     if (!state?.enabled) return show("disabled");
+-    [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
++    [currentTab] = await queryActiveTab();
+     if (!currentTab || !validPage(currentTab.url)) return show("unsupported");
+-    const entry = await chrome.runtime.sendMessage({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url });
++    const entry = await send({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url }, 1500);
+     if (!entry) return scan();
+     if (entry.status === "loading") { const token = ++loadingToken; startLoading(entry.startedAt); return waitForTabResult(token); }
+     render(entry, currentTab);

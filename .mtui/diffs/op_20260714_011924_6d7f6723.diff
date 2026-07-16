@@ -1,0 +1,9 @@
+@@ -191,7 +191,7 @@
+                 </ul>
+                 <div className="mt-10 text-center">
+                     <a
+-                        href="/demo"
++                        href="/analyze"
+                         className="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-700"
+                     >
+                         Mở demo kỹ thuật

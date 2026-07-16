@@ -1,0 +1,32 @@
+@@ -319,6 +319,31 @@
+     external_scripts = [src for src in parser.scripts if src and not _same_host(url, src)]
+     page_text = unquote(" ".join(parser.text_parts)).lower()
+     urgency_hits = [keyword for keyword in SUSPICIOUS_TEXT if keyword in page_text]
++    commercial_terms = ("buy now", "add to cart", "checkout", "mua ngay", "giỏ hàng", "thanh toán")
++    data_terms = ("password", "otp", "cvv", "pin", "mật khẩu", "cccd", "seed phrase")
++    privacy_terms = ("privacy", "chính sách bảo mật", "quyền riêng tư")
++    terms_terms = ("refund", "return policy", "terms", "hoàn tiền", "đổi trả", "điều khoản")
++    contact_terms = ("contact", "liên hệ", "support", "hỗ trợ", "hotline")
++    scam_template_terms = ("virus detected", "you have won", "trúng thưởng", "technical support", "đầu tư lợi nhuận")
++    link_text = " ".join(f"{href} {label}" for href, label in parser.links).lower()
++    emails = sorted(set(__import__("re").findall(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", page_text)))
++    page_host = (urlsplit(url).hostname or "").lower()
++    mismatched_emails = [email for email in emails if email.rsplit("@", 1)[-1].lower() != page_host
++                         and not email.lower().endswith(("@gmail.com", "@outlook.com", "@yahoo.com"))]
++    is_commercial = any(term in page_text for term in commercial_terms)
++    collects_data = parser.sensitive_inputs > 0 or any(term in page_text for term in data_terms)
++
++    if not any(term in page_text or term in link_text for term in contact_terms) and is_commercial:
++        issues.append(_issue("missing_contact_information", "medium", "content", "Trang thương mại không có thông tin liên hệ rõ ràng."))
++    if mismatched_emails:
++        issues.append(_issue("business_email_mismatch", "high", "content", "Email doanh nghiệp không khớp tên miền website.", ", ".join(mismatched_emails[:3])))
++    if collects_data and not any(term in page_text or term in link_text for term in privacy_terms):
++        issues.append(_issue("missing_privacy_policy", "medium", "content", "Trang thu thập dữ liệu nhưng không thấy chính sách bảo mật."))
++    if is_commercial and not any(term in page_text or term in link_text for term in terms_terms):
++        issues.append(_issue("missing_terms_refund", "medium", "content", "Trang giao dịch không thấy điều khoản hoặc chính sách hoàn tiền."))
++    scam_hits = [term for term in scam_template_terms if term in page_text]
++    if scam_hits:
++        issues.append(_issue("scam_template_content", "high", "content", "Nội dung khớp mẫu lừa đảo đã biết.", ", ".join(scam_hits)))
+ 
+     if parser.password_inputs:
+         issues.append(_issue("password_form", "high", "content", "Trang có ô nhập mật khẩu.", f"Số ô: {parser.password_inputs}"))

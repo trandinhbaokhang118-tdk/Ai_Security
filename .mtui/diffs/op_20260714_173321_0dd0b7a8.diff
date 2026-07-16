@@ -1,0 +1,8 @@
+@@ -8,6 +8,7 @@
+ 
+ type View="lab"|"sandbox"; type Tier="free"|"pro"|"max";
+ type CloudSession={id:string;tier:Tier;status:string;remoteUrl:string|null;expiresAt:string;error:string|null};
++type FreeBrowser={url:string;title:string;image:string;width:number;height:number};
+ type CloudStatus={accountTier:Tier;credits:number;availableTiers:Array<{tier:Tier;web:boolean;exe:boolean;gpu:boolean;minutes:number;provider:string;allowed:boolean}>;cloudConfigured:boolean;freeConfigured:boolean;session:CloudSession|null};
+ const API=(process.env.NEXT_PUBLIC_API_BASE_URL||"http://localhost:8000").replace(/\/$/,"");
+ async function cloudRequest<T>(path:string,init?:RequestInit):Promise<T>{const token=readStoredAccessToken();const response=await fetch(`${API}/v1/sandbox-cloud${path}`,{...init,headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})}});if(!response.ok)throw new Error((await response.json().catch(()=>null))?.detail||`Lỗi ${response.status}`);return response.json()}

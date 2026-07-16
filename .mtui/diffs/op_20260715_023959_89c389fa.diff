@@ -1,0 +1,8 @@
+@@ -9,6 +9,7 @@
+ 
+ import time
+ import uuid
++from dataclasses import asdict
+ 
+ from ai.adapters.file_adapter import analyze_file_bytes
+ from ai.inference.engine import InferenceEngine

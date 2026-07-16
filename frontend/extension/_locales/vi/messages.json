@@ -1,0 +1,10 @@
+{
+    "appName": {
+        "message": "AI Security Armor",
+        "description": "Tên tiện ích"
+    },
+    "appDesc": {
+        "message": "Lá chắn an ninh AI: đánh giá rủi ro URL và email tức thì, luôn kèm bằng chứng.",
+        "description": "Mô tả tiện ích"
+    }
+}

@@ -1,0 +1,18 @@
+@@ -51,6 +51,17 @@
+         return sanitize_text(value)
+ 
+ 
++class ToolOutputInput(StrictInput):
++    content: str = Field(min_length=1, max_length=100_000)
++    tool_name: str = Field(min_length=1, max_length=100)
++    intended_use: Literal["read_only", "memory_write", "tool_argument", "user_display"] = "read_only"
++
++    @field_validator("content")
++    @classmethod
++    def sanitize_output(cls, value: str) -> str:
++        return sanitize_text(value)
++
++
+ class ActionInput(StrictInput):
+     action_type: Literal[
+         "open_url", "click_link", "submit_form", "send_email", "download_file",

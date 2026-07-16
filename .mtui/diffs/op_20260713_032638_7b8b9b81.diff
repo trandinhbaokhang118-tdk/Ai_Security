@@ -1,0 +1,7 @@
+@@ -1,5 +1,5 @@
+ "use client";
+-import Image from "next/image";import Link from "next/link";import {useEffect,useRef,useState} from "react";
++import Image from "next/image";import Link from "next/link";import {useRouter} from "next/navigation";import {useEffect,useRef,useState} from "react";
+ type PhishItem={id:number;kind:"word"|"url";label:string;sub?:string;x:number;y:number;duration:number;delay:number};
+ const phishWords=[["VERIFY","identity required"],["LOG_IN","session expired"],["AUTH_RIZE","grant access →"],["CONFIRM","payment pending"],["UNL_CK","account restricted"],["RE-AUTH","session invalid"],["TRANSFER","approval required"],["PAY NOW","invoice overdue"]];
+ const phishUrls=["secure-account-check[.]com/verify","paypaI-support[.]net/login","authorize-wallet[.]site/connect","billing-update[.]cloud/confirm"];

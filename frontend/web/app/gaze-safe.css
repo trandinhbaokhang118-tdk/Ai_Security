@@ -1,0 +1,2 @@
+/* Gaze tự nhiên, giữ iris trong hốc mắt: không perspective, không scale. */
+.the-eye{--px:0px;--py:0px;--shine-x:0px;--shine-y:0px}.iris-3d{will-change:left,top}.pupil-3d{translate:var(--px) var(--py);will-change:translate}.eye-shine{translate:var(--shine-x) var(--shine-y);will-change:translate}.organic-lids{transform:none}@media(prefers-reduced-motion:reduce){.pupil-3d,.eye-shine{translate:0 0!important}}

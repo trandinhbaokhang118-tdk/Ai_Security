@@ -1,0 +1,11 @@
+@@ -450,8 +450,8 @@
+     if (!element) continue;
+     const original = node.__prewiseOriginalText ?? node.nodeValue ?? "";
+     if (node.__prewiseOriginalText === undefined) node.__prewiseOriginalText = original;
+-    if (language === "en") node.nodeValue = translateText(original) ?? original;
+-    else node.nodeValue = original;
++    const next = language === "en" ? (translateText(original) ?? original) : original;
++    if (node.nodeValue !== next) node.nodeValue = next;
+   }
+ 
+   for (const element of root.querySelectorAll<HTMLElement>("[placeholder], [title], [aria-label]")) {

@@ -1,0 +1,8 @@
+@@ -10,6 +10,7 @@
+ import time
+ import uuid
+ from dataclasses import asdict
++from urllib.parse import urlsplit
+ 
+ from ai.adapters.file_adapter import analyze_file_bytes
+ from ai.inference.engine import InferenceEngine

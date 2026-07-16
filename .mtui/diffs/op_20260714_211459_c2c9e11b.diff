@@ -1,0 +1,8 @@
+@@ -50,6 +50,7 @@
+ from backend.demo.simulator import attack_simulator
+ from backend.demo.websocket import connection_manager
+ from backend.dependencies import get_deepfake_service, get_inference_service
++from security.domain_intelligence import domain_intelligence_service
+ from security.url_risk_core import assess_url as assess_url_risk
+ 
+ # Router setup with prefix and tags

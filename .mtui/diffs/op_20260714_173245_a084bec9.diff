@@ -1,0 +1,55 @@
+@@ -237,6 +237,54 @@
+     return session_dict(row)
+ 
+ 
++@router.get("/sessions/{session_id}/browser")
++def free_browser_state(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
++    require_free_session(db, session_id, auth.user.id)
++    try:
++        return free_web_sandbox.state(session_id)
++    except (KeyError, TimeoutError) as exc:
++        raise HTTPException(410, str(exc)) from exc
++
++
++def require_free_session(db: DbSession, session_id: str, user_id: str) -> CloudSandboxSession:
++    row = db.get(CloudSandboxSession, session_id)
++    if row is None or row.user_id != user_id or row.sandbox_tier != "free" or row.status != "ready":
++        raise HTTPException(404, "Không tìm thấy Free Sandbox đang chạy")
++    return row
++
++
++@router.post("/sessions/{session_id}/browser/navigate")
++def free_browser_navigate(payload: FreeNavigateInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
++    require_free_session(db, session_id, auth.user.id)
++    try:
++        return free_web_sandbox.navigate(session_id, payload.url)
++    except PermissionError as exc:
++        raise HTTPException(403, "URL nội bộ hoặc không công khai đã bị chặn") from exc
++    except Exception as exc:
++        raise HTTPException(502, f"Không mở được website: {exc}") from exc
++
++
++@router.post("/sessions/{session_id}/browser/click")
++def free_browser_click(payload: FreeClickInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
++    require_free_session(db, session_id, auth.user.id)
++    return free_web_sandbox.click(session_id, payload.x, payload.y)
++
++
++@router.post("/sessions/{session_id}/browser/key")
++def free_browser_key(payload: FreeKeyInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
++    require_free_session(db, session_id, auth.user.id)
++    try:
++        return free_web_sandbox.key(session_id, payload.key)
++    except ValueError as exc:
++        raise HTTPException(400, "Phím không được phép") from exc
++
++
++@router.post("/sessions/{session_id}/browser/type")
++def free_browser_type(payload: FreeTypeInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
++    require_free_session(db, session_id, auth.user.id)
++    return free_web_sandbox.type_text(session_id, payload.text)
++
++
+ @router.get("/sessions/{session_id}")
+ def get_session(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
+     row = db.get(CloudSandboxSession, session_id)

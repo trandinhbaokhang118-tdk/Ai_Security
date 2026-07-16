@@ -1,0 +1,13 @@
+
+> ai-security-armor-web@0.1.0 start
+> next start -p 3103
+
+ ⚠ You are using a non-standard "NODE_ENV" value in your environment. This creates inconsistencies in the project and is strongly advised against. Read more: https://nextjs.org/docs/messages/non-standard-node-env
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3103
+   - Network:      http://26.79.202.28:3103
+
+ ✓ Starting...
+ ✓ Ready in 466ms
+
+C:\NDT\PJ\Ai_Security-main\frontend\web>

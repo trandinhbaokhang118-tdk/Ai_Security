@@ -1,0 +1,22 @@
+@@ -164,10 +164,18 @@
+                         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                         Chạy so sánh A/B
+                     </button>
++                <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
++                    <label className="flex cursor-pointer items-center gap-2 font-medium">
++                        <input
++                            type="checkbox"
++                            checked={advancedAnalysis}
++                            onChange={(event) => setAdvancedAnalysis(event.target.checked)}
++                            className="h-4 w-4 accent-cyan-800"
++                        />
++                        Kiểm tra chuyên sâu trong browser sandbox
++                    </label>
++                    <span className="max-w-xs text-right text-zinc-500">Dùng canary tổng hợp, chặn gửi biểu mẫu và giám sát hành vi; có thể mất thêm ~35 giây.</span>
+                 </div>
+-            </section>
+-
+-            {result && (
+                 <section className="space-y-4">
+                     <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">
+                         <article className="rounded-lg border border-red-300 bg-red-50 p-5">

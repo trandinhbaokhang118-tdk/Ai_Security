@@ -1,0 +1,9 @@
+@@ -92,7 +92,7 @@
+             listed=listed,
+             score=min(1.0, score),
+             reasons=tuple(reasons),
+-            available=bool(whois or rdap or certificates or reputation),
++            available=bool(whoisxml or whois or rdap or certificates or reputation),
+         )
+         with self._lock:
+             self._cache[key] = (time.monotonic(), result)

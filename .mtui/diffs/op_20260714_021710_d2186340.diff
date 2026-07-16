@@ -1,0 +1,6 @@
+@@ -1,4 +1,4 @@
+-import { assessUrl, assessText, assessAction } from "./shared/api.js";
++import { assessUrl, assessText, assessAction, verifyExtensionKey } from "./shared/api.js";
+ import { getRiskLevel, toDisplayScore } from "./shared/risk.js";
+ 
+ const tabResults = new Map();

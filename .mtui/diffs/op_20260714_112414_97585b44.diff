@@ -1,0 +1,8 @@
+@@ -455,6 +455,7 @@
+   }
+ 
+   for (const element of root.querySelectorAll<HTMLElement>("[placeholder], [title], [aria-label]")) {
++    if (element.closest("[data-i18n-ignore]")) continue;
+     for (const attribute of ["placeholder", "title", "aria-label"] as const) {
+       const value = element.getAttribute(attribute);
+       if (!value) continue;

@@ -1,0 +1,16 @@
+@@ -366,6 +366,15 @@
+         "iframes": len(parser.iframes),
+         "external_iframes": len(external_iframes),
+         "urgency_hits": urgency_hits[:10],
++        "is_commercial": is_commercial,
++        "collects_sensitive_data": collects_data,
++        "emails": emails[:20],
++        "links": len(parser.links),
++        "has_privacy_policy": any(term in page_text or term in link_text for term in privacy_terms),
++        "has_terms_refund": any(term in page_text or term in link_text for term in terms_terms),
++        "has_contact_channel": any(term in page_text or term in link_text for term in contact_terms),
++        "metadata": parser.meta,
++        "favicons": parser.favicons[:5],
+     }
+     return {"page_title": parser.title, "page_signals": signals}, issues
+ 

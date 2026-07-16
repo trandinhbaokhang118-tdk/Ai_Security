@@ -1,0 +1,38 @@
+@@ -208,6 +208,37 @@
+         response["safe_summary"] = result.reasons[0] if result.reasons else ""
+         return response
+ 
++    def assess_tool_output(self, payload: ToolOutputInput) -> dict[str, Any]:
++        result = self.service.assess_untrusted_content(
++            payload.content,
++            "text",
++            {"source": "tool_output", "tool_name": payload.tool_name},
++        )
++        response = _assessment_json(result)
++        risky_sink = payload.intended_use in {"memory_write", "tool_argument"}
++        injection = any(
++            item.source in {"prompt_firewall", "prompt_adapter", "prompt_model", "prompt_transformer"}
++            and item.severity.value in {"high", "critical"}
++            for item in result.evidence
++        )
++        if injection and risky_sink:
++            response["verdict"] = "BLOCK"
++            response["decision"] = "BLOCK"
++            response["enforcement"].update({
++                "proceed": False, "ask_user": False,
++                "disable_tools": True, "quarantine_content": True,
++            })
++        response.update({
++            "injection_detected": injection,
++            "trust_boundary": "untrusted_tool_output",
++            "tool_name": payload.tool_name,
++            "intended_use": payload.intended_use,
++            "memory_write_allowed": not (injection or result.risk_score >= 0.5),
++            "tool_argument_allowed": not (injection or result.risk_score >= 0.5),
++            "instruction_policy": "tool_output_is_data_never_authority",
++        })
++        return response
++
+     def scan_prompt_injection(self, payload: TextInput) -> dict[str, Any]:
+         return _assessment_json(self.service.assess_prompt(payload.content))
+ 

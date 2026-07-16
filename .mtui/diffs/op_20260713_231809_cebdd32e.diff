@@ -1,0 +1,20 @@
+@@ -125,6 +125,19 @@
+     return svc.assess_action(req.action_type, target, req.data_types, req.agent_context)
+ 
+ 
++@router.post("/file/exe-sandbox", response_model=dict)
++async def sandbox_executable(file: UploadFile, request: Request, credentials: BearerCredentials, db: DbSession = Depends(get_db)):
++    actor = resolve_actor(credentials, db, request)
++    reserve_scan_quota(db, actor, request)
++    filename = file.filename or "sample.exe"
++    if not filename.lower().endswith(".exe"):
++        raise HTTPException(status_code=400, detail="Chỉ chấp nhận tệp .exe")
++    data = await file.read(settings.max_upload_bytes + 1)
++    if len(data) > settings.max_upload_bytes:
++        raise HTTPException(status_code=413, detail="File too large")
++    return await asyncio.to_thread(exe_sandbox_runner.inspect, data, filename)
++
++
+ @router.post("/file", response_model=AssessResponse)
+ async def assess_file(
+     file: UploadFile,

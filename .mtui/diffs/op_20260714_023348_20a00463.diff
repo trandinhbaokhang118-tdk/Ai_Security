@@ -1,0 +1,11 @@
+@@ -2,8 +2,8 @@
+ import {useEffect,useState} from "react";import {PrewiseShell} from "@/components/PrewiseUI";import {useLanguage} from "@/context/LanguageContext";
+ type Tab="appearance"|"privacy"|"data"|"language";type Prefs={motion:string;density:string;saveHistory:boolean;maskSensitive:boolean;language:string};
+ const defaults:Prefs={motion:"balanced",density:"comfortable",saveHistory:true,maskSensitive:true,language:"vi"};
+-export default function Settings(){const [tab,setTab]=useState<Tab>("appearance"),[prefs,setPrefs]=useState<Prefs>(defaults),[notice,setNotice]=useState(""),[confirmClear,setConfirmClear]=useState(false);
+- useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem("prewise-settings")||"null");if(saved)setPrefs({...defaults,...saved})}catch{}},[]);
++export default function Settings(){const {language,setLanguage}=useLanguage();const [tab,setTab]=useState<Tab>("appearance"),[prefs,setPrefs]=useState<Prefs>(defaults),[notice,setNotice]=useState(""),[confirmClear,setConfirmClear]=useState(false);
++ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem("prewise-settings")||"null");if(saved)setPrefs({...defaults,...saved,language})}catch{}},[language]);
+  useEffect(()=>{document.documentElement.dataset.motion=prefs.motion;document.documentElement.dataset.density=prefs.density;try{localStorage.setItem("prewise-settings",JSON.stringify(prefs))}catch{}},[prefs]);
+  const update=(patch:Partial<Prefs>)=>{setPrefs(v=>({...v,...patch}));setNotice("Đã lưu thay đổi");setTimeout(()=>setNotice(""),1800)};
+  const clear=()=>{localStorage.removeItem("prewise-history");setConfirmClear(false);setNotice("Đã xóa toàn bộ lịch sử cục bộ");setTimeout(()=>setNotice(""),2200)};

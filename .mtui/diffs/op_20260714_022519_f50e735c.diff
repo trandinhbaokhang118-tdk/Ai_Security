@@ -1,0 +1,11 @@
+@@ -53,7 +53,9 @@
+                      last_scan_at, created_at, updated_at)
+                 VALUES
+                     (:id, :identity, :usage_day, 1, :limit, :now, :now, :now)
+-                ON CONFLICT ({identity_column}, usage_day) DO UPDATE SET
++                ON CONFLICT ({identity_column}, usage_day)
++                    WHERE {identity_column} IS NOT NULL
++                DO UPDATE SET
+                     scan_count = daily_quota_usage.scan_count + 1,
+                     limit_snapshot = EXCLUDED.limit_snapshot,
+                     last_scan_at = EXCLUDED.last_scan_at,

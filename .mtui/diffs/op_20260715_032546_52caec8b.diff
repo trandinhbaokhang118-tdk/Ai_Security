@@ -1,0 +1,13 @@
+@@ -82,6 +82,12 @@
+     "SourceConfig",
+     "SubjectKeys",
+     "assess",
++    "add_browser_sandbox",
++    "add_domain_intelligence",
++    "add_http_sandbox",
++    "add_offline_url_findings",
++    "add_structured_observations",
++    "build_criteria_evidence",
+     "default_config",
+     "default_risk_config",
+     "make_finding_key",

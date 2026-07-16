@@ -1,0 +1,9 @@
+@@ -173,6 +173,8 @@
+         if not raw:
+             return None
+         value = str(raw).strip()
++        if value.endswith(" UTC"):
++            value = value[:-4] + "+00:00"
+         candidates = (value, value.replace("Z", "+00:00"))
+         for candidate in candidates:
+             try:

@@ -1,0 +1,9 @@
+@@ -31,7 +31,7 @@
+     overrides, effective = evaluate_overrides(resolved, override_rules)
+     score = max(base, effective.floor if effective else 0.0)
+     confidence = compute_confidence(criteria, resolved)
+-    band = "high" if confidence.score >= 75 else "medium" if confidence.score >= 45 else "low"
++    band = "high" if confidence.score >= 70 else "medium" if confidence.score >= 40 else "low"
+     unavailable = [c.criterion_id for c in criteria if c.status.value == "unavailable"]
+     not_checked = [c.criterion_id for c in criteria if c.status.value == "not_checked"]
+     reasoning = [

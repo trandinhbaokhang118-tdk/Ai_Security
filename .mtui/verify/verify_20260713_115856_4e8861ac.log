@@ -1,0 +1,10 @@
+$ python .omni/generate_prewise_icon.py --profile python
+mode: fallback
+exit_code: 0
+duration_ms: 542
+---- stdout ----
+created=C:\NDT\PJ\Ai_Security-main\frontend\web\public\prewise-icon-512.png
+size=512x512
+source_symbol=318x286
+
+---- stderr ----

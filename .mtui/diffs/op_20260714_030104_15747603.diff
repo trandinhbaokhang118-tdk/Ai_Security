@@ -1,0 +1,8 @@
+@@ -118,6 +118,7 @@
+     if policy:
+         score += .18; families.append("policy_tampering")
+         evidence.append(_e("Nội dung cố thay đổi policy, trust hoặc allowlist của agent.", Severity.CRITICAL, "policy_tampering", .18))
++    if override:
+         score += .35; families.append("instruction_override")
+         evidence.append(_e("Phát hiện lệnh ghi đè/chống lại chỉ dẫn ưu tiên.", Severity.CRITICAL, "instruction_override", .35))
+     if privilege:

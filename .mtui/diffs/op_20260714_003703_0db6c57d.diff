@@ -1,0 +1,62 @@
+@@ -75,39 +75,35 @@
+     # Validate URL
+     _validate_url(request.url)
+ 
+-    # Get inference engine
++    # The engine combines offline ML with deterministic identity, intent and evasion rules.
+     engine = inference_service.engine
+-
+-    # Analyze URL using InferenceEngine
+     result = engine.predict_url(request.url)
+-
+-    # Map risk_score to threat_level
+-    threat_level = _map_risk_to_threat_level(result.risk_score)
+-
+-    # Build response
++    core = assess_url_risk(request.url, model_score=result.risk_score)
++    final_score = core.score
++    run_sandbox = request.deep_analysis or request.advanced_analysis
++    layers = [
++        URLScoreLayer("L1 · Nhận diện URL & giả mạo thương hiệu", core.layer_scores["lexical_identity"], "completed", "Phân tích tên miền thật, thương hiệu, HTTPS, TLD, shortlink và homoglyph.", sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence)),
++        URLScoreLayer("L2 · Ý đồ đánh cắp & né tránh", max(core.layer_scores["credential_intent"], core.layer_scores["evasion"]), "completed", "Phát hiện lure OTP/mật khẩu/thanh toán, URL mã hóa và tham số bất thường.", sum(item.feature in {"credential_theft_intent", "credential_lure_cluster", "at_symbol", "url_obfuscation", "excessive_query_parameters", "high_entropy_domain"} for item in core.evidence)),
++        URLScoreLayer("L3 · Sandbox trình duyệt cô lập", 0.0, "skipped" if not run_sandbox else "unavailable", "Chạy theo yêu cầu: canary tổng hợp, chặn submit/exfiltration, giám sát redirect và network."),
++    ]
+     response = URLAnalysisResponse(
+-        url=request.url,
+-        risk_score=result.risk_score,
+-        threat_level=threat_level,
++        url=request.url, risk_score=final_score, threat_level=_map_risk_to_threat_level(final_score),
+         analysis_time_ms=int((time.time() - start_time) * 1000),
+-        traditional_detection=TraditionalDetection(
+-            detected=False,  # Traditional methods miss these attacks
+-            methods=[],
+-        ),
+-        ai_detection=AIDetection(
+-            detected=result.risk_score >= 0.5,
+-            confidence=result.risk_score,
+-            model_version=result.model_version,
+-        ),
+-        evidence=[item.model_dump() for item in result.evidence],
+-        sandbox_report=None,
++        traditional_detection=TraditionalDetection(detected=False, methods=[]),
++        ai_detection=AIDetection(detected=final_score >= 0.5, confidence=final_score, model_version=result.model_version),
++        evidence=[item.model_dump() for item in core.evidence], score_layers=layers,
++        deep_analysis_recommended=core.requires_deep_analysis, sandbox_report=None,
+     )
+-
+-    # If deep analysis requested, run sandbox
+-    if request.deep_analysis:
++    if run_sandbox:
+         sandbox_report = await sandbox_runner.analyze_url(request.url)
+         response.sandbox_report = sandbox_report
+-
++        sandbox_score = min(1.0, sum({"critical": 0.30, "high": 0.18, "medium": 0.10, "low": 0.04}.get(item.get("severity"), 0.0) for item in sandbox_report.behaviors))
++        layers[-1] = URLScoreLayer("L3 · Sandbox trình duyệt cô lập", sandbox_score, "completed" if not sandbox_report.error else "unavailable", "Quan sát hành vi live trong browser cô lập; không dùng dữ liệu thật.", len(sandbox_report.behaviors))
++        response.risk_score = max(response.risk_score, sandbox_score)
++        response.threat_level = _map_risk_to_threat_level(response.risk_score)
++        response.ai_detection.detected = response.risk_score >= 0.5
++        response.ai_detection.confidence = response.risk_score
++        response.analysis_time_ms = int((time.time() - start_time) * 1000)
+     return response
+ 
+ 

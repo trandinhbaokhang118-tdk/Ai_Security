@@ -1,0 +1,21 @@
+@@ -82,6 +82,20 @@
+     deep_analysis: bool = Field(
+         default=False, description="Enable sandbox analysis (slower but more detailed)"
+     )
++    advanced_analysis: bool = Field(
++        default=False,
++        description="Run browser sandbox with synthetic canaries for ambiguous/high-risk URLs",
++    )
++
++
++class URLScoreLayer(BaseModel):
++    """Explainable result of one defensive URL-analysis layer."""
++
++    layer: str
++    score: float = Field(..., ge=0.0, le=1.0)
++    status: Literal["completed", "skipped", "unavailable"] = "completed"
++    summary: str
++    signals: int = 0
+ 
+ 
+ class URLAnalysisResponse(BaseModel):

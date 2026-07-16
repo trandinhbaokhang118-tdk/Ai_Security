@@ -1,0 +1,12 @@
+@@ -1,6 +1,10 @@
+ from security.domain_intelligence import DomainIntelligence, DomainIntelligenceService
+ from security.risk_core import CriterionStatus, default_config
+-from security.risk_core.detectors import ScanObservations, add_domain_intelligence, build_criteria_evidence
++from security.risk_core.detectors import (
++    ScanObservations,
++    add_domain_intelligence,
++    build_criteria_evidence,
++)
+ 
+ 
+ def _intel(**overrides):

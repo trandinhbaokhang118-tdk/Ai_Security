@@ -1,0 +1,8 @@
+@@ -34,6 +34,7 @@
+ router = APIRouter(prefix="/v1/assess", tags=["assess"])
+ sandbox_runner = URLSandboxRunner()
+ browser_sandbox_runner = BrowserSandboxRunner()
++exe_sandbox_runner = ExeSandboxRunner()
+ 
+ 
+ @router.post("/url", response_model=AssessResponse)

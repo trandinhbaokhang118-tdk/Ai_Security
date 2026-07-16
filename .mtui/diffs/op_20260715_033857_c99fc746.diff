@@ -1,0 +1,11 @@
+@@ -158,7 +158,9 @@
+         for cid in (1, 3, 4, 11, 12):
+             obs.unavailable[cid] = "Domain intelligence providers unavailable."
+         return
+-    obs.clean(1, 3, 4, 11, 12)
++    obs.clean(1, 11)
++    for cid in (3, 4, 12):
++        obs.unavailable[cid] = "Provider response does not contain enough data for this check."
+     if intelligence.age_days is not None and intelligence.age_days < 180:
+         severity = (
+             1.0 if intelligence.age_days < 30 else 0.75 if intelligence.age_days < 90 else 0.5

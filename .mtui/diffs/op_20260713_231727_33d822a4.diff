@@ -1,0 +1,8 @@
+@@ -16,6 +16,7 @@
+ from backend.services.quota_service import reserve_scan_quota
+ from backend.services.scan_log_service import log_assessment
+ from security.browser_sandbox import BrowserSandboxRunner
++from security.exe_sandbox import ExeSandboxRunner
+ from security.url_sandbox import URLSandboxRunner
+ from shared.schemas import (
+     AgentRiskResponse,

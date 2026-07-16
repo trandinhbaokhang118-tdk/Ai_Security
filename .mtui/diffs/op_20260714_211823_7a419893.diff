@@ -1,0 +1,18 @@
+@@ -67,12 +67,11 @@
+                 reasons.append(f"Domain còn mới: {age_days} ngày (<180 ngày).")
+         if listed:
+             score += 0.45
+-            threat = reputation.get("threat") or "malicious URL"
+-            reasons.append(f"URLhaus đã liệt kê URL với loại đe dọa: {threat}.")
+-        if not reasons and (rdap or reputation):
+-            reasons.append("Không phát hiện tín hiệu tuổi domain mới hoặc URL bị URLhaus liệt kê.")
+-        errors = [error for error in (rdap_error, reputation_error) if error]
+-        if errors and not (rdap or reputation):
++            reasons.append("Nguồn urlscan.io có kết quả đánh dấu độc hại cho domain.")
++        if not reasons and (rdap or certificates or reputation):
++            reasons.append("Không phát hiện domain mới hoặc kết quả độc hại trong nguồn công khai đã truy vấn.")
++        errors = [error for error in (rdap_error, certificate_error, reputation_error) if error]
++        if errors and not (rdap or certificates or reputation):
+             reasons.append("Không thể truy vấn nguồn intelligence: " + "; ".join(errors))
+ 
+         result = DomainIntelligence(

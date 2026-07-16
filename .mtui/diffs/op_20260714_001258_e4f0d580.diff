@@ -1,0 +1,19 @@
+@@ -19,8 +19,16 @@
+       <div class="empty-icon">🛡️</div><h2>Bảo vệ đang tắt</h2><p>Bật công tắc phía trên để kiểm tra trang và cảnh báo liên kết nguy hiểm.</p>
+     </section>
+ 
+-    <section id="loading" class="empty" aria-live="polite">
+-      <div class="spinner"></div><h2>Đang kiểm tra trang</h2><p>Quá trình này chỉ mất vài giây.</p>
++    <section id="loading" class="loading-card" aria-live="polite">
++      <div class="loading-head"><div class="spinner"></div><div><h2 id="loading-title">Đang chuẩn bị kiểm tra</h2><p id="loading-detail">Đang đọc thông tin trang hiện tại…</p></div><strong id="loading-elapsed">0.0s</strong></div>
++      <div class="progress-track"><span id="loading-progress"></span></div>
++      <ol class="scan-steps">
++        <li id="step-page"><span>1</span><div><strong>Đọc trang hiện tại</strong><small>Xác định URL và trạng thái tab</small></div></li>
++        <li id="step-gateway"><span>2</span><div><strong>Kết nối Gateway</strong><small>Gửi yêu cầu qua kênh bảo vệ</small></div></li>
++        <li id="step-analysis"><span>3</span><div><strong>Phân tích rủi ro</strong><small>Chờ mô hình đánh giá URL</small></div></li>
++        <li id="step-result"><span>4</span><div><strong>Hoàn thiện kết quả</strong><small>Chuẩn hóa lý do và bằng chứng</small></div></li>
++      </ol>
++      <p id="loading-warning" class="loading-warning" hidden>Yêu cầu đang chậm hơn bình thường nhưng chưa bị treo.</p>
+     </section>
+ 
+     <section id="unsupported" class="empty" hidden>

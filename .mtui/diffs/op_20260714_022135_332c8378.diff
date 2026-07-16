@@ -1,0 +1,55 @@
+@@ -34,12 +34,53 @@
+ 
+ 
+ def reserve_scan_quota(db: Session, actor: ActorContext, request: Request) -> None:
+-    """Consume one scan unit atomically enough for app-level quota enforcement."""
++    """Atomically consume one scan unit, including under concurrent PostgreSQL traffic."""
+ 
+     user_id, api_key_id, anonymous_id = _identity(actor, request)
+     limit = _daily_limit(db, actor)
+     today = date.today()
+ 
++    if db.bind is not None and db.bind.dialect.name == "postgresql":
++        identity_column = (
++            "user_id" if user_id is not None else "api_key_id" if api_key_id is not None else "anonymous_id"
++        )
++        identity_value = user_id or api_key_id or anonymous_id
++        result = db.execute(
++            text(
++                f"""
++                INSERT INTO daily_quota_usage
++                    (id, {identity_column}, usage_day, scan_count, limit_snapshot,
++                     last_scan_at, created_at, updated_at)
++                VALUES
++                    (:id, :identity, :usage_day, 1, :limit, :now, :now, :now)
++                ON CONFLICT ({identity_column}, usage_day) DO UPDATE SET
++                    scan_count = daily_quota_usage.scan_count + 1,
++                    limit_snapshot = EXCLUDED.limit_snapshot,
++                    last_scan_at = EXCLUDED.last_scan_at,
++                    updated_at = EXCLUDED.updated_at
++                WHERE :limit IS NULL OR daily_quota_usage.scan_count < :limit
++                RETURNING scan_count
++                """
++            ),
++            {
++                "id": DailyQuotaUsage().id,
++                "identity": identity_value,
++                "usage_day": today,
++                "limit": limit,
++                "now": utcnow(),
++            },
++        ).scalar_one_or_none()
++        if result is None:
++            db.rollback()
++            raise HTTPException(
++                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
++                detail="Bạn đã hết lượt quét hôm nay.",
++            )
++        db.commit()
++        return
++
++    # SQLite fallback for local development and tests. SQLite serializes writers;
++    # the unique constraint plus retry handles a competing first insert.
+     for _ in range(2):
+         try:
+             query = select(DailyQuotaUsage).where(DailyQuotaUsage.usage_day == today)

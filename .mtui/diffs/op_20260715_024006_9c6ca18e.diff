@@ -1,0 +1,19 @@
+@@ -14,6 +14,18 @@
+ from ai.adapters.file_adapter import analyze_file_bytes
+ from ai.inference.engine import InferenceEngine
+ from security.policy_engine import PolicyEngine, score_to_level
++from security.risk_core import (
++    CriterionStatus,
++    EvidenceV2,
++    MatchedSubject,
++    PolicyEngineV2,
++    ProviderVerdict,
++    assess as assess_risk_v2,
++    make_finding_key,
++    make_incident_key,
++    normalize_url,
++)
++from shared.schemas import RiskCoreTrace
+ from shared.schemas import (
+     AgentContext,
+     AgentRiskResponse,

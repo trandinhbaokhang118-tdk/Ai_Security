@@ -1,0 +1,9 @@
+@@ -13,6 +13,8 @@
+ type StoredRecord = {
+   score?: number;
+   content?: string;
++  isDemo?: boolean;
++  dataSource?: string;
+   result?: {
+     risk_score?: number;
+     confidence?: number;

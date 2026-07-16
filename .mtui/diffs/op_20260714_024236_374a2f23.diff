@@ -1,0 +1,18 @@
+@@ -492,7 +492,16 @@
+             model_score=score,
+         )
+         version = self._hybrid_version("text", transformer_score, lightweight_score) + "+phishing-core-1"
+-        return PredictionResult(core.score, core.evidence, version)
++        model_evidence = self._text_evidence(
++            clean,
++            lightweight_score=lightweight_score,
++            transformer_score=transformer_score,
++        )
++        evidence = [
++            *core.evidence,
++            *(item for item in model_evidence if item.severity != Severity.INFO),
++        ]
++        return PredictionResult(core.score, evidence, version)
+ 
+     def _heuristic_text(self, text: str) -> float:
+         lower = normalize_for_detection(text)

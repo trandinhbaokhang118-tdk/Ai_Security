@@ -1,0 +1,13 @@
+@@ -84,6 +84,12 @@
+             unsafe.append("SEED_DEMO_USER=false")
+         if self.database_auto_create:
+             unsafe.append("DATABASE_AUTO_CREATE=false")
++        if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
++            unsafe.append("DATABASE_URL=postgresql+psycopg://...")
++        if self.database_require_tls and "sslmode=" not in self.database_url:
++            unsafe.append("DATABASE_URL with sslmode=require or verify-full")
++        if len(self.api_key_pepper.encode("utf-8")) < 32:
++            unsafe.append("API_KEY_PEPPER>=32 bytes")
+         if self.mcp_allow_anonymous:
+             unsafe.append("MCP_ALLOW_ANONYMOUS=false")
+         if self.mcp_api_key_rate_limit_per_min <= 0:

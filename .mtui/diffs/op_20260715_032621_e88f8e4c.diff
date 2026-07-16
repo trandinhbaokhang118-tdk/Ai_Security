@@ -1,0 +1,13 @@
+@@ -116,8 +116,10 @@
+                 observations.unavailable[criterion_id] = (
+                     f"Domain intelligence unavailable: {type(exc).__name__}"
+                 )
+-        v2_evidence = build_criteria_evidence(observations, default_config())
+-        risk = assess_risk_v2(v2_evidence)
++        config = default_config()
++        v2_evidence = build_criteria_evidence(observations, config)
++        v2_evidence.extend(collect_external(url, config))
++        risk = assess_risk_v2(v2_evidence, config=config)
+         policy = PolicyEngineV2().decide(risk)
+         trace = asdict(risk)
+         trace.update(

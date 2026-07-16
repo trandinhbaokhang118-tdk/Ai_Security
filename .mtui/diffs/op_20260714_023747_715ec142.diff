@@ -1,0 +1,53 @@
+@@ -585,30 +585,32 @@
+                 )
+             except Exception:
+                 transformer_score = None
+-        prob = self._hybrid_score(transformer_score, lightweight_score, heuristic_prob)
+-        version = self._hybrid_version("prompt", transformer_score, lightweight_score)
+-        ev: list[Evidence] = []
+-        if prob >= 0.5:
+-            if transformer_score is not None and transformer_score >= 0.5:
+-                ev.append(Evidence(source="prompt_transformer",
+-                                   message="ProtectAI Transformer flagged prompt injection",
+-                                   severity=Severity.CRITICAL,
+-                                   feature="prompt_transformer_probability",
+-                                   contribution=transformer_score))
+-            if lightweight_score is not None and lightweight_score >= 0.5:
+-                ev.append(Evidence(source="prompt_model",
+-                                   message="Lightweight prompt model flagged injection risk",
+-                                   severity=Severity.CRITICAL,
+-                                   feature="prompt_model_probability",
+-                                   contribution=lightweight_score))
++        model_prob = self._hybrid_score(transformer_score, lightweight_score, heuristic_prob)
++        firewall = assess_prompt_firewall(text)
++        # A deterministic high-confidence family cannot be averaged away by a
++        # weak/stale classifier. Conversely the ML ensemble still catches novel
++        # semantic attacks not covered by fixed signatures.
++        prob = _clip01(max(model_prob, firewall.score))
++        version = self._hybrid_version("prompt", transformer_score, lightweight_score) + "+firewall-1"
++        ev: list[Evidence] = list(firewall.evidence)
++        if transformer_score is not None and transformer_score >= 0.5:
++            ev.append(Evidence(source="prompt_transformer",
++                               message="ProtectAI Transformer flagged prompt injection",
++                               severity=Severity.CRITICAL,
++                               feature="prompt_transformer_probability",
++                               contribution=transformer_score))
++        if lightweight_score is not None and lightweight_score >= 0.5:
++            ev.append(Evidence(source="prompt_model",
++                               message="Lightweight prompt model flagged injection risk",
++                               severity=Severity.CRITICAL,
++                               feature="prompt_model_probability",
++                               contribution=lightweight_score))
++        if heuristic_prob >= 0.5:
+             ev.append(Evidence(source="prompt_adapter",
+                                message="Phát hiện mẫu tấn công ghi đè chỉ dẫn",
+                                severity=Severity.CRITICAL, feature="injection_pattern",
+                                contribution=heuristic_prob))
+-        else:
+-            ev.append(Evidence(source="prompt_adapter", message="Không phát hiện prompt injection",
+-                               severity=Severity.INFO, contribution=0.02))
+-        return PredictionResult(_clip01(prob), ev, version)
++        return PredictionResult(prob, ev, version)
+ 
+     def _run_transformer_binary_classifier(
+         self, session: Any, tokenizer: Any, text: str, max_length: int = 256

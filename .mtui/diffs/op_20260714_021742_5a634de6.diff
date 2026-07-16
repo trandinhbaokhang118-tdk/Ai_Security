@@ -1,0 +1,10 @@
+@@ -124,7 +124,8 @@
+         }
+         case "ASSESS_ACTION": try { return sendResponse({ result: await assessAction(message.actionType, message.targetUrl, message.dataTypes) }); } catch (error) { return sendResponse({ error: errorInfo(error) }); }
+         case "GET_TAB_RESULT": { const entry = tabResults.get(message.tabId); return sendResponse(entry?.url === message.url ? entry : null); }
+-        case "GET_SETTINGS": { const current = await settings(); return sendResponse({ ...current, rateLimited: Date.now() < rateLimitedUntil, retryAfter: Math.max(0, Math.ceil((rateLimitedUntil - Date.now()) / 1000)) }); }
++        case "VERIFY_API_KEY": try { const activation = await verifyExtensionKey(); await chrome.storage.local.set({ extensionActivation: activation }); return sendResponse({ activation }); } catch (error) { return sendResponse({ error: errorInfo(error) }); }
++        case "GET_SETTINGS": { const current = await settings(); const stored = await chrome.storage.local.get(["extensionApiKey", "extensionActivation"]); return sendResponse({ ...current, activated: Boolean(stored.extensionApiKey && stored.extensionActivation?.valid), activation: stored.extensionActivation || null, rateLimited: Date.now() < rateLimitedUntil, retryAfter: Math.max(0, Math.ceil((rateLimitedUntil - Date.now()) / 1000)) }); }
+         default: return sendResponse({ error: { type: "unknown_message", message: "Thông điệp không được hỗ trợ." } });
+       }
+     } catch (error) { sendResponse({ error: errorInfo(error) }); }

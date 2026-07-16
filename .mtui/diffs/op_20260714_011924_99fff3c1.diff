@@ -1,0 +1,9 @@
+@@ -23,7 +23,7 @@
+ /** Bộ liên kết chân trang mặc định (tiếng Việt/nhãn ngắn khớp nav). */
+ const DEFAULT_LINKS: FooterLink[] = [
+     { label: "Trang chủ", href: "/" },
+-    { label: "Demo", href: "/demo" },
++    { label: "Phân tích", href: "/analyze" },
+     { label: "Chat AI", href: "/chat" },
+     { label: "Giới thiệu", href: "/about" },
+     { label: "Gói dịch vụ", href: "/pricing" },

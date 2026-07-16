@@ -1,0 +1,28 @@
+@@ -223,6 +223,27 @@
+                         </article>
+                     </div>
+ 
++                    {result.score_layers && result.score_layers.length > 0 && (
++                        <div className="grid gap-3 md:grid-cols-3">
++                            {result.score_layers.map((layer) => (
++                                <article key={layer.layer} className="rounded-lg border border-zinc-200 bg-white p-4">
++                                    <div className="flex items-start justify-between gap-2">
++                                        <h3 className="text-sm font-bold text-zinc-900">{layer.layer}</h3>
++                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${layer.status === "completed" ? "bg-cyan-100 text-cyan-800" : "bg-zinc-100 text-zinc-600"}`}>{layer.status}</span>
++                                    </div>
++                                    <p className="mt-2 text-2xl font-bold text-zinc-950">{(layer.score * 100).toFixed(0)}<span className="text-sm">%</span></p>
++                                    <p className="mt-1 text-xs text-zinc-600">{layer.summary}</p>
++                                    <p className="mt-2 font-mono text-[11px] text-zinc-500">{layer.signals} tín hiệu</p>
++                                </article>
++                            ))}
++                        </div>
++                    )}
++                    {result.deep_analysis_recommended && !advancedAnalysis && (
++                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
++                            <strong>Khuyến nghị kiểm tra chuyên sâu:</strong> URL có tín hiệu chưa đủ rõ hoặc liên quan tới dữ liệu nhạy cảm. Bật sandbox để xác minh redirect, biểu mẫu và hành vi gửi dữ liệu trong môi trường cô lập.
++                        </div>
++                    )}
++
+                     {result.evidence.length > 0 && (
+                         <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                             <div className="border-b border-zinc-200 px-4 py-3">

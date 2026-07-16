@@ -1,0 +1,10 @@
+@@ -42,8 +42,7 @@
+     ".next-production-clean/types/**/*.ts",
+     ".next-production-v2/types/**/*.ts",
+     ".next/types/**/*.ts",
+-    "next-env.d.ts",
+-    ".next-dev-33008/types/**/*.ts"
++    "next-env.d.ts"
+   ],
+   "exclude": [
+     "node_modules"

@@ -1,0 +1,9 @@
+@@ -63,7 +63,7 @@
+                 """
+             ),
+             {
+-                "id": DailyQuotaUsage().id,
++                "id": uuid_str(),
+                 "identity": identity_value,
+                 "usage_day": today,
+                 "limit": limit,

@@ -1,0 +1,30 @@
+@@ -293,6 +293,29 @@
+         obs.not_applicable[45] = "No business-email use was observed."
+ 
+ 
++def add_dns_intelligence(obs: ScanObservations, intelligence: Any) -> None:
++    """Add current DNS posture; churn remains unavailable until historical snapshots exist."""
++    if not intelligence.available:
++        reason = "; ".join(intelligence.errors[:3]) or "DNS provider unavailable."
++        obs.unavailable[44] = reason
++        obs.unavailable[45] = reason
++        return
++    # A single current snapshot can verify resolution but cannot honestly prove churn.
++    obs.unavailable[44] = "Current DNS snapshot collected; historical comparison is required for churn."
++    if not intelligence.mx:
++        obs.not_applicable[45] = "No MX record was observed; business email security is not applicable."
++        return
++    obs.clean(45)
++    missing = [name for name, present in (("SPF", intelligence.spf),
++                                          ("DMARC", intelligence.dmarc),
++                                          ("DKIM default selector", intelligence.dkim_observed)) if not present]
++    if missing:
++        severity = 0.75 if len(missing) >= 2 else 0.5
++        obs.risk(45, "weak_email_security", severity, 1.0,
++                 "Missing or unobserved email controls: " + ", ".join(missing) + ".",
++                 source="cloudflare_dns")
++
++
+ def add_http_sandbox(obs: ScanObservations, report: Any) -> None:
+     covered = {8, 9, 10, 16, 20, 24, 25, 28, 29, 30, 33, 35, 36, 37, 46, 47}
+     if not report.ok:

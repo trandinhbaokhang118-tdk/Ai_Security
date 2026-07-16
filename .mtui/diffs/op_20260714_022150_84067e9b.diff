@@ -1,0 +1,8 @@
+@@ -12,6 +12,7 @@
+ from sqlalchemy import select
+ from sqlalchemy.orm import Session as DbSession
+ 
++from backend.config import settings
+ from backend.db import get_db
+ from backend.models import ApiKey, DailyQuotaUsage, ScanEvent, SessionRecord, Subscription, User
+ from backend.security_utils import (

@@ -1,0 +1,9 @@
+@@ -89,7 +89,7 @@
+   const timedOut = error?.type === "timeout";
+   setConnection(false, limited ? "Gateway đang giới hạn lượt quét" : timedOut ? "Gateway phản hồi quá chậm" : "Gateway không khả dụng");
+   $("error-title").textContent = limited ? "Đã quét quá nhiều lần" : timedOut ? "Gateway phản hồi quá chậm" : "Không thể kiểm tra trang";
+-  $("error-message").textContent = limited ? "Gateway đang tạm giới hạn yêu cầu để bảo vệ hệ thống. Bảo vệ vẫn đang bật; vui lòng chờ khoảng một phút rồi thử lại." : error?.message || "Kiểm tra cấu hình Gateway và thử lại.";
++  $("error-message").textContent = limited ? `Gateway đang tạm giới hạn yêu cầu theo IP. Bảo vệ vẫn bật; thử lại sau ${Math.max(1, error?.retryAfter || 60)} giây.` : error?.message || "Kiểm tra cấu hình Gateway và thử lại.";
+   show("offline");
+ }
+ function render(entry, tab) {

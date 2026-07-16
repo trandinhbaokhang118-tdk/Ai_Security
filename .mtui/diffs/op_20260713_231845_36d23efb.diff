@@ -1,0 +1,16 @@
+@@ -329,6 +329,15 @@
+         );
+     }
+ 
++    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
++        const form = new FormData();
++        form.append("file", file);
++        const response = await fetch(`${getApiBase()}/v1/assess/file/exe-sandbox`,
++            withAuthentication({ method: "POST", body: form }));
++        if (!response.ok) throw new Error(`Kiểm thử EXE thất bại: ${response.status} — ${await response.text()}`);
++        return response.json() as Promise<ExeSandboxResult>;
++    }
++
+     async assessText(
+         text: string,
+         metadata?: AssessMetadata,

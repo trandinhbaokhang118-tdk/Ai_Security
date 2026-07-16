@@ -1,0 +1,25 @@
+@@ -525,8 +525,22 @@
+       requestAnimationFrame(apply);
+     };
+     schedule();
+-    const observer = new MutationObserver(schedule);
+-    observer.observe(document.body, { childList: true, subtree: true });
++    const observer = new MutationObserver((mutations) => {
++      for (const mutation of mutations) {
++        if (mutation.type === "characterData") {
++          const node = mutation.target as Text;
++          const current = node.nodeValue || "";
++          const previous = mutation.oldValue || "";
++          const translatedPrevious = translateText(previous);
++          if (current !== translatedPrevious) node.__prewiseOriginalText = current;
++        }
++        for (const added of mutation.addedNodes) {
++          if (added.nodeType === Node.TEXT_NODE) (added as Text).__prewiseOriginalText = added.nodeValue || "";
++        }
++      }
++      schedule();
++    });
++    observer.observe(document.body, { childList: true, subtree: true, characterData: true, characterDataOldValue: true });
+     return () => observer.disconnect();
+   }, [language]);
+ 

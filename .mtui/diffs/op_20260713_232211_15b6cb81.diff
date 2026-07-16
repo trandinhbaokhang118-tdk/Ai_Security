@@ -1,0 +1,8 @@
+@@ -138,4 +138,4 @@
+ if ($defender.Count -gt 0) { $risk = 100; $issues += "Microsoft Defender phát hiện mối đe dọa." }
+ $verdict = if ($risk -ge 70) { "dangerous" } elseif ($risk -ge 35) { "suspicious" } else { "no_obvious_theft_detected" }
+ @{ verdict=$verdict; risk_score=[Math]::Min(100,$risk); issues=$issues; processes=$children; files_created=$files; network_attempts=$connections; signature_status=[string]$signature.Status; signer=[string]$signature.SignerCertificate.Subject; defender_detections=$defender } | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 C:\report\result.json
+-'''  # noqa: E501
+\ No newline at end of file
++'''
+\ No newline at end of file

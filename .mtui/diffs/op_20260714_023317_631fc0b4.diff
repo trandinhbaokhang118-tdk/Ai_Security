@@ -1,0 +1,8 @@
+@@ -13,6 +13,7 @@
+ import "./evidence-effects.css";
+ import "./gaze-safe.css";
+ import { AuthProvider } from "@/context/AuthContext";
++import { LanguageProvider } from "@/context/LanguageContext";
+ import AppChrome from "@/components/AppChrome";
+ 
+ export const metadata: Metadata = {

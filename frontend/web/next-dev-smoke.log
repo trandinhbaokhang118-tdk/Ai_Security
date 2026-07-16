@@ -1,0 +1,20 @@
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3010
+   - Network:      http://26.79.202.28:3010
+
+ ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-dev-46520/types/**/*.ts'
+
+ ✓ Ready in 3.4s
+ ○ Compiling /pricing ...
+ ✓ Compiled /pricing in 6.5s (901 modules)
+ GET /pricing 200 in 7152ms

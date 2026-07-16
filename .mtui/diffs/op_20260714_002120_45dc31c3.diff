@@ -1,0 +1,31 @@
+@@ -15,10 +15,28 @@
+   ]).finally(() => clearTimeout(timer));
+ }
+ function send(message, timeoutMs = 6000) {
+-  return withTimeout(chrome.runtime.sendMessage(message), timeoutMs, "Tiến trình nền không phản hồi.");
++  const request = new Promise((resolve, reject) => {
++    try {
++      chrome.runtime.sendMessage(message, (response) => {
++        const runtimeError = chrome.runtime.lastError;
++        if (runtimeError) reject(new Error(runtimeError.message));
++        else resolve(response);
++      });
++    } catch (error) { reject(error); }
++  });
++  return withTimeout(request, timeoutMs, "Tiến trình nền không phản hồi.");
+ }
+ function queryActiveTab() {
+-  return withTimeout(chrome.tabs.query({ active: true, currentWindow: true }), 2000, "Không đọc được tab hiện tại.");
++  const request = new Promise((resolve, reject) => {
++    try {
++      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
++        const runtimeError = chrome.runtime.lastError;
++        if (runtimeError) reject(new Error(runtimeError.message));
++        else resolve(tabs);
++      });
++    } catch (error) { reject(error); }
++  });
++  return withTimeout(request, 2000, "Không đọc được tab hiện tại.");
+ }
+ 
+ function show(id) {

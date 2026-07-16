@@ -1,0 +1,8 @@
+@@ -530,6 +530,7 @@
+     };
+     schedule();
+     const observer = new MutationObserver((mutations) => {
++      if (applyingTranslation) return;
+       for (const mutation of mutations) {
+         if (mutation.type === "characterData") {
+           const node = mutation.target as Text;

@@ -1,0 +1,9 @@
+@@ -91,7 +91,7 @@
+     )
+     final_score = min(1.0, final_score + intelligence.score)
+     evidence_by_feature = {item.feature: item for item in core.evidence if item.feature}
+-    l1_details = _build_l1_details(signals, evidence_by_feature)
++    l1_details = _build_l1_details(signals, evidence_by_feature, intelligence)
+     l2_details = _build_l2_details(signals, evidence_by_feature)
+     layers = [
+         URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=core.layer_scores["lexical_identity"], status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, TLD, shortlink và homoglyph.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "brand_typosquatting", "punycode_domain", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence), details=l1_details),

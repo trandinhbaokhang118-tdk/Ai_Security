@@ -1,0 +1,19 @@
+@@ -95,9 +95,15 @@
+     background.putalpha(rounded)
+     canvas = Image.alpha_composite(canvas, background)
+ 
+-    target_box = 336 * scale
+-    symbol.thumbnail((target_box, target_box), Image.Resampling.LANCZOS)
+-    symbol = symbol.resize((symbol.width * scale, symbol.height * scale), Image.Resampling.LANCZOS)
++    target_box = 318 * scale
++    resize_ratio = min(target_box / symbol.width, target_box / symbol.height)
++    symbol = symbol.resize(
++        (
++            max(1, round(symbol.width * resize_ratio)),
++            max(1, round(symbol.height * resize_ratio)),
++        ),
++        Image.Resampling.LANCZOS,
++    )
+ 
+     x = (canvas_px - symbol.width) // 2
+     y = (canvas_px - symbol.height) // 2

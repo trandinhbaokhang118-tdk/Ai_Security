@@ -1,0 +1,11 @@
+@@ -37,9 +37,7 @@
+   "include": [
+     "**/*.ts",
+     "**/*.tsx",
+-    ".next-dev-15136/types/**/*.ts",
+-    ".next-dev-27220/types/**/*.ts",
+-    ".next-dev-35440/types/**/*.ts",
++    ".next-dev-*/types/**/*.ts",
+     ".next-dev/types/**/*.ts",
+     ".next-production-clean/types/**/*.ts",
+     ".next-production-v2/types/**/*.ts",

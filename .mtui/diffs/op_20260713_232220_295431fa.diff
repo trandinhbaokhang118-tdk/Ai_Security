@@ -1,0 +1,9 @@
+@@ -115,7 +115,7 @@
+ </Configuration>"""
+ 
+     @staticmethod
+-    def _powershell_script() -> str:
++    def _powershell_script() -> str:  # noqa: E501
+         return r'''$ErrorActionPreference = "SilentlyContinue"
+ $sample = "C:\sample\sample.exe"
+ $work = "C:\Users\WDAGUtilityAccount\Desktop\aisec-work"

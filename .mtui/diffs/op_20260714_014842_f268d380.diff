@@ -1,0 +1,9 @@
+@@ -16,7 +16,7 @@
+ import AppChrome from "@/components/AppChrome";
+ 
+ export const metadata: Metadata = {
+-  metadataBase: new URL("https://prewise.xyz"),
++  metadataBase: new URL("https://prewise.site"),
+   title: { default: "Prewise — Thấy rõ rủi ro trước khi quá muộn", template: "%s · Prewise" },
+   description: "Phân tích website, email và tin nhắn để phát hiện dấu hiệu lừa đảo, giả mạo và dữ liệu nhạy cảm.",
+   applicationName: "Prewise",

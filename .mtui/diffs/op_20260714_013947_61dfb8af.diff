@@ -1,0 +1,28 @@
+@@ -97,8 +97,25 @@
+                            Severity.MEDIUM, "shortlink", 0.10))
+ 
+     # Layer 2: credential theft intent and URL obfuscation/evasion.
+-    credential_terms = {"password", "otp", "card", "payment", "billing", "bank", "wallet", "cccd"}
+-    matched_sensitive = credential_terms.intersection(signals.suspicious_keywords)
++    # Decode repeatedly (bounded) so percent-encoding cannot hide another URL or
++    # an account/credential lure from the offline gate.
++    decoded_rounds = decoded
++    for _ in range(2):
++        next_value = unquote(decoded_rounds)
++        if next_value == decoded_rounds:
++            break
++        decoded_rounds = next_value
++    credential_terms = {"password", "passwd", "otp", "2fa", "mfa", "card", "cvv", "payment", "billing", "bank", "wallet", "cccd", "token", "seed", "mnemonic"}
++    matched_sensitive = {term for term in credential_terms if term in decoded_rounds}
++    embedded_urls = decoded_rounds.count("http://") + decoded_rounds.count("https://")
++    if embedded_urls >= 2:
++        evasion += 0.18
++        evidence.append(_e("URL lồng nhiều địa chỉ đích; đây là mẫu chuyển hướng/che giấu phổ biến.",
++                           Severity.HIGH, "nested_url_redirect", 0.18))
++    if any(key in decoded_rounds for key in ("redirect=", "redirect_uri=", "return_url=", "continue=", "next=", "target=", "url=")):
++        evasion += 0.07
++        evidence.append(_e("URL có tham số chuyển hướng; đích cuối cần được xác thực trong sandbox.",
++                           Severity.LOW, "redirect_parameter", 0.07))
+     if matched_sensitive:
+         intent += min(0.26, 0.09 * len(matched_sensitive))
+         evidence.append(_e("URL nhắm tới dữ liệu nhạy cảm: " + ", ".join(sorted(matched_sensitive)) + ".",

@@ -1,0 +1,84 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\MyPC\AppData\Local\Programs\Python\Python311\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\NDT\PJ\Ai_Security-main
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.13.0, hypothesis-6.148.5, asyncio-0.26.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 99 items
+
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_record_attack_creates_new_session PASSED [  1%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_record_attack_unprotected_success PASSED [  2%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_record_attack_protected_blocked PASSED [  3%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_record_multiple_attacks_calculates_rates PASSED [  4%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_improvement_percentage_calculation PASSED [  5%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_improvement_percentage_with_zero_unprotected PASSED [  6%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_average_processing_time_calculation PASSED [  7%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_get_metrics_nonexistent_session_raises_error PASSED [  8%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_reset_session PASSED [  9%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_delete_session PASSED [ 10%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_list_sessions PASSED [ 11%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_separate_protection_states PASSED [ 12%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_concurrent_attack_recording PASSED [ 13%]
+tests/backend/demo/test_metrics.py::TestMetricsAggregator::test_zero_attacks_has_zero_rates PASSED [ 14%]
+tests/backend/demo/test_sandbox.py::test_demo_sandbox_maps_real_browser_result PASSED [ 15%]
+tests/e2e/test_web_gateway_contract.py::test_assess_url_contract_matches_web_client PASSED [ 16%]
+tests/e2e/test_web_gateway_contract.py::test_assess_text_contract_matches_web_client PASSED [ 17%]
+tests/e2e/test_web_gateway_contract.py::test_ws_chat_flow_matches_useChatSession PASSED [ 18%]
+tests/e2e/test_web_gateway_contract.py::test_health_contract PASSED      [ 19%]
+tests/integration/test_api_flow.py::test_health PASSED                   [ 20%]
+tests/integration/test_api_flow.py::test_url_assess_e2e_phishing PASSED  [ 21%]
+tests/integration/test_api_flow.py::test_url_assess_deceptive_subdomain_brand_mismatch PASSED [ 22%]
+tests/integration/test_api_flow.py::test_url_assess_e2e_benign PASSED    [ 23%]
+tests/integration/test_api_flow.py::test_confidence_varies_with_risk_and_evidence PASSED [ 24%]
+tests/integration/test_api_flow.py::test_url_sandbox_blocks_private_network_with_exact_error PASSED [ 25%]
+tests/integration/test_api_flow.py::test_browser_sandbox_blocks_private_network_with_exact_error PASSED [ 26%]
+tests/integration/test_api_flow.py::test_text_assess_vietnamese_phishing PASSED [ 27%]
+tests/integration/test_api_flow.py::test_action_block_credential_exfil PASSED [ 28%]
+tests/integration/test_api_flow.py::test_prompt_benign_not_blocked PASSED [ 29%]
+tests/integration/test_api_flow.py::test_llm_explanation_fallback_present_in_health PASSED [ 30%]
+tests/integration/test_api_flow.py::test_judge_demo_phishing_comparison_uses_live_detector PASSED [ 31%]
+tests/integration/test_api_flow.py::test_judge_demo_prompt_injection_before_after PASSED [ 32%]
+tests/integration/test_api_flow.py::test_judge_demo_training_poison_is_quarantined PASSED [ 33%]
+tests/integration/test_api_flow.py::test_judge_demo_deepfake_image_runs_local_model PASSED [ 34%]
+tests/test_admin_security.py::test_spec_id_rejects_path_traversal PASSED [ 35%]
+tests/test_admin_security.py::test_training_data_must_be_inside_allowlisted_directory PASSED [ 36%]
+tests/test_admin_security.py::test_admin_dependency_rejects_non_admin PASSED [ 37%]
+tests/test_admin_security.py::test_admin_api_requires_admin_session PASSED [ 38%]
+tests/test_admin_security.py::test_training_request_accepts_only_one_model_per_dataset PASSED [ 39%]
+tests/test_agent_security.py::test_agent_response_is_machine_actionable_for_block PASSED [ 40%]
+tests/test_agent_security.py::test_prompt_injection_returns_agent_contract PASSED [ 41%]
+tests/test_auth.py::test_account_endpoints_require_bearer_session PASSED [ 42%]
+tests/test_auth.py::test_login_allows_account_access_and_logout_revokes_token PASSED [ 43%]
+tests/test_auth.py::test_authenticated_scan_persists_to_history_and_quota PASSED [ 44%]
+tests/test_auth.py::test_api_keys_are_scoped_per_user_and_rotate_independently FAILED [ 45%]
+
+================================== FAILURES ===================================
+_________ test_api_keys_are_scoped_per_user_and_rotate_independently __________
+
+    def test_api_keys_are_scoped_per_user_and_rotate_independently() -> None:
+        demo = login_demo()
+        email = f"member-{secrets.token_hex(4)}@example.com"
+        registration = client.post(
+            "/v1/auth/register",
+            json={"email": email, "password": "StrongPass!123", "displayName": "Member"},
+        )
+        assert registration.status_code == 200
+        member = registration.json()
+    
+        demo_key = client.get("/v1/account/api-key", headers=bearer(demo["token"])).json()["key"]
+        member_headers = bearer(member["token"])
+        member_key = client.get("/v1/account/api-key", headers=member_headers).json()["key"]
+        assert member_key != demo_key
+    
+>       rotated_key = client.post("/v1/account/api-key/rotate", headers=member_headers).json()["key"]
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'key'
+
+tests\test_auth.py:87: KeyError
+=========================== short test summary info ===========================
+FAILED tests/test_auth.py::test_api_keys_are_scoped_per_user_and_rotate_independently - KeyError: 'key'
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+======================== 1 failed, 44 passed in 5.57s =========================

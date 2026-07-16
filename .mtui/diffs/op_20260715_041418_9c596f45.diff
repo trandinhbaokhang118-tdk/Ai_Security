@@ -1,0 +1,23 @@
+@@ -143,6 +143,22 @@
+         response.final_score = round(risk.risk_score / 100, 4)
+         return response
+ 
++    def assess_sandbox_report(self, url: str, report: object, *, browser: bool = False) -> RiskCoreTrace:
++        observations = ScanObservations(url)
++        (add_browser_sandbox if browser else add_http_sandbox)(observations, report)
++        config = default_config()
++        risk = assess_risk_v2(build_criteria_evidence(observations, config), config=config)
++        policy = PolicyEngineV2().decide(risk)
++        trace = asdict(risk)
++        trace.update({
++            "schema_version": "2", "scoring_version": risk.scan_version,
++            "raw_score": risk.base_risk_score, "final_score": risk.risk_score,
++            "confidence": risk.confidence_score, "verdict": risk.risk_level,
++            "decision": policy.decision.value, "next_action": policy.next_action.value,
++        })
++        return RiskCoreTrace.model_validate(trace)
++
++
+     # ------------------------------------------------------------------ text
+     def assess_text(self, text: str, modality: str = "email", metadata: dict | None = None):
+         t0 = time.perf_counter()

@@ -1,0 +1,234 @@
+"""Production sandbox entitlement API: Free Web, Pro EXE, and Max GPU."""
+from __future__ import annotations
+
+import asyncio
+import re
+import secrets
+from datetime import date, datetime, timedelta
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DbSession
+
+from backend.config import settings
+from backend.db import get_db
+from backend.models import CloudSandboxSession, PaymentOrder, SandboxWallet, Subscription
+from backend.routers.auth import CurrentSession
+from backend.security_utils import utcnow
+from backend.services.cloud_sandbox_service import cloud_sandbox_service
+
+router = APIRouter(prefix="/v1/sandbox-cloud", tags=["sandbox-cloud"])
+TIER_RANK = {"free": 0, "pro": 1, "max": 2}
+TIER_CAPABILITIES = {
+    "free": {"web": True, "exe": False, "gpu": False, "minutes": 10, "provider": "local"},
+    "pro": {"web": True, "exe": True, "gpu": False, "minutes": 15, "provider": "aws"},
+    "max": {"web": True, "exe": True, "gpu": True, "minutes": 30, "provider": "aws"},
+}
+
+
+class BuyCreditsInput(BaseModel):
+    credits: int = Field(default=1, ge=1, le=100)
+
+
+class CreateSessionInput(BaseModel):
+    tier: str = "free"
+
+
+class SePayWebhook(BaseModel):
+    id: str | int | None = None
+    transferAmount: int | float = 0
+    content: str = ""
+    referenceCode: str | None = None
+
+
+def wallet_for(db: DbSession, user_id: str) -> SandboxWallet:
+    wallet = db.get(SandboxWallet, user_id)
+    if wallet is None:
+        wallet = SandboxWallet(user_id=user_id, credits=0)
+        db.add(wallet)
+        db.flush()
+    return wallet
+
+
+def account_tier(db: DbSession, user_id: str) -> str:
+    row = db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(("trialing", "active")),
+        ).order_by(Subscription.created_at.desc())
+    ).scalar_one_or_none()
+    tier = row.plan_tier if row else "free"
+    if tier in {"team", "enterprise"}:
+        return "max"
+    return tier if tier in TIER_RANK else "free"
+
+
+def session_dict(row: CloudSandboxSession) -> dict:
+    return {
+        "id": row.id, "tier": row.sandbox_tier, "status": row.status,
+        "remoteUrl": row.remote_url, "expiresAt": row.expires_at.isoformat(), "error": row.error,
+    }
+
+
+@router.get("/status")
+def get_status(auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
+    wallet = wallet_for(db, auth.user.id)
+    plan = account_tier(db, auth.user.id)
+    active = db.execute(
+        select(CloudSandboxSession).where(
+            CloudSandboxSession.user_id == auth.user.id,
+            CloudSandboxSession.status.in_(("provisioning", "ready")),
+        ).order_by(CloudSandboxSession.created_at.desc())
+    ).scalar_one_or_none()
+    db.commit()
+    return {
+        "accountTier": plan, "credits": wallet.credits,
+        "availableTiers": [
+            {"tier": tier, **capability, "allowed": TIER_RANK[plan] >= TIER_RANK[tier]}
+            for tier, capability in TIER_CAPABILITIES.items()
+        ],
+        "cloudConfigured": cloud_sandbox_service.configured(),
+        "freeConfigured": bool(settings.free_sandbox_remote_url),
+        "session": session_dict(active) if active else None,
+    }
+
+
+@router.post("/payments")
+def create_payment(payload: BuyCreditsInput, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
+    reference = f"PW{secrets.token_hex(6).upper()}"
+    order = PaymentOrder(
+        user_id=auth.user.id, reference=reference, credits=payload.credits,
+        amount_vnd=payload.credits * settings.sandbox_credit_price_vnd,
+    )
+    db.add(order)
+    db.commit()
+    return {
+        "orderId": order.id, "reference": reference, "amountVnd": order.amount_vnd,
+        "credits": order.credits, "bankAccount": settings.sepay_bank_account,
+        "bankName": settings.sepay_bank_name, "accountName": settings.sepay_account_name,
+        "transferContent": reference, "status": order.status,
+    }
+
+
+@router.post("/webhooks/sepay")
+def sepay_webhook(
+    payload: SePayWebhook, db: DbSession = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> dict:
+    supplied = (authorization or "").removeprefix("Apikey ").removeprefix("Bearer ").strip()
+    if not settings.sepay_webhook_api_key or not secrets.compare_digest(supplied, settings.sepay_webhook_api_key):
+        raise HTTPException(401, "Webhook không hợp lệ")
+    match = re.search(r"\b(PW[A-F0-9]{12})\b", payload.content.upper())
+    if not match:
+        return {"success": True, "ignored": "missing_reference"}
+    order = db.execute(select(PaymentOrder).where(PaymentOrder.reference == match.group(1))).scalar_one_or_none()
+    if order is None or payload.transferAmount < order.amount_vnd:
+        return {"success": True, "ignored": "unknown_or_insufficient"}
+    transaction_id = str(payload.id or payload.referenceCode or "")
+    duplicate = transaction_id and db.execute(
+        select(PaymentOrder).where(PaymentOrder.provider_transaction_id == transaction_id)
+    ).scalar_one_or_none()
+    if duplicate:
+        return {"success": True, "duplicate": True}
+    if order.status != "paid":
+        order.status = "paid"
+        order.paid_at = utcnow()
+        order.provider_transaction_id = transaction_id or None
+        order.provider_payload = payload.model_dump()
+        wallet_for(db, order.user_id).credits += order.credits
+        db.commit()
+    return {"success": True}
+
+
+async def provision_task(session_id: str) -> None:
+    from backend.db import SessionLocal
+    with SessionLocal() as db:
+        row = db.get(CloudSandboxSession, session_id)
+        if row is None:
+            return
+        try:
+            instance_id, remote_url = await asyncio.to_thread(
+                cloud_sandbox_service.provision, row.id, row.user_id,
+                row.expires_at.isoformat(), row.sandbox_tier,
+            )
+            row.provider_instance_id = instance_id
+            row.remote_url = remote_url
+            row.status = "ready"
+        except Exception as exc:
+            row.status = "failed"
+            row.error = str(exc)[:1000]
+            wallet_for(db, row.user_id).credits += 1
+        db.commit()
+
+
+@router.post("/sessions")
+async def create_session(
+    payload: CreateSessionInput, auth: CurrentSession, db: DbSession = Depends(get_db),
+) -> dict:
+    requested = payload.tier.lower()
+    if requested not in TIER_RANK:
+        raise HTTPException(400, "Tier Sandbox không hợp lệ")
+    plan = account_tier(db, auth.user.id)
+    if TIER_RANK[requested] > TIER_RANK[plan]:
+        raise HTTPException(403, f"Gói {plan.upper()} không được dùng Sandbox {requested.upper()}")
+    existing = db.execute(select(CloudSandboxSession).where(
+        CloudSandboxSession.user_id == auth.user.id,
+        CloudSandboxSession.status.in_(("provisioning", "ready")),
+    )).scalar_one_or_none()
+    if existing:
+        return session_dict(existing)
+
+    capability = TIER_CAPABILITIES[requested]
+    if requested == "free":
+        start = datetime.combine(date.today(), datetime.min.time())
+        used = db.execute(select(CloudSandboxSession).where(
+            CloudSandboxSession.user_id == auth.user.id,
+            CloudSandboxSession.sandbox_tier == "free",
+            CloudSandboxSession.created_at >= start,
+        )).scalars().first()
+        if used:
+            raise HTTPException(429, "Bạn đã dùng phiên Free hôm nay")
+        if not settings.free_sandbox_remote_url:
+            raise HTTPException(503, "Free Web Sandbox local chưa được cấu hình")
+        row = CloudSandboxSession(
+            user_id=auth.user.id, sandbox_tier="free", provider="local", status="ready",
+            remote_url=settings.free_sandbox_remote_url,
+            expires_at=utcnow() + timedelta(minutes=capability["minutes"]),
+        )
+    else:
+        wallet = wallet_for(db, auth.user.id)
+        if wallet.credits < 1:
+            raise HTTPException(402, "Bạn cần mua một lượt Sandbox")
+        wallet.credits -= 1
+        row = CloudSandboxSession(
+            user_id=auth.user.id, sandbox_tier=requested, provider="aws",
+            expires_at=utcnow() + timedelta(minutes=capability["minutes"]),
+        )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    if requested != "free":
+        asyncio.create_task(provision_task(row.id))
+    return session_dict(row)
+
+
+@router.get("/sessions/{session_id}")
+def get_session(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
+    row = db.get(CloudSandboxSession, session_id)
+    if row is None or row.user_id != auth.user.id:
+        raise HTTPException(404, "Không tìm thấy phiên")
+    return session_dict(row)
+
+
+@router.delete("/sessions/{session_id}")
+async def stop_session(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
+    row = db.get(CloudSandboxSession, session_id)
+    if row is None or row.user_id != auth.user.id:
+        raise HTTPException(404, "Không tìm thấy phiên")
+    if row.provider_instance_id:
+        await asyncio.to_thread(cloud_sandbox_service.terminate, row.provider_instance_id)
+    row.status = "terminated"
+    row.terminated_at = utcnow()
+    db.commit()
+    return {"ok": True}

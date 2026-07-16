@@ -1,0 +1,11 @@
+@@ -103,6 +103,10 @@
+           const current = await settings(); const tabs = await chrome.tabs.query({});
+           await Promise.all(tabs.filter((tab) => tab.id != null).map((tab) => chrome.tabs.sendMessage(tab.id, { type: "PROTECTION_STATE_CHANGED", enabled: current.protectionEnabled, linkProtection: current.linkProtection }).catch(() => null)));
+           if (!message.enabled) { tabResults.clear(); urlCache.clear(); rateLimitedUntil = 0; clearTimeout(rateLimitTimer); tabs.forEach((tab) => clearBadge(tab.id)); }
++          else {
++            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
++            if (activeTab?.id != null && /^https?:/.test(activeTab.url || "")) void handleAssessUrl(activeTab.url, activeTab.id, true);
++          }
+           return sendResponse({ enabled: message.enabled === true });
+         }
+         case "ASSESS_TEXT": {

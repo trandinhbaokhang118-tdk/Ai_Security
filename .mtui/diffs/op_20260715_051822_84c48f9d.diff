@@ -1,0 +1,25 @@
+@@ -49,6 +49,24 @@
+     assert html_step["status"] == "failed"
+ 
+ 
++def test_worker_reports_business_policy_and_content_findings(monkeypatch) -> None:
++    html = b"""
++      <html><head><title>Virus detected - Buy now</title></head><body>
++      <p>Buy now. You have won. Verify your account. Act now.</p>
++      <form><input type="password" name="password"></form>
++      <p>Email: billing@unrelated.example</p>
++      </body></html>
++    """
++    monkeypatch.setattr(sandbox_worker, "_request_once", lambda *args: {
++        "status": 200, "reason": "OK", "headers": {"content-type": "text/html"},
++        "body": html, "truncated": False, "resolved_ip": "93.184.216.34", "tls": {},
++    })
++    result = sandbox_worker.run({"url": "https://shop.example.test"})
++    codes = {issue["code"] for issue in result["issues"]}
++    assert {"missing_contact_information", "business_email_mismatch", "missing_privacy_policy",
++            "missing_terms_refund", "scam_template_content", "urgency_language"} <= codes
++
++
+ def test_worker_follows_and_records_redirect(monkeypatch) -> None:
+     responses = iter(
+         [

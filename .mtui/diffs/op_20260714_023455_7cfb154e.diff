@@ -1,0 +1,14 @@
+@@ -230,7 +230,12 @@
+ }
+ 
+ type LanguageContextValue = { language: Language; setLanguage: (language: Language) => void; toggleLanguage: () => void };
+-const LanguageContext = createContext<LanguageContextValue | null>(null);
++const fallbackLanguageContext: LanguageContextValue = {
++  language: "vi",
++  setLanguage: () => undefined,
++  toggleLanguage: () => undefined,
++};
++const LanguageContext = createContext<LanguageContextValue>(fallbackLanguageContext);
+ 
+ export function LanguageProvider({ children }: { children: ReactNode }) {
+   const [language, setLanguageState] = useState<Language>("vi");

@@ -1,0 +1,9 @@
+@@ -27,7 +27,7 @@
+     WebSocketDisconnect,
+ )
+ 
+-from ai.adapters.url_adapter import analyze_url_signals, shannon_entropy
++from ai.adapters.url_adapter import analyze_url_signals
+ from backend.demo.metrics import metrics_aggregator
+ from backend.demo.models import (
+     AIDetection,

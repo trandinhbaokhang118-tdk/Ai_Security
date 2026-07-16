@@ -1,0 +1,14 @@
+@@ -46,7 +46,13 @@
+     aws_region: str = "ap-southeast-1"
+     aws_sandbox_ami_id: str = ""
+     aws_sandbox_instance_type: str = "t3.large"
++    aws_sandbox_max_ami_id: str = ""
++    aws_sandbox_max_instance_type: str = "g4dn.xlarge"
+     aws_sandbox_subnet_id: str = ""
++    free_sandbox_remote_url: str = ""
++    free_sandbox_daily_minutes: int = 10
++    pro_sandbox_session_minutes: int = 15
++    max_sandbox_session_minutes: int = 30
+     aws_sandbox_security_group_id: str = ""
+     aws_sandbox_key_name: str = ""
+     aws_sandbox_remote_port: int = 8443

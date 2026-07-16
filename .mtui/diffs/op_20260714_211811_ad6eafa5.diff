@@ -1,0 +1,16 @@
+@@ -46,10 +46,13 @@
+                 return cached[1]
+ 
+         rdap, rdap_error = self._query_rdap(domain)
+-        reputation, reputation_error = self._query_urlhaus(url)
++        certificates, certificate_error = self._query_certificates(domain)
++        reputation, reputation_error = self._query_reputation(domain)
+         age_days, created_at = self._domain_age(rdap)
++        if age_days is None:
++            age_days, created_at = self._certificate_age(certificates)
+         registrar = self._registrar(rdap)
+-        listed = reputation.get("query_status") == "ok" if reputation else None
++        listed = self._reputation_listed(reputation)
+         reasons: list[str] = []
+         score = 0.0
+         if age_days is not None:

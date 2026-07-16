@@ -1,0 +1,21 @@
+{
+  "artifact": "url_lgbm.onnx",
+  "architecture": "LightGBM over 15 explainable URL features",
+  "purpose": "phishing URL classification for portable gateway serving",
+  "label_mapping": {
+    "0": "benign",
+    "1": "phishing"
+  },
+  "dataset": {
+    "rows": 874416,
+    "train_rows": 699532,
+    "test_rows": 174884
+  },
+  "metrics": {
+    "test": {
+      "accuracy": 0.8375437432812607,
+      "f1": 0.842975023903876
+    }
+  },
+  "sha256": "9e954fc286b4d1ee65a8aef9b1b48e4bd0b4077e997f1ff761a06df5e71150da"
+}

@@ -1,0 +1,13 @@
+@@ -390,6 +390,12 @@
+   Object.entries(ENGLISH_TRANSLATIONS).map(([source, target]) => [normalize(source), target]),
+ );
+ 
++declare global {
++  interface Text {
++    __prewiseOriginalText?: string;
++  }
++}
++
+ function normalize(value: string): string {
+   return value.replace(/\s+/g, " ").trim();
+ }

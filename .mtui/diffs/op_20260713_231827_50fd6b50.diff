@@ -1,0 +1,27 @@
+@@ -122,6 +122,26 @@
+     notes: string[];
+ }
+ 
++export interface ExeSandboxResult {
++    ok: boolean;
++    execution_status: "completed" | "failed";
++    filename: string;
++    sha256: string;
++    size_bytes: number;
++    sandbox: string;
++    network: string;
++    verdict: "dangerous" | "suspicious" | "no_obvious_theft_detected" | "unknown";
++    risk_score: number;
++    issues: string[];
++    processes: Record<string, unknown>[];
++    files_created: Record<string, unknown>[];
++    network_attempts: Record<string, unknown>[];
++    signature_status?: string;
++    signer?: string;
++    defender_detections?: Record<string, unknown>[];
++    elapsed_ms: number;
++}
++
+ export interface BrowserSandboxResult {
+     ok: boolean;
+     execution_status: "completed" | "failed";

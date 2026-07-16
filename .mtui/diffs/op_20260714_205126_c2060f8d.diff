@@ -1,0 +1,11 @@
+@@ -82,6 +82,10 @@
+     core = assess_url_risk(request.url, model_score=result.risk_score)
+     final_score = core.score
+     run_sandbox = request.deep_analysis or request.advanced_analysis
++    signals = analyze_url_signals(request.url)
++    evidence_by_feature = {item.feature: item for item in core.evidence if item.feature}
++    l1_details = _build_l1_details(signals, evidence_by_feature)
++    l2_details = _build_l2_details(signals, evidence_by_feature)
+     layers = [
+         URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=core.layer_scores["lexical_identity"], status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, TLD, shortlink và homoglyph.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence)),
+         URLScoreLayer(layer="L2 · Ý đồ đánh cắp & né tránh", score=max(core.layer_scores["credential_intent"], core.layer_scores["evasion"]), status="completed", summary="Phát hiện lure OTP/mật khẩu/thanh toán, URL mã hóa và tham số bất thường.", signals=sum(item.feature in {"credential_theft_intent", "credential_lure_cluster", "at_symbol", "url_obfuscation", "excessive_query_parameters", "high_entropy_domain"} for item in core.evidence)),

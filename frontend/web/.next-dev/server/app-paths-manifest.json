@@ -1,0 +1,8 @@
+{
+  "/brand-logo/route": "app/brand-logo/route.js",
+  "/page": "app/page.js",
+  "/analyze/page": "app/analyze/page.js",
+  "/sandbox/page": "app/sandbox/page.js",
+  "/downloads/page": "app/downloads/page.js",
+  "/account/api-key/page": "app/account/api-key/page.js"
+}

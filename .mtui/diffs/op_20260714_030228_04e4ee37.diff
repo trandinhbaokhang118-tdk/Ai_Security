@@ -1,0 +1,18 @@
+@@ -45,6 +45,17 @@
+             {"content": content, "content_type": content_type},
+         )
+ 
++    @server.tool(name="assess_tool_output")
++    def assess_tool_output(
++        content: str,
++        tool_name: str,
++        intended_use: Literal["read_only", "memory_write", "tool_argument", "user_display"] = "read_only",
++    ) -> dict[str, Any]:
++        return handlers.dispatch(
++            "assess_tool_output",
++            {"content": content, "tool_name": tool_name, "intended_use": intended_use},
++        )
++
+     @server.tool(name="scan_prompt_injection")
+     def scan_prompt_injection(content: str) -> dict[str, Any]:
+         return handlers.dispatch(

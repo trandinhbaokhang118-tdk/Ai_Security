@@ -1,0 +1,17 @@
+@@ -1,6 +1,16 @@
+ """Deterministic CoreGuide v2 Risk and Policy Engine public API."""
+ 
+ from .config import CriterionConfig, RiskConfig, SourceConfig, default_config
++from .detectors import (
++    ScanObservations,
++    add_browser_sandbox,
++    add_domain_intelligence,
++    add_http_sandbox,
++    add_offline_url_findings,
++    add_structured_observations,
++    build_criteria_evidence,
++    mark_context_applicability,
++)
+ from .engine import assess
+ from .normalization import make_finding_key, make_incident_key, normalize_url
+ from .overrides import OverrideRule

@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: armor-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./server/models:/app/server/models:ro
+      - ./data:/app/data
+    depends_on:
+      - ollama
+    networks:
+      - armor-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: armor-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - armor-net
+    restart: unless-stopped
+    # Sau khi container chạy lần đầu, exec vào và pull model:
+    # docker exec -it armor-ollama ollama pull qwen2.5:3b-instruct
+
+  redis:
+    image: redis:7-alpine
+    container_name: armor-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - armor-net
+    restart: unless-stopped
+    # Optional: chỉ cần nếu RATE_LIMIT_BACKEND=redis trong .env
+
+networks:
+  armor-net:
+    driver: bridge
+
+volumes:
+  ollama-data:

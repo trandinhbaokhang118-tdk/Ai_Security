@@ -1,0 +1,9 @@
+@@ -491,7 +491,7 @@
+             metadata=metadata,
+             model_score=score,
+         )
+-        version = self._hybrid_version("text", transformer_score, lightweight_score) + "+phishing-core-1"
++        version = self._hybrid_version("text", transformer_score, lightweight_score)
+         model_evidence = self._text_evidence(
+             clean,
+             lightweight_score=lightweight_score,

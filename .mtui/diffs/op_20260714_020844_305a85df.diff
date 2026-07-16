@@ -1,0 +1,10 @@
+@@ -68,7 +68,8 @@
+   const promise = (async () => {
+     try {
+       const result = await assessUrl(url);
+-      const entry = { status: "complete", url, score: toDisplayScore(result.risk_score), result, requestId, startedAt, completedAt: Date.now(), latencyMs: Date.now() - startedAt };
++      const level = getRiskLevel(toDisplayScore(result.risk_score));
++      const entry = { status: "complete", url, score: toDisplayScore(result.risk_score), level: level.key, result, requestId, startedAt, completedAt: Date.now(), latencyMs: Date.now() - startedAt };
+       urlCache.set(url, entry);
+       if (tabId != null && tabResults.get(tabId)?.requestId === requestId) { tabResults.set(tabId, entry); setBadge(tabId, entry); }
+       return entry;

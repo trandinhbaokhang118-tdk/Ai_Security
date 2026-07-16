@@ -1,0 +1,85 @@
+{
+  "artifact": "url_lgbm.onnx",
+  "architecture": "LightGBM LGBMClassifier over handcrafted URL features",
+  "runtime_input": "tensor(float) shape [N, 15]",
+  "runtime_outputs": [
+    "label",
+    "probabilities"
+  ],
+  "purpose": "real-data URL phishing classifier for gateway serving",
+  "trained_at_utc": "2026-07-07T06:40:35+00:00",
+  "label_mapping": {
+    "0": "benign",
+    "1": "phishing"
+  },
+  "dataset": {
+    "path": "data/url_dataset.csv",
+    "rows": 874416,
+    "skipped_rows": 818,
+    "class_counts": {
+      "0": 419077,
+      "1": 455339
+    },
+    "test_size": 0.2,
+    "train_rows": 699532,
+    "test_rows": 174884
+  },
+  "feature_names": [
+    "url_length",
+    "domain_entropy",
+    "subdomain_depth",
+    "tld_risk_score",
+    "has_ip_address",
+    "special_char_ratio",
+    "path_depth",
+    "query_param_count",
+    "has_https",
+    "homoglyph_score",
+    "is_shortlink",
+    "digit_ratio",
+    "vowel_consonant_ratio",
+    "url_path_entropy",
+    "has_suspicious_keywords"
+  ],
+  "model_config": {
+    "n_estimators": 300,
+    "num_leaves": 48,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42
+  },
+  "metrics": {
+    "test": {
+      "f1": 0.842975023903876,
+      "classification_report": {
+        "0": {
+          "precision": 0.8258389301215022,
+          "recall": 0.8376920874296077,
+          "f1-score": 0.8317232801255664,
+          "support": 83816.0
+        },
+        "1": {
+          "precision": 0.8486173705001947,
+          "recall": 0.8374072121930864,
+          "f1-score": 0.842975023903876,
+          "support": 91068.0
+        },
+        "accuracy": 0.8375437432812607,
+        "macro avg": {
+          "precision": 0.8372281503108485,
+          "recall": 0.837549649811347,
+          "f1-score": 0.8373491520147212,
+          "support": 174884.0
+        },
+        "weighted avg": {
+          "precision": 0.8377004326512177,
+          "recall": 0.8375437432812607,
+          "f1-score": 0.8375824427842606,
+          "support": 174884.0
+        }
+      }
+    }
+  },
+  "sha256": "9e954fc286b4d1ee65a8aef9b1b48e4bd0b4077e997f1ff761a06df5e71150da"
+}

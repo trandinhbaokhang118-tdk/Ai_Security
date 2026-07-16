@@ -1,0 +1,9 @@
+@@ -1,7 +1,7 @@
+ "use client";
+ import Image from "next/image";
+ import Link from "next/link";
+-import { Download, Eye, FlaskConical, History, Home, KeyRound, LogIn, LogOut, ScanSearch, Settings, UserRound, WalletCards } from "lucide-react";
++import { Download, Eye, FlaskConical, History, Home, KeyRound, LogIn, LogOut, PlugZap, ScanSearch, Settings, UserRound, WalletCards } from "lucide-react";
+ import { usePathname } from "next/navigation";
+ import { ReactNode, useEffect, useRef, useState } from "react";
+ import { useLanguage } from "@/context/LanguageContext";

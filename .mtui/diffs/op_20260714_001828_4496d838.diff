@@ -1,0 +1,6 @@
+@@ -126,4 +126,5 @@
+ $("copy-url").addEventListener("click", async () => { if (currentTab?.url) { await navigator.clipboard.writeText(currentTab.url); $("copy-url").textContent = "✓"; setTimeout(() => $("copy-url").textContent = "⧉", 1200); } });
+ $("leave-page").addEventListener("click", () => { if (currentTab?.id) chrome.tabs.update(currentTab.id, { url: "chrome://newtab" }); });
+ $("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
++startLoading();
+ init();

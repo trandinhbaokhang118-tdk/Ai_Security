@@ -1,0 +1,8 @@
+@@ -78,6 +78,7 @@
+     "RiskConfig",
+     "RiskEngineV2",
+     "RiskResultV2",
++    "ScanObservations",
+     "SourceConfig",
+     "SubjectKeys",
+     "assess",

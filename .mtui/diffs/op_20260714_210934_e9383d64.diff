@@ -1,0 +1,18 @@
+@@ -235,12 +235,14 @@
+     supplied = (authorization or "").removeprefix("Apikey ").removeprefix("Bearer ").strip()
+     if not settings.sepay_webhook_api_key or not secrets.compare_digest(supplied, settings.sepay_webhook_api_key):
+         raise HTTPException(401, "Webhook không hợp lệ")
+-    match = re.search(r"\b(PW[A-F0-9]{12})\b", payload.content.upper())
++    match = re.search(r"\b((?:PW|PP)[A-F0-9]{12})\b", payload.content.upper())
+     if not match:
+         return {"success": True, "ignored": "missing_reference"}
+     order = db.execute(select(PaymentOrder).where(PaymentOrder.reference == match.group(1))).scalar_one_or_none()
+-    if order is None or payload.transferAmount < order.amount_vnd:
+-        return {"success": True, "ignored": "unknown_or_insufficient"}
++    if order is None or order.status == "expired" or (order.expires_at is not None and order.expires_at <= utcnow()):
++        return {"success": True, "ignored": "unknown_or_expired"}
++    if payload.transferAmount < order.amount_vnd:
++        return {"success": True, "ignored": "insufficient"}
+     transaction_id = str(payload.id or payload.referenceCode or "")
+     duplicate = transaction_id and db.execute(
+         select(PaymentOrder).where(PaymentOrder.provider_transaction_id == transaction_id)

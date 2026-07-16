@@ -1,0 +1,15 @@
+{
+  "source": "user zips: Phishing_Email.csv + SMS + n96 HTML",
+  "total_rows": 102691,
+  "class_counts": {
+    "0": 65686,
+    "1": 37005
+  },
+  "format": "text,label (1=phishing/spam, 0=benign)",
+  "seed": 42,
+  "source_rows_before_dedup": {
+    "Phishing_Email.csv": 18634,
+    "SMS TEXT column": 5333,
+    "n96ncsr5g4-1.zip HTML": 80000
+  }
+}

@@ -1,0 +1,9 @@
+@@ -94,7 +94,7 @@
+ async function waitForTabResult(token) {
+   for (let count = 0; count < 30 && token === loadingToken; count += 1) {
+     await new Promise((resolve) => setTimeout(resolve, 250));
+-    const entry = await chrome.runtime.sendMessage({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url });
++    const entry = await send({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url }, 1500);
+     if (entry && entry.status !== "loading") { render(entry, currentTab); return; }
+   }
+   if (token === loadingToken) showError({ type: "timeout", message: "Không nhận được trạng thái hoàn tất từ tiến trình nền. Hãy thử quét lại." });

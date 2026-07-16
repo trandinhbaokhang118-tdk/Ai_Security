@@ -1,0 +1,12 @@
+@@ -33,6 +33,11 @@
+     credits: int = Field(default=1, ge=1, le=100)
+ 
+ 
++class CreateSubscriptionPaymentInput(BaseModel):
++    planTier: str = Field(pattern="^pro$")
++    billingPeriod: str = Field(pattern="^(monthly|yearly)$")
++
++
+ class CreateSessionInput(BaseModel):
+     tier: str = "free"
+ 

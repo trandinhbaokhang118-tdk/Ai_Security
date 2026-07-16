@@ -1,0 +1,18 @@
+@@ -84,6 +84,17 @@
+         lexical += 0.32
+         evidence.append(_e("Tên miền có ký tự/dạng viết gần giống thương hiệu (homoglyph).",
+                            Severity.CRITICAL, "homoglyph", 0.32))
++    # Bắt biến thể gõ sai thương hiệu ngay cả khi không có chữ số/punycode.
++    # Ví dụ: vietcombank-login.example hoặc paypa-security.example.
++    brand_distance = min_brand_distance(signals.parts.domain_label)
++    if 0.0 < brand_distance <= 0.25 and len(signals.parts.domain_label) >= 5:
++        lexical += 0.24
++        evidence.append(_e(
++            "Nhãn tên miền gần giống một thương hiệu đã biết; có thể là biến thể gõ sai để giả mạo.",
++            Severity.HIGH,
++            "brand_typosquatting",
++            0.24,
++        ))
+     if signals.ip_host:
+         lexical += 0.20
+         evidence.append(_e("URL dùng địa chỉ IP thay vì tên miền, thường dùng để né nhận diện.",

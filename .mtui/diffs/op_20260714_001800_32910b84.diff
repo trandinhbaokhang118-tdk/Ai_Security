@@ -1,0 +1,9 @@
+@@ -103,7 +103,7 @@
+   if (!currentTab || !validPage(currentTab.url)) return show("unsupported");
+   const token = ++loadingToken; startLoading();
+   try {
+-    const entry = await chrome.runtime.sendMessage({ type: "ASSESS_URL", url: currentTab.url, tabId: currentTab.id, force });
++    const entry = await send({ type: "ASSESS_URL", url: currentTab.url, tabId: currentTab.id, force }, 6500);
+     if (token === loadingToken) render(entry, currentTab);
+   } catch { if (token === loadingToken) showError({ type: "runtime", message: "Mất kết nối với tiến trình nền của extension. Hãy tải lại extension." }); }
+ }

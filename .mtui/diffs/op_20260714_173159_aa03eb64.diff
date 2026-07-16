@@ -1,0 +1,9 @@
+@@ -107,7 +107,7 @@
+             for tier, capability in TIER_CAPABILITIES.items()
+         ],
+         "cloudConfigured": cloud_sandbox_service.configured(),
+-        "freeConfigured": bool(settings.free_sandbox_remote_url),
++        "freeConfigured": True,
+         "session": session_dict(active) if active else None,
+     }
+ 

@@ -1,0 +1,66 @@
+@@ -1,61 +1,4 @@
+-// Gmail content script: extracts the currently open email body + sender and
+-// assesses it for phishing. Injects an inline risk banner above the message.
+-
+-(function () {
+-    "use strict";
+-
+-    let lastScanned = "";
+-
+-    function findOpenEmail() {
+-        // Gmail renders the open message body in an element with role="listitem"
+-        // containing a div.a3s (message body). Best-effort, resilient to failure.
+-        const body = document.querySelector("div.a3s");
+-        if (!body) return null;
+-        const senderEl = document.querySelector("span.gD");
+-        return {
+-            text: body.innerText.slice(0, 20000),
+-            sender: senderEl?.getAttribute("email") || senderEl?.textContent || "",
+-            anchor: body,
+-        };
+-    }
+-
+-    function banner(level, reasons) {
+-        const colors = { safe: "#dcfce7", warn: "#fef3c7", danger: "#fee2e2" };
+-        const fg = { safe: "#166534", warn: "#92400e", danger: "#991b1b" };
+-        const icons = { safe: "✅", warn: "⚠", danger: "⛔" };
+-        const el = document.createElement("div");
+-        el.setAttribute("data-ai-armor", "1");
+-        el.style.cssText = `font-family:Roboto,system-ui,sans-serif;margin:8px 0;padding:10px 14px;
+-      border-radius:8px;font-size:13px;background:${colors[level]};color:${fg[level]};`;
+-        const list = (reasons || []).slice(0, 3).map((r) => `• ${r}`).join(" ");
+-        el.textContent = `${icons[level]} AI Security Armor: ${{ safe: "Email an toàn", warn: "Email đáng ngờ", danger: "Cảnh báo lừa đảo" }[level]
+-            }. ${list}`;
+-        return el;
+-    }
+-
+-    function scan() {
+-        const email = findOpenEmail();
+-        if (!email || !email.text || email.text === lastScanned) return;
+-        lastScanned = email.text;
+-
+-        chrome.runtime.sendMessage(
+-            {
+-                type: "ASSESS_TEXT", text: email.text, modality: "email",
+-                metadata: { sender: email.sender }
+-            },
+-            (res) => {
+-                if (!res || res.offline || !res.result) return;
+-                const score = Math.round((res.result.risk_score || 0) * 100);
+-                const level = score <= 39 ? "safe" : score <= 69 ? "warn" : "danger";
+-                if (level === "safe") return; // don't clutter safe emails
+-                email.anchor.parentElement?.insertBefore(
+-                    banner(level, res.result.reasons),
+-                    email.anchor
+-                );
+-            }
+-        );
+-    }
+-
+-    // Gmail is a SPA; poll for the open message changing.
+-    setInterval(scan, 2000);
+-})();
++(()=>{"use strict";const scanned=new Map();let timer=null;function visibleMessages(){return [...document.querySelectorAll("div.a3s")].filter(el=>el.offsetParent!==null)}function identify(body,sender){return `${location.hash}|${sender}|${body.innerText.slice(0,300)}`}
++function makeBanner(level,reasons,error){const old=document.createElement("div");old.dataset.aiArmor="1";old.setAttribute("role","status");old.style.cssText=`font-family:Roboto,system-ui;margin:8px 0;padding:12px 14px;border:1px solid ${level==="danger"?"#ef4444":"#f59e0b"};border-radius:10px;background:${level==="danger"?"#fee2e2":"#fef3c7"};color:${level==="danger"?"#7f1d1d":"#78350f"};font-size:13px;line-height:1.5`;const title=document.createElement("strong");title.textContent=error?"⚠️ Không thể kiểm tra email":level==="danger"?"⛔ Cảnh báo email có rủi ro cao":"⚠️ Email đáng ngờ";const text=document.createElement("span");text.textContent=` — ${error||reasons?.slice(0,2).join(" · ")||"Hãy xác minh người gửi trước khi thực hiện yêu cầu."}`;const close=document.createElement("button");close.textContent="Ẩn";close.style.cssText="float:right;border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer";close.onclick=()=>old.remove();old.append(close,title,text);return old}
++async function scan(){if(document.visibilityState!=="visible")return;const body=visibleMessages().at(-1);if(!body||!body.innerText.trim())return;const senderEl=body.closest("[role=listitem]")?.querySelector("span.gD")||document.querySelector("span.gD");const sender=senderEl?.getAttribute("email")||senderEl?.textContent||"";const key=identify(body,sender);if(scanned.has(key)||body.parentElement?.querySelector(":scope > [data-ai-armor]"))return;scanned.set(key,"pending");const res=await chrome.runtime.sendMessage({type:"ASSESS_TEXT",text:body.innerText.slice(0,20000),modality:"email",metadata:{sender,subject:document.querySelector("h2.hP")?.textContent||""}});if(res?.disabled)return scanned.delete(key);if(res?.error){body.parentElement?.insertBefore(makeBanner("warn",[],res.error.message),body);return}const score=Math.round(Math.max(0,Math.min(1,res.result?.risk_score||0))*100),level=score<=39?"safe":score<=69?"warn":"danger";if(level!=="safe")body.parentElement?.insertBefore(makeBanner(level,res.result?.reasons),body);scanned.set(key,level)}
++function schedule(){clearTimeout(timer);timer=setTimeout(scan,350)}const observer=new MutationObserver(schedule);observer.observe(document.documentElement,{childList:true,subtree:true});document.addEventListener("visibilitychange",schedule);chrome.storage.onChanged.addListener((changes)=>{if(changes.protectionEnabled?.newValue===false)document.querySelectorAll("[data-ai-armor]").forEach(el=>el.remove());else schedule()});schedule()})();

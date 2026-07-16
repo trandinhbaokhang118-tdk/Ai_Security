@@ -1,0 +1,14 @@
+@@ -10,7 +10,12 @@
+ from dataclasses import dataclass
+ from urllib.parse import parse_qsl, unquote, urlparse
+ 
+-from ai.adapters.url_adapter import URLSignals, analyze_url_signals, shannon_entropy
++from ai.adapters.url_adapter import (
++    URLSignals,
++    analyze_url_signals,
++    min_brand_distance,
++    shannon_entropy,
++)
+ from shared.schemas import Evidence, Severity
+ 
+ 

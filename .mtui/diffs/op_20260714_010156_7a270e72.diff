@@ -1,0 +1,9 @@
+@@ -9,7 +9,7 @@
+ type StoredRecord = { score?: number; content?: string; result?: { risk_score?: number; confidence?: number; analysis_time_ms?: number; threat_level?: string; evidence?: Array<{ source?: string; feature?: string; message?: string; severity?: string }> } };
+ 
+ function ResultContent() {
+-  const query = useSearchParams(); const id = query.get("id"); const isDemo = query.get("demo") !== "0";
++  const query = useSearchParams(); const params = useParams<{ id: string }>(); const id = params.id; const isDemo = query.get("demo") !== "0";
+   const fallbackScore = Number(query.get("score") || 87); const type = query.get("type") || "url";
+   const [record, setRecord] = useState<StoredRecord | null>(null);
+   useEffect(() => { if (!id) return; try { const raw = localStorage.getItem(`prewise-result:${id}`); if (raw) setRecord(JSON.parse(raw) as StoredRecord); } catch { /* Result query fallback remains available. */ } }, [id]);

@@ -1,0 +1,64 @@
+{
+  "model_dir": "server/models",
+  "runtime": "onnxruntime",
+  "models": [
+    {
+      "name": "url_lgbm",
+      "file": "url_lgbm.onnx",
+      "modality": "url",
+      "role": "primary",
+      "status": "available_real_dataset",
+      "quality_note": "trained on data/url_dataset.csv from user zips including n96 index.sql; rows=875234, test_f1=0.8430"
+    },
+    {
+      "name": "text_lightweight",
+      "file": "mdeberta_text.onnx",
+      "modality": "email_text",
+      "role": "primary_cpu_serving",
+      "architecture": "tfidf_logistic_regression",
+      "status": "available_real_dataset",
+      "quality_note": "trained on data/phishing_text_*.csv from Phishing_Email + SMS + n96 HTML; rows=102691, test_f1=0.9584, test_roc_auc=0.9950"
+    },
+    {
+      "name": "mdeberta_text_transformer",
+      "file": "mdeberta_text_transformer.onnx",
+      "tokenizer": "mdeberta_text_tokenizer",
+      "modality": "email_text",
+      "role": "candidate_transformer",
+      "architecture": "mdeberta_v3_sequence_classifier",
+      "precision": "fp32",
+      "status": "quality_gated_off_until_retrained",
+      "quality_note": "local CPU demo F1=0.5273; runtime disables this branch below validation F1 0.65; full n96 fine-tune requires CUDA/disk budget"
+    },
+    {
+      "name": "prompt_lightweight",
+      "file": "protectai_prompt.onnx",
+      "modality": "prompt",
+      "role": "hybrid_fallback",
+      "architecture": "tfidf_logistic_regression",
+      "status": "available_real_dataset",
+      "quality_note": "trained on data/prompt_injection_*.csv; test_f1=0.9836, test_roc_auc=0.9996"
+    },
+    {
+      "name": "protectai_prompt_transformer",
+      "file": "protectai_prompt_transformer.onnx",
+      "tokenizer": "protectai_prompt_tokenizer",
+      "modality": "prompt",
+      "role": "hybrid_primary",
+      "architecture": "deberta_v3_sequence_classifier",
+      "precision": "fp32",
+      "status": "available_pretrained_export",
+      "quality_note": "official ProtectAI checkpoint exported without INT8 quantization"
+    }
+  ],
+  "ensemble": {
+    "transformer_weight": 0.7,
+    "lightweight_weight": 0.2,
+    "heuristic_weight": 0.1,
+    "heuristic_is_risk_floor": true,
+    "quality_gate": {
+      "text_transformer_min_validation_f1": 0.65
+    }
+  },
+  "fallback": "quality_gated_transformer_then_lightweight_then_heuristic"
+}

@@ -1,0 +1,16 @@
+@@ -393,8 +393,13 @@
+     ):
+         user = db.get(User, api_key.user_id)
+         if user is not None and user.status == "active":
+-            api_key.last_used_at = utcnow()
+-            db.commit()
++            now = utcnow()
++            write_interval = timedelta(
++                seconds=settings.api_key_last_used_write_interval_seconds
++            )
++            if api_key.last_used_at is None or api_key.last_used_at <= now - write_interval:
++                api_key.last_used_at = now
++                db.commit()
+             return ActorContext(user=user, api_key=api_key, channel="api")
+ 
+     unauthorized()

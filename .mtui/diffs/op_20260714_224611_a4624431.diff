@@ -1,0 +1,8 @@
+@@ -9,6 +9,7 @@
+ MCP_API_KEY_RATE_LIMIT_PER_MIN=120
+ MCP_ANONYMOUS_RATE_LIMIT_PER_MIN=10
+ OLLAMA_BASE_URL=http://localhost:11434
++IP2WHOIS_API_KEY=
+ CORS_ALLOW_ORIGINS=["https://prewise.site","https://www.prewise.site","http://localhost:3000","http://127.0.0.1:3000"]
+ 
+ # SePay: webhook Authorization: Apikey <key>. Dùng cho QR chuyển khoản mua gói và credit Sandbox.

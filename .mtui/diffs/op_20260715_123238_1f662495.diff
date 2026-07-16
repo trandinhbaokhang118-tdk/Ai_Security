@@ -1,0 +1,11 @@
+@@ -92,7 +92,9 @@
+   const query = useSearchParams();
+   const params = useParams<{ id: string }>();
+   const id = params.id;
+-  const isDemo = query.get("demo") !== "0";
++  const queryDemo = query.get("demo");
++  const isStoredBackend = record?.isDemo === false || record?.dataSource === "backend" || Boolean(record?.result);
++  const isDemo = isStoredBackend ? false : queryDemo !== "0";
+   const fallbackScore = Number(query.get("score") || 87);
+   const type = query.get("type") || "url";
+   const [record, setRecord] = useState<StoredRecord | null>(null);

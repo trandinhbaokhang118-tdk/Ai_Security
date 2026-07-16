@@ -1,0 +1,23 @@
+@@ -307,6 +307,22 @@
+                     return None, raw
+         return None, None
+ 
++    @classmethod
++    def _expiry_days(cls, whoisxml: dict[str, Any] | None,
++                     whois: dict[str, Any] | None, rdap: dict[str, Any] | None) -> int | None:
++        registry = (whoisxml or {}).get("registryData") or {}
++        raw = (registry.get("expiresDateNormalized") or registry.get("expiresDate")
++               or (whoisxml or {}).get("expiresDateNormalized")
++               or (whoisxml or {}).get("expiresDate")
++               or (whois or {}).get("expire_date") or (whois or {}).get("expiration_date"))
++        if not raw and rdap:
++            for event in rdap.get("events", []):
++                if event.get("eventAction") in {"expiration", "expiry", "expires"}:
++                    raw = event.get("eventDate")
++                    break
++        expires = cls._parse_date(raw)
++        return (expires - datetime.now(UTC)).days if expires else None
++
+     @staticmethod
+     def _registrar(data: dict[str, Any] | None) -> str | None:
+         if not data:

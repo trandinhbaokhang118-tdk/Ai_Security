@@ -1,0 +1,8 @@
+@@ -397,7 +397,6 @@
+   "xác minh trong vòng 30 phút": "verify within 30 minutes",
+   "Yêu cầu dữ liệu nhạy cảm": "Requests sensitive data",
+   "Biểu mẫu đích yêu cầu thông tin đăng nhập và mã xác thực.": "The destination form requests sign-in details and verification codes.",
+-  "Đang thiết lập kênh bảo mật…": "Setting up a secure channel…",
+   "Tải xuống · Prewise": "Downloads · Prewise",
+   "Tải ứng dụng Prewise và tiện ích mở rộng trình duyệt.": "Download the Prewise app and browser extension."
+ };

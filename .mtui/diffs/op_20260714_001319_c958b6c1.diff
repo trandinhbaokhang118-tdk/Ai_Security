@@ -1,0 +1,12 @@
+@@ -3,8 +3,9 @@
+ 
+ const nextConfig = {
+     reactStrictMode: true,
+-    // Tách cache dev và production để tránh Windows/antivirus khóa vendor chunks.
+-    distDir: process.env.NEXT_DIST_DIR || (process.env.NODE_ENV === "development" ? ".next-dev" : ".next"),
++    // Mỗi tiến trình dev dùng cache riêng. Tránh chunk cũ/mất (vd. ./611.js)
++    // khi nhiều Next dev hoặc antivirus trên Windows cùng chạm vào .next-dev.
++    distDir: process.env.NEXT_DIST_DIR || (process.env.NODE_ENV === "development" ? `.next-dev-${process.pid}` : ".next"),
+     outputFileTracingRoot: path.resolve(__dirname, "../.."),
+     env: {
+         // Chế độ API client: "mock" (demo standalone) hoặc "real" (gọi Security Gateway)

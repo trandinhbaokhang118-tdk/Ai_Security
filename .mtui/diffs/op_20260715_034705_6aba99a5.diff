@@ -1,0 +1,9 @@
+@@ -62,6 +62,8 @@
+         if age_days is None:
+             age_days, created_at = self._certificate_age(certificates)
+         registrar = self._whoisxml_registrar(whoisxml) or self._ip2whois_registrar(whois) or self._registrar(rdap)
++        expiry_days = self._expiry_days(whoisxml, whois, rdap)
++        certificate_age_days, _ = self._certificate_age(certificates)
+         listed = self._reputation_listed(reputation)
+         reasons: list[str] = []
+         score = 0.0

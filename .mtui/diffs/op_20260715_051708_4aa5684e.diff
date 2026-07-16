@@ -1,0 +1,12 @@
+@@ -308,6 +308,11 @@
+         "password_form": 29,
+         "external_form_action": 30,
+         "external_iframe": 36,
++        "missing_contact_information": 20,
++        "business_email_mismatch": 21,
++        "missing_privacy_policy": 24,
++        "missing_terms_refund": 25,
++        "scam_template_content": 26,
+     }
+     for issue in report.issues:
+         cid = issue_map.get(issue.code)

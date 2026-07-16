@@ -1,0 +1,9 @@
+@@ -94,7 +94,7 @@
+     if signals.shortlink:
+         lexical += 0.10
+         evidence.append(_e("Shortlink che giấu đích đến; cần mở rộng redirect trong sandbox.",
+-                           Severity.MEDIUM, "shortlink", 0.10))
++                           Severity.MEDIUM, "is_shortlink", 0.10))
+ 
+     # Layer 2: credential theft intent and URL obfuscation/evasion.
+     # Decode repeatedly (bounded) so percent-encoding cannot hide another URL or

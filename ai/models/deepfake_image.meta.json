@@ -1,0 +1,19 @@
+{
+  "artifact": "deepfake_image_q4.onnx",
+  "source": "onnx-community/ai-image-detection-ONNX",
+  "base_model": "capcheck/ai-image-detection",
+  "architecture": "ViT image classifier, 4-bit ONNX",
+  "purpose": "screen still images for AI-generated pixel patterns",
+  "labels": {
+    "0": "REAL",
+    "1": "FAKE"
+  },
+  "dataset": "CIFAKE",
+  "license": "Apache-2.0",
+  "sha256": "28c7f06d5aa87bc7e023c023eab1fbf473deef54e9c62f9838a99e50422810ec",
+  "limitations": [
+    "Still images only; no video or audio analysis",
+    "Optimized for AI-generated images, not every face-swap technique",
+    "Use as a screening signal, not as conclusive forensic evidence"
+  ]
+}

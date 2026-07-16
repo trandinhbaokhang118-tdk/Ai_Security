@@ -1,0 +1,17 @@
+@@ -224,7 +224,15 @@
+     db.add(row)
+     db.commit()
+     db.refresh(row)
+-    if requested != "free":
++    if requested == "free":
++        try:
++            await asyncio.to_thread(free_web_sandbox.create, row.id, row.expires_at)
++        except Exception as exc:
++            row.status = "failed"
++            row.error = str(exc)[:1000]
++            db.commit()
++            raise HTTPException(503, f"Không khởi động được Free Sandbox: {exc}") from exc
++    else:
+         asyncio.create_task(provision_task(row.id))
+     return session_dict(row)
+ 

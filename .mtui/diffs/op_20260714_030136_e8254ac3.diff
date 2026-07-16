@@ -1,0 +1,8 @@
+@@ -89,6 +89,7 @@
+     "prewise_connection_test": PingInput,
+     "assess_url": URLInput,
+     "assess_text": TextInput,
++    "assess_tool_output": ToolOutputInput,
+     "scan_prompt_injection": TextInput,
+     "assess_action": ActionInput,
+     "assess_page": PageInput,

@@ -1,0 +1,11 @@
+@@ -19,9 +19,7 @@
+ from security.risk_core import PolicyEngineV2, default_config
+ from security.risk_core import assess as assess_risk_v2
+ from security.risk_core.detectors import (
+-    ScanObservations,
+-    add_browser_sandbox,
+-    add_http_sandbox,
++    ScanObservations,
+     add_domain_intelligence,
+     add_offline_url_findings,
+     build_criteria_evidence,

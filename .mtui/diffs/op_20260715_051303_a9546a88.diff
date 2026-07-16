@@ -1,0 +1,10 @@
+@@ -124,6 +124,9 @@
+         self.scripts: list[str] = []
+         self.iframes: list[str] = []
+         self.meta_refresh: list[str] = []
++        self.links: list[tuple[str, str]] = []
++        self.meta: dict[str, str] = {}
++        self.favicons: list[str] = []
+         self.text_parts: list[str] = []
+ 
+     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:

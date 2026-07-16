@@ -1,0 +1,9 @@
+@@ -2,7 +2,7 @@
+ 
+ import Link from "next/link";
+ import { Suspense, useEffect, useState } from "react";
+-import { useSearchParams } from "next/navigation";
++import { useParams, useSearchParams } from "next/navigation";
+ import { PrewiseShell, RiskDial, demoFindings } from "@/components/PrewiseUI";
+ 
+ type Finding = { title: string; detail: string; evidence: string; severity: "high" | "medium" };

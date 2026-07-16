@@ -1,0 +1,9 @@
+@@ -87,7 +87,7 @@
+     l1_details = _build_l1_details(signals, evidence_by_feature)
+     l2_details = _build_l2_details(signals, evidence_by_feature)
+     layers = [
+-        URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=core.layer_scores["lexical_identity"], status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, TLD, shortlink và homoglyph.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence)),
++        URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=core.layer_scores["lexical_identity"], status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, TLD, shortlink và homoglyph.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "brand_typosquatting", "punycode_domain", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence), details=l1_details),
+         URLScoreLayer(layer="L2 · Ý đồ đánh cắp & né tránh", score=max(core.layer_scores["credential_intent"], core.layer_scores["evasion"]), status="completed", summary="Phát hiện lure OTP/mật khẩu/thanh toán, URL mã hóa và tham số bất thường.", signals=sum(item.feature in {"credential_theft_intent", "credential_lure_cluster", "at_symbol", "url_obfuscation", "excessive_query_parameters", "high_entropy_domain"} for item in core.evidence)),
+         URLScoreLayer(layer="L3 · Sandbox trình duyệt cô lập", score=0.0, status="skipped" if not run_sandbox else "unavailable", summary="Chạy theo yêu cầu: canary tổng hợp, chặn submit/exfiltration, giám sát redirect và network."),
+     ]

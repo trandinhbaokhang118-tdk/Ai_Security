@@ -1,0 +1,10 @@
+@@ -61,7 +61,8 @@
+         with tempfile.TemporaryDirectory(prefix="aisec-exe-") as root:
+             root_path = Path(root)
+             input_dir, output_dir = root_path / "input", root_path / "report"
+-            input_dir.mkdir(); output_dir.mkdir()
++            input_dir.mkdir()
++            output_dir.mkdir()
+             sample_path = input_dir / "sample.exe"
+             sample_path.write_bytes(data)
+             script_path = output_dir / "run.ps1"

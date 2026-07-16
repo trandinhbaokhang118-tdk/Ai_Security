@@ -1,0 +1,9 @@
+@@ -271,7 +271,7 @@
+         "tls_certificate_error": 10,
+         "meta_refresh": 16,
+         "urgency_language": 28,
+-        "password_form": 30,
++        "password_form": 29,
+         "external_form_action": 30,
+         "external_iframe": 36,
+     }

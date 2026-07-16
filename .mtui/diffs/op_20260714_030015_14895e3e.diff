@@ -1,0 +1,26 @@
+@@ -85,7 +85,24 @@
+ 
+ def assess_prompt_firewall(content: str) -> PromptFirewallAssessment:
+     views = _decoded_views(content)
+-    joined = " ".join(views)
++    # ROT13 and reversed payloads are common low-cost mutations. Add bounded
++    # alternate views only when they reveal a known security verb to limit FPs.
++    raw_canon = views[0]
++    rot13 = _canon(codecs.decode(raw_canon, "rot_13"))
++    reversed_view = _canon(raw_canon[::-1])
++    marker_terms = (*OVERRIDE, *PRIVILEGE, *EXFILTRATION, *TOOL_COERCION)
++    if any(term in rot13 for term in marker_terms):
++        views.append(rot13)
++    if any(term in reversed_view for term in marker_terms):
++        views.append(reversed_view)
++    # Compare word signatures so "ignroe prevouis instructions" is matched
++    # without fuzzy-editing every token in arbitrary user content.
++    signature_terms = {_word_signature(word) for term in marker_terms for word in term.split() if len(word) >= 4}
++    suspicious_scramble = any(
++        _word_signature(word) in signature_terms and word not in joined
++        for word in re.findall(r"[a-zA-Z]{4,}", raw_canon)
++    )
++    joined = " ".join(views[:10])
+     score = .02
+     evidence: list[Evidence] = []
+     families: list[str] = []

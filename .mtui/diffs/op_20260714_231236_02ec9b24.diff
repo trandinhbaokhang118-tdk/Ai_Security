@@ -1,0 +1,55 @@
+@@ -98,6 +98,54 @@
+             self._cache[key] = (time.monotonic(), result)
+         return result
+ 
++    def _query_whoisxml(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
++        if not settings.whoisxml_api_key:
++            return None, "WHOISXML_API_KEY chưa cấu hình"
++        try:
++            response = httpx.post(
++                "https://www.whoisxmlapi.com/whoisserver/WhoisService",
++                json={
++                    "domainName": domain,
++                    "apiKey": settings.whoisxml_api_key,
++                    "outputFormat": "JSON",
++                },
++                timeout=max(self.timeout_seconds, 12.0),
++                headers={"Content-Type": "application/json", "Accept": "application/json"},
++            )
++            if response.status_code != 200:
++                return None, f"WhoisXML HTTP {response.status_code}"
++            data = response.json()
++            if data.get("ErrorMessage"):
++                return None, f"WhoisXML {data['ErrorMessage']}"
++            record = data.get("WhoisRecord")
++            return (record, None) if record else (None, "WhoisXML thiếu WhoisRecord")
++        except Exception as exc:
++            return None, f"WhoisXML {type(exc).__name__}"
++
++    @classmethod
++    def _whoisxml_age(cls, data: dict[str, Any] | None) -> tuple[int | None, str | None]:
++        if not data:
++            return None, None
++        registry = data.get("registryData") or {}
++        raw = (
++            registry.get("createdDateNormalized")
++            or registry.get("createdDate")
++            or data.get("createdDateNormalized")
++            or data.get("createdDate")
++        )
++        created = cls._parse_date(raw)
++        if created is None:
++            return None, str(raw) if raw else None
++        return max(0, (datetime.now(UTC) - created).days), str(raw)
++
++    @staticmethod
++    def _whoisxml_registrar(data: dict[str, Any] | None) -> str | None:
++        if not data:
++            return None
++        registry = data.get("registryData") or {}
++        value = registry.get("registrarName") or data.get("registrarName")
++        return str(value) if value else None
++
+     def _query_ip2whois(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
+         if not settings.ip2whois_api_key:
+             return None, "IP2WHOIS_API_KEY chưa cấu hình"

@@ -1,0 +1,7 @@
+@@ -1,5 +1,5 @@
+ "use client";
+-import {useEffect,useState} from "react";import {PrewiseShell} from "@/components/PrewiseUI";
++import {useEffect,useState} from "react";import {PrewiseShell} from "@/components/PrewiseUI";import {useLanguage} from "@/context/LanguageContext";
+ type Tab="appearance"|"privacy"|"data"|"language";type Prefs={motion:string;density:string;saveHistory:boolean;maskSensitive:boolean;language:string};
+ const defaults:Prefs={motion:"balanced",density:"comfortable",saveHistory:true,maskSensitive:true,language:"vi"};
+ export default function Settings(){const [tab,setTab]=useState<Tab>("appearance"),[prefs,setPrefs]=useState<Prefs>(defaults),[notice,setNotice]=useState(""),[confirmClear,setConfirmClear]=useState(false);

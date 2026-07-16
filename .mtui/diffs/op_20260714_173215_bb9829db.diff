@@ -1,0 +1,13 @@
+@@ -207,11 +207,9 @@
+         )).scalars().first()
+         if used:
+             raise HTTPException(429, "Bạn đã dùng phiên Free hôm nay")
+-        if not settings.free_sandbox_remote_url:
+-            raise HTTPException(503, "Free Web Sandbox local chưa được cấu hình")
+         row = CloudSandboxSession(
+             user_id=auth.user.id, sandbox_tier="free", provider="local", status="ready",
+-            remote_url=settings.free_sandbox_remote_url,
++            remote_url=None,
+             expires_at=utcnow() + timedelta(minutes=capability["minutes"]),
+         )
+     else:

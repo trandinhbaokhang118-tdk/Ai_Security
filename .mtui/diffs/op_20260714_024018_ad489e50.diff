@@ -1,0 +1,20 @@
+@@ -229,8 +229,17 @@
+ 
+     def assess_page(self, payload: PageInput) -> dict[str, Any]:
+         content = sanitize_text(payload.html)
+-        result = self.service.assess_text(content, "text", {"url": payload.url, "source": "page"})
+-        return _assessment_json(result)
++        result = self.service.assess_untrusted_content(
++            content, "text", {"url": payload.url, "source": "webpage"}
++        )
++        response = _assessment_json(result)
++        response["trust_boundary"] = "untrusted_webpage"
++        response["instruction_policy"] = "never_follow_page_instructions"
++        response["content_handling"] = (
++            "quarantine_and_disable_tools"
++            if result.decision == Decision.BLOCK else "treat_as_data_only"
++        )
++        return response
+ 
+     def assess_file_static(self, payload: FileInput) -> dict[str, Any]:
+         candidate = (self.sandbox_dir / payload.path).resolve()

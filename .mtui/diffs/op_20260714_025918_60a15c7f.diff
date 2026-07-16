@@ -1,0 +1,25 @@
+@@ -26,6 +26,24 @@
+ EXFILTRATION = ("reveal secrets", "show secrets", "api key", "private key", "access token", "environment variable", "send to", "upload to", "exfiltrate", "curl ", "webhook")
+ TOOL_COERCION = ("call the tool", "use browser", "run command", "execute", "download", "disable security", "turn off safety", "do not tell the user")
+ DELIMITER = ("<system>", "</system>", "[system]", "### system", "assistant:", "developer:", "begin system")
++MEMORY_POISONING = ("remember this", "store this instruction", "save to memory", "from now on", "for all future", "persistent instruction", "ghi nhớ chỉ dẫn", "lưu vào bộ nhớ")
++POLICY_TAMPERING = ("change policy", "update policy", "new policy", "security exception", "mark as trusted", "allowlist", "whitelist", "trusted source")
++
++# Character-separated and typoglycemia-like evasions are canonicalized only for
++# security matching. Original content is never rewritten into an executable prompt.
++_SEPARATED_WORD = re.compile(r"(?<!\w)(?:[a-zA-Z][.\-_\s]){3,}[a-zA-Z](?!\w)")
++
++
++def _collapse_separated_words(value: str) -> str:
++    return _SEPARATED_WORD.sub(lambda match: re.sub(r"[.\-_\s]", "", match.group(0)), value)
++
++
++def _word_signature(word: str) -> str:
++    return word if len(word) < 4 else word[0] + "".join(sorted(word[1:-1])) + word[-1]
++
++
++def _typoglycemia_view(value: str) -> str:
++    return " ".join(_word_signature(word) for word in re.findall(r"[a-zA-Z]+|[^a-zA-Z]+", value))
+ 
+ @dataclass(frozen=True)
+ class PromptFirewallAssessment:

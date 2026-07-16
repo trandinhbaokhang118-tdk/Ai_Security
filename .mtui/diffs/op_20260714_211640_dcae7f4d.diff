@@ -1,0 +1,9 @@
+@@ -148,7 +148,7 @@
+     }
+ 
+ 
+-def _build_l1_details(signals, evidence_by_feature: dict[str, object]) -> list[dict]:
++def _build_l1_details(signals, evidence_by_feature: dict[str, object], intelligence) -> list[dict]:
+     parts = signals.parts
+     return [
+         _detail("Xác định hostname, domain thật và subdomain", f"Hostname: {parts.host} · Domain đăng ký: {parts.registrable_domain} · Subdomain: {parts.subdomain or '(không có)'}", None, "Đã tách cấu trúc URL thành công. Bước này không tự cộng điểm rủi ro."),

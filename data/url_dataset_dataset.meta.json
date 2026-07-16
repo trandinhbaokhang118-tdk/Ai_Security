@@ -1,0 +1,15 @@
+{
+  "source": "user zips: new_data_urls.csv + SMS + n96 index.sql",
+  "total_rows": 875234,
+  "class_counts": {
+    "1": 455358,
+    "0": 419876
+  },
+  "format": "url,label (1=phishing/spam, 0=benign)",
+  "seed": 42,
+  "source_rows_before_dedup": {
+    "new_data_urls.csv": 822010,
+    "SMS URL column": 0,
+    "n96ncsr5g4-1.zip index.sql": 80000
+  }
+}

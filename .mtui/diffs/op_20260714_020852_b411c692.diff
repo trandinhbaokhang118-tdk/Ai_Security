@@ -1,0 +1,9 @@
+@@ -97,7 +97,7 @@
+     try {
+       switch (message.type) {
+         case "ASSESS_URL": return sendResponse(await handleAssessUrl(message.url, tabId, message.force));
+-        case "GET_PROTECTION_STATE": return sendResponse(await settings());
++        case "GET_PROTECTION_STATE": { const current = await settings(); return sendResponse({ enabled: current.protectionEnabled === true, linkProtection: current.linkProtection, gmailProtection: current.gmailProtection }); }
+         case "SET_PROTECTION_STATE": {
+           await chrome.storage.local.set({ protectionEnabled: message.enabled === true });
+           const current = await settings(); const tabs = await chrome.tabs.query({});

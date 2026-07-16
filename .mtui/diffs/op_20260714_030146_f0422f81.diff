@@ -1,0 +1,8 @@
+@@ -114,6 +114,7 @@
+     _schema("prewise_connection_test", "Test the MCP connection. Always returns done."),
+     _schema("assess_url", "Assess a URL before navigation or click."),
+     _schema("assess_text", "Assess email, SMS, text, or chat content."),
++    _schema("assess_tool_output", "Gate untrusted tool output before use, memory write, or another tool call."),
+     _schema("scan_prompt_injection", "Detect prompt injection before agent processing."),
+     _schema("assess_action", "Assess an agent action before execution."),
+     _schema("assess_page", "Assess sanitized HTML/page content and forms."),

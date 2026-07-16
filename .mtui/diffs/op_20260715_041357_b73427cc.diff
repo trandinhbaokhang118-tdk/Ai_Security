@@ -1,0 +1,8 @@
+@@ -275,6 +275,7 @@
+ 
+ 
+ class BrowserSandboxURLResponse(BaseModel):
++    risk_core: RiskCoreTrace | None = None
+     ok: bool
+     execution_status: Literal["completed", "failed"]
+     url: str

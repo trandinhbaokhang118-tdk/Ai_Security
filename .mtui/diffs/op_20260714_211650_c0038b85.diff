@@ -1,0 +1,20 @@
+@@ -156,7 +156,18 @@
+         _detail("Phát hiện biến thể gõ sai thương hiệu", f"Nhãn domain: {parts.domain_label}", evidence_by_feature.get("brand_typosquatting"), "Không phát hiện nhãn tên miền gần giống thương hiệu đã biết."),
+         _detail("Phát hiện homoglyph, punycode và ký tự giả mạo", "Có nhãn punycode" if "xn--" in parts.host else "Không thấy nhãn punycode", evidence_by_feature.get("homoglyph") or evidence_by_feature.get("punycode_domain"), "Không phát hiện homoglyph hoặc punycode ở hostname."),
+         _detail("Kiểm tra HTTPS, IP host, TLD rủi ro và shortlink", f"Protocol: {'HTTPS' if not signals.no_https else 'HTTP'} · TLD: {parts.suffix or '—'}", next((evidence_by_feature[key] for key in ("no_https", "ip_host", "risky_tld", "is_shortlink") if key in evidence_by_feature), None), "Không phát hiện IP host, TLD rủi ro, shortlink hoặc HTTP không mã hóa."),
+-        _detail("Tuổi domain và danh tiếng nguồn ngoài", "Chưa truy vấn WHOIS/reputation feed", None, "Chưa chạy: phân tích nhanh ngoại tuyến không truy vấn WHOIS hoặc cơ sở dữ liệu website lừa đảo; cần tích hợp nguồn dữ liệu ngoài để có kết quả."),
++        {
++            "criterion": "Tuổi domain và danh tiếng nguồn ngoài",
++            "value": (
++                f"Tuổi: {intelligence.age_days} ngày · Đăng ký: {intelligence.created_at or 'không rõ'} · "
++                f"Registrar: {intelligence.registrar or 'không rõ'} · URLhaus: {intelligence.reputation_status}"
++                if intelligence.available
++                else "Không thể truy vấn RDAP/URLhaus"
++            ),
++            "triggered": intelligence.score > 0,
++            "contribution": intelligence.score,
++            "reason": " ".join(intelligence.reasons),
++        },
+     ]
+ 
+ 
