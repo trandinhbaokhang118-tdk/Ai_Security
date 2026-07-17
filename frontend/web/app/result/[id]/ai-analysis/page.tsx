@@ -6,6 +6,7 @@ import {
   Bot,
   CheckCircle2,
   Clock3,
+  Download,
   ExternalLink,
   Fingerprint,
   Globe2,
@@ -17,6 +18,7 @@ import {
   Server,
   ShieldAlert,
 } from "lucide-react";
+import NextImage from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +108,12 @@ function hostname(value: string): string {
   try { return new URL(value).hostname; } catch { return value; }
 }
 
+function screenshotFilename(domain?: string, url?: string): string {
+  const source = domain || (url ? hostname(url) : "website") || "website";
+  const safeName = source.toLowerCase().replace(/[^a-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `prewise-sandbox-${safeName || "website"}.jpg`;
+}
+
 function AiAnalysisContent(): JSX.Element {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -130,7 +138,7 @@ function AiAnalysisContent(): JSX.Element {
       const response = await fetch("/api/demo/url/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, deep_analysis: true, advanced_analysis: true }),
+        body: JSON.stringify({ url, deep_analysis: true, advanced_analysis: true, scan_all: true }),
       });
       const payload = await response.json() as DeepResult & { detail?: string };
       if (!response.ok) throw new Error(payload.detail || "Không thể hoàn tất phân tích AI chuyên sâu.");
@@ -203,7 +211,20 @@ function AiAnalysisContent(): JSX.Element {
       <section className="ai-summary-band"><div className={`ai-risk ${risk >= 70 ? "danger" : risk >= 40 ? "warn" : "safe"}`}><span>Rủi ro tổng hợp</span><strong>{risk}<small>/100</small></strong><b>{result.threat_level || "chưa xác định"}</b></div><div><Fingerprint /><span>AI/model</span><strong>{result.ai_detection?.model_version || "Không cung cấp"}</strong><small>Độ tin cậy {Math.round((result.ai_detection?.confidence || 0) * 100)}%</small></div><div><Activity /><span>Dấu vết browser</span><strong>{(sandbox?.behaviors?.length || 0) + redirects.length}</strong><small>{sandbox?.network_calls?.length || 0} network request</small></div><div><Clock3 /><span>Thời gian phân tích</span><strong>{result.analysis_time_ms || sandbox?.analysis_time_ms || 0} ms</strong><small>Backend + sandbox cô lập</small></div></section>
 
       <div className="ai-investigation-grid">
-        <section className="ai-visual" aria-labelledby="ai-visual-title"><header><div><ImageIcon size={20} /><div><span>ẢNH GHI NHẬN TRỰC TIẾP</span><h2 id="ai-visual-title">Website trong sandbox</h2></div></div><em>{identity.status_code ? `HTTP ${identity.status_code}` : "Không có HTTP"}</em></header>{sandbox?.screenshot_data_url ? <img src={sandbox.screenshot_data_url} alt={`Ảnh chụp an toàn của ${identity.page_title || intel?.domain || "website"}`} /> : <div className="ai-no-visual"><ImageIcon size={34} /><b>Không tạo được ảnh chụp</b><span>Website có thể chặn trình duyệt tự động hoặc browser engine chưa khả dụng.</span></div>}<div className="ai-page-caption"><b>{identity.page_title || "Không đọc được tiêu đề trang"}</b><p>{identity.description || "Không có mô tả công khai trong metadata."}</p><code>{identity.final_url || record?.content}</code></div></section>
+        <section className="ai-visual" aria-labelledby="ai-visual-title">
+          <header><div><ImageIcon size={20} /><div><span>ẢNH GHI NHẬN TRỰC TIẾP</span><h2 id="ai-visual-title">Website trong sandbox</h2></div></div><em>{identity.status_code ? `HTTP ${identity.status_code}` : "Không có HTTP"}</em></header>
+          {sandbox?.screenshot_data_url ? <>
+            <div className="ai-screenshot-frame"><NextImage src={sandbox.screenshot_data_url} width={1280} height={800} unoptimized alt={`Ảnh chụp an toàn của ${identity.page_title || intel?.domain || "website"}`} /></div>
+            <div className="ai-visual-actions">
+              <span><CheckCircle2 size={14} /> Ảnh JPEG chụp trong browser sandbox cô lập</span>
+              <div>
+                <a href={sandbox.screenshot_data_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Mở ảnh đầy đủ</a>
+                <a href={sandbox.screenshot_data_url} download={screenshotFilename(intel?.domain, identity.final_url || record?.content)}><Download size={14} /> Tải ảnh JPG</a>
+              </div>
+            </div>
+          </> : <div className="ai-no-visual"><ImageIcon size={34} /><b>Không tạo được ảnh chụp</b><span>{sandbox?.error ? `Sandbox báo lỗi: ${sandbox.error}` : "Website có thể chặn trình duyệt tự động hoặc browser engine chưa khả dụng."}</span></div>}
+          <div className="ai-page-caption"><b>{identity.page_title || "Không đọc được tiêu đề trang"}</b><p>{identity.description || "Không có mô tả công khai trong metadata."}</p><code>{identity.final_url || record?.content}</code></div>
+        </section>
 
         <section className="ai-identity" aria-labelledby="ai-identity-title"><header><div><Fingerprint size={20} /><div><span>NHẬN DIỆN WEBSITE</span><h2 id="ai-identity-title">Danh tính và đăng ký</h2></div></div></header><dl><div><dt><Globe2 /> Domain / tên miền</dt><dd>{intel?.domain || "Không xác định"}</dd></div><div><dt><Server /> IP và nhà cung cấp</dt><dd>{intel?.primary_ip || intel?.ip_addresses?.join(", ") || "Không tìm thấy"}<small>{[intel?.asn, intel?.provider, intel?.ip_location].filter(Boolean).join(" · ") || "Không có ASN/vị trí công khai"}</small></dd></div><div><dt><Fingerprint /> Nhà đăng ký / chủ thể</dt><dd>{intel?.registrar || "Không công khai"}<small>{intel?.registrant || "Thông tin chủ thể bị ẩn hoặc không công khai"}</small></dd></div><div><dt><Phone /> Số điện thoại công khai</dt><dd>{contacts.phones.length ? contacts.phones.join(", ") : "Không tìm thấy / đã ẩn"}<small>WHOIS/RDAP hoặc nội dung hiển thị trên website</small></dd></div><div><dt><Mail /> Email công khai trên trang</dt><dd>{contacts.emails.length ? contacts.emails.join(", ") : "Không tìm thấy"}</dd></div><div><dt><Clock3 /> Vòng đời tên miền</dt><dd>{formatDate(intel?.registered_at)} → {formatDate(intel?.expires_at)}</dd></div></dl><div className="ai-source-row">{intel?.sources?.map((source) => <span className={source.status || "unavailable"} title={source.detail || ""} key={source.source}><i />{source.source}</span>)}</div></section>
       </div>

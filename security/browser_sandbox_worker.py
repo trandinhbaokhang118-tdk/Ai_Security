@@ -67,6 +67,32 @@ BROWSER_FAILURE_STEP = {
 }
 
 
+def _write_progress(stage: str) -> None:
+    path = os.environ.get("AISEC_BROWSER_PROGRESS_PATH")
+    if not path:
+        return
+    try:
+        Path(path).write_text(stage, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _write_result_checkpoint(result: dict) -> None:
+    """Publish a complete result before browser cleanup can block.
+
+    Chromium can occasionally hang while Playwright closes a persistent context
+    on Windows. The parent process treats this file as the completion boundary
+    and then owns termination of the isolated browser process tree.
+    """
+    path = os.environ.get("AISEC_BROWSER_RESULT_PATH")
+    if not path:
+        return
+    try:
+        Path(path).write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _read_proxy_headers(connection: socket.socket) -> bytes:
     data = bytearray()
     while b"\r\n\r\n" not in data:
@@ -817,11 +843,128 @@ def _launch_browser(playwright, user_data_dir: str, proxy_server: str):
     raise RuntimeError("No Chromium browser channel is available")
 
 
+def _completed_result(
+    *,
+    raw_url: str,
+    started: float,
+    initial_ip: str,
+    canary: dict,
+    status_code: int | None,
+    final_url: str,
+    title: str,
+    fill_report: dict,
+    probe_report: dict,
+    browser_events: list,
+    network_events: list[dict],
+    download_events: list[dict],
+    console_errors: list[str],
+    visual_analysis: dict,
+    page_identity: dict,
+    screenshot_data_url: str,
+    base_issues: list[dict] | None = None,
+) -> dict:
+    fields = fill_report.get("fields", []) if isinstance(fill_report, dict) else []
+    field_types = dict(Counter(field.get("kind", "unknown") for field in fields))
+    normalized_browser_events = browser_events if isinstance(browser_events, list) else []
+    normalized_probe_report = probe_report if isinstance(probe_report, dict) else {}
+    issues = list(base_issues or [])
+    issues.extend(_status_issue(status_code))
+    issues.extend(
+        _issues_from_signals(
+            fill_report,
+            normalized_browser_events,
+            network_events,
+            canary,
+            download_events,
+        )
+    )
+    if visual_analysis.get("brand_mismatch") is True:
+        issues.append(
+            _issue(
+                "visual_brand_impersonation",
+                "critical",
+                "credential",
+                "The page visually matches a curated brand reference on an unofficial domain.",
+                (
+                    f"Brand={visual_analysis.get('matched_brand')}; "
+                    f"similarity={visual_analysis.get('similarity')}"
+                ),
+            )
+        )
+        issues.append(
+            _issue(
+                "forged_brand_image",
+                "high",
+                "visual",
+                "A rendered page image matches a curated brand reference on an unofficial domain.",
+                (
+                    f"Brand={visual_analysis.get('matched_brand')}; "
+                    f"similarity={visual_analysis.get('similarity')}"
+                ),
+            )
+        )
+    canary_blocked = any(
+        event.get("reason") == "canary_payload_blocked" for event in network_events
+    )
+    scripted_canary = _event_contains_canary(normalized_browser_events, canary)
+    blocked_forms = [
+        event
+        for event in normalized_browser_events
+        if str(event.get("type", "")).endswith("form_submit_blocked")
+    ]
+
+    return {
+        "ok": True,
+        "execution_status": "completed",
+        "url": raw_url,
+        "final_url": final_url,
+        "status_code": status_code,
+        "page_title": title,
+        "isolation": {
+            "mode": "headless_browser",
+            "profile": "temporary",
+            "network_private_block": True,
+            "egress_proxy": "dns_pinned",
+            "downloads": "blocked",
+            "permissions": "denied",
+            "service_workers": "blocked",
+            "websockets": "blocked",
+            "webrtc_non_proxied_udp": "blocked",
+            "initial_resolved_ip": initial_ip,
+            "canary_credentials": "synthetic_only",
+        },
+        "canary": {
+            "enabled": True,
+            "mode": "dry_run",
+            "clone_email": canary["email"],
+            "fields_filled": len(fields),
+            "field_types": field_types,
+            "form_submissions_blocked": len(blocked_forms),
+            "exfiltration_blocked": bool(canary_blocked or scripted_canary),
+            "notes": [
+                "Synthetic clone values were used.",
+                f"Sensitive forms probed: {normalized_probe_report.get('sensitive_forms', 0)}",
+                "Form submissions were prevented inside the sandbox.",
+            ],
+        },
+        "network_events": network_events,
+        "browser_events": normalized_browser_events[:80],
+        "console_errors": console_errors[:20],
+        "visual_analysis": visual_analysis,
+        "page_identity": page_identity,
+        "screenshot_data_url": screenshot_data_url,
+        "issues": issues,
+        "scan_steps": _scan_steps(issues=issues),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+
+
 def run(payload: dict) -> dict:
     started = time.perf_counter()
     raw_url = str(payload.get("url", ""))
     timeout_ms = min(max(int(payload.get("timeout_ms", 15_000)), 5_000), 30_000)
     canary = _make_canary()
+    _write_progress("preflight_public_url")
     current, initial_ip = _preflight_public_url(raw_url)
     root_origin = _origin(current)
 
@@ -841,6 +984,7 @@ def run(payload: dict) -> dict:
     console_errors: list[str] = []
     download_events: list[dict] = []
     issues: list[dict] = []
+    completed_result: dict | None = None
 
     def add_network_event(event: dict) -> None:
         if len(network_events) < MAX_NETWORK_EVENTS:
@@ -914,10 +1058,15 @@ def run(payload: dict) -> dict:
             return
 
     try:
+        _write_progress("start_egress_proxy")
         with _PinnedEgressProxy() as egress_proxy:
+            _write_progress("create_browser_profile")
             with tempfile.TemporaryDirectory(prefix="aisec-browser-sandbox-") as profile_dir:
+                _write_progress("start_playwright")
                 with sync_playwright() as pw:
+                    _write_progress("launch_browser")
                     context = _launch_browser(pw, profile_dir, egress_proxy.url)
+                    _write_progress("install_browser_guards")
                     context.set_default_timeout(timeout_ms)
                     context.route("**/*", route_handler)
                     context.route_web_socket("**/*", websocket_handler)
@@ -947,7 +1096,9 @@ def run(payload: dict) -> dict:
                             }
                         ),
                     )
+                    _write_progress("navigate_page")
                     response = page.goto(current, wait_until="domcontentloaded", timeout=timeout_ms)
+                    _write_progress("inspect_page")
                     try:
                         page.wait_for_load_state("networkidle", timeout=2_500)
                     except PlaywrightTimeoutError:
@@ -1047,109 +1198,57 @@ def run(payload: dict) -> dict:
                         if content_sample
                         else ""
                     )
+                    _write_progress("capture_screenshot")
                     screenshot = page.screenshot(type="jpeg", quality=55, full_page=False)
                     screenshot_data_url = "data:image/jpeg;base64," + base64.b64encode(screenshot).decode("ascii")
+                    _write_progress("analyze_visual_hash")
                     visual_analysis = analyze_visual_hash(
                         screenshot,
                         host=urlsplit(final_url).hostname or "",
                         title=title,
                         registry_path=os.environ.get("BRAND_VISUAL_HASH_REGISTRY"),
                     )
+                    for event in egress_proxy.events:
+                        if event.get("blocked"):
+                            add_network_event(event)
+                    completed_result = _completed_result(
+                        raw_url=raw_url,
+                        started=started,
+                        initial_ip=initial_ip,
+                        canary=canary,
+                        status_code=status_code,
+                        final_url=final_url,
+                        title=title,
+                        fill_report=fill_report,
+                        probe_report=probe_report,
+                        browser_events=browser_events,
+                        network_events=network_events,
+                        download_events=download_events,
+                        console_errors=console_errors,
+                        visual_analysis=visual_analysis,
+                        page_identity=page_identity,
+                        screenshot_data_url=screenshot_data_url,
+                        base_issues=issues,
+                    )
+                    _write_progress("write_result_checkpoint")
+                    _write_result_checkpoint(completed_result)
+                    _write_progress("close_browser_context")
                     context.close()
-                for event in egress_proxy.events:
-                    if event.get("blocked"):
-                        add_network_event(event)
+                    _write_progress("browser_context_closed")
     except PlaywrightTimeoutError as exc:
         return _failure(raw_url, "browser_navigation_failed", f"Timeout: {exc}", started)
     except PlaywrightError as exc:
         return _failure(raw_url, "browser_navigation_failed", str(exc), started)
 
-    fields = fill_report.get("fields", []) if isinstance(fill_report, dict) else []
-    field_types = dict(Counter(field.get("kind", "unknown") for field in fields))
-    browser_events = browser_events if isinstance(browser_events, list) else []
-    probe_report = probe_report if isinstance(probe_report, dict) else {}
-    issues.extend(_status_issue(status_code))
-    issues.extend(
-        _issues_from_signals(
-            fill_report,
-            browser_events,
-            network_events,
-            canary,
-            download_events,
+    _write_progress("serialize_result")
+    if completed_result is None:
+        return _failure(
+            raw_url,
+            "browser_sandbox_error",
+            "Browser inspection finished without a completed result.",
+            started,
         )
-    )
-    if visual_analysis.get("brand_mismatch") is True:
-        issues.append(
-            _issue(
-                "visual_brand_impersonation",
-                "critical",
-                "credential",
-                "The page visually matches a curated brand reference on an unofficial domain.",
-                (
-                    f"Brand={visual_analysis.get('matched_brand')}; "
-                    f"similarity={visual_analysis.get('similarity')}"
-                ),
-            )
-        )
-        issues.append(
-            _issue(
-                "forged_brand_image",
-                "high",
-                "visual",
-                "A rendered page image matches a curated brand reference on an unofficial domain.",
-                f"Brand={visual_analysis.get('matched_brand')}; similarity={visual_analysis.get('similarity')}",
-            )
-        )
-    canary_blocked = any(event.get("reason") == "canary_payload_blocked" for event in network_events)
-    scripted_canary = _event_contains_canary(browser_events, canary)
-    blocked_forms = [
-        event for event in browser_events if str(event.get("type", "")).endswith("form_submit_blocked")
-    ]
-
-    return {
-        "ok": True,
-        "execution_status": "completed",
-        "url": raw_url,
-        "final_url": final_url,
-        "status_code": status_code,
-        "page_title": title,
-        "isolation": {
-            "mode": "headless_browser",
-            "profile": "temporary",
-            "network_private_block": True,
-            "egress_proxy": "dns_pinned",
-            "downloads": "blocked",
-            "permissions": "denied",
-            "service_workers": "blocked",
-            "websockets": "blocked",
-            "webrtc_non_proxied_udp": "blocked",
-            "initial_resolved_ip": initial_ip,
-            "canary_credentials": "synthetic_only",
-        },
-        "canary": {
-            "enabled": True,
-            "mode": "dry_run",
-            "clone_email": canary["email"],
-            "fields_filled": len(fields),
-            "field_types": field_types,
-            "form_submissions_blocked": len(blocked_forms),
-            "exfiltration_blocked": bool(canary_blocked or scripted_canary),
-            "notes": [
-                "Synthetic clone values were used.",
-                f"Sensitive forms probed: {probe_report.get('sensitive_forms', 0)}",
-                "Form submissions were prevented inside the sandbox.",
-            ],
-        },
-        "network_events": network_events,
-        "browser_events": browser_events[:80],
-        "console_errors": console_errors[:20],
-        "visual_analysis": visual_analysis,
-        "page_identity": page_identity,
-        "screenshot_data_url": screenshot_data_url,
-        "issues": issues,
-        "scan_steps": _scan_steps(issues=issues),
-        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
-    }
+    return completed_result
 
 
 def main() -> None:
@@ -1171,7 +1270,13 @@ def main() -> None:
         result = _failure(raw_url, str(exc), str(exc), started)
     except Exception as exc:
         result = _failure(raw_url, "browser_sandbox_error", f"{type(exc).__name__}: {exc}", started)
-    sys.stdout.write(json.dumps(result, ensure_ascii=False))
+    _write_progress("write_result")
+    result_path = os.environ.get("AISEC_BROWSER_RESULT_PATH")
+    if result_path:
+        _write_result_checkpoint(result)
+    else:
+        # Keep the stdout protocol for direct/manual worker execution.
+        sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":
