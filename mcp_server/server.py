@@ -3,17 +3,42 @@
 from __future__ import annotations
 
 import argparse
+import os
 from typing import Any, Literal
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+from mcp.server.transport_security import TransportSecuritySettings
 
-from mcp_server.auth import MCPApiKeyMiddleware
+from fastapi import HTTPException
+
+from mcp_server.auth import MCPApiKeyMiddleware, current_mcp_identity, reserve_mcp_scan_quota
 from mcp_server.tools import MCPTools
+from mcp_server.oauth import OAUTH_SCOPES, PrewiseOAuthProvider, install_oauth_routes
+from backend.config import settings
 
 
 def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:
     handlers = MCPTools()
+    oauth_provider = PrewiseOAuthProvider()
+
+    def dispatch(name: str, arguments: dict[str, Any], *, consume_scan: bool = True) -> dict[str, Any]:
+        if consume_scan:
+            try:
+                reserve_mcp_scan_quota()
+            except HTTPException as exc:
+                return {
+                    "error": "quota_exceeded" if exc.status_code == 429 else "access_denied",
+                    "detail": exc.detail,
+                    "status_code": exc.status_code,
+                }
+        return handlers.dispatch(name, arguments)
+    allowed_hosts = ["localhost", "127.0.0.1", f"{host}:{port}"]
+    allowed_hosts.extend(value.strip() for value in os.getenv("MCP_ALLOWED_HOSTS", "").split(",") if value.strip())
+    allowed_origins = [
+        value.strip() for value in os.getenv("MCP_ALLOWED_ORIGINS", "").split(",") if value.strip()
+    ]
     server = FastMCP(
         "ai-security-armor",
         instructions="Assess risk before an AI agent processes content or takes action.",
@@ -24,23 +49,44 @@ def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:
         streamable_http_path="/mcp",
         stateless_http=True,
         json_response=True,
+        auth_server_provider=oauth_provider,
+        auth=AuthSettings(
+            issuer_url=settings.mcp_public_url,
+            resource_server_url=f"{settings.mcp_public_url.rstrip('/')}/mcp",
+            required_scopes=OAUTH_SCOPES,
+            client_registration_options=ClientRegistrationOptions(
+                enabled=True,
+                valid_scopes=OAUTH_SCOPES,
+                default_scopes=OAUTH_SCOPES,
+            ),
+            revocation_options=RevocationOptions(enabled=True),
+        ),
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        ),
     )
+    install_oauth_routes(server)
 
     @server.tool(name="prewise_connection_test")
     def prewise_connection_test(request: str = "test") -> dict[str, Any]:
         """Test MCP connectivity and authentication; returns status done."""
-        return handlers.dispatch("prewise_connection_test", {"request": request})
+        result = dispatch("prewise_connection_test", {"request": request}, consume_scan=False)
+        identity = current_mcp_identity.get()
+        result["authenticated"] = bool(identity and identity.authenticated)
+        return result
 
     @server.tool(name="assess_url")
     def assess_url(url: str, context: str = "") -> dict[str, Any]:
-        return handlers.dispatch("assess_url", {"url": url, "context": context})
+        return dispatch("assess_url", {"url": url, "context": context})
 
     @server.tool(name="assess_text")
     def assess_text(
         content: str,
         content_type: Literal["email", "sms", "text", "webpage", "chat_message", "prompt"] = "text",
     ) -> dict[str, Any]:
-        return handlers.dispatch(
+        return dispatch(
             "assess_text",
             {"content": content, "content_type": content_type},
         )
@@ -51,14 +97,14 @@ def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:
         tool_name: str,
         intended_use: Literal["read_only", "memory_write", "tool_argument", "user_display"] = "read_only",
     ) -> dict[str, Any]:
-        return handlers.dispatch(
+        return dispatch(
             "assess_tool_output",
             {"content": content, "tool_name": tool_name, "intended_use": intended_use},
         )
 
     @server.tool(name="scan_prompt_injection")
     def scan_prompt_injection(content: str) -> dict[str, Any]:
-        return handlers.dispatch(
+        return dispatch(
             "scan_prompt_injection",
             {"content": content, "content_type": "prompt"},
         )
@@ -72,7 +118,7 @@ def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:
         target: str,
         protected_assets: list[str] | None = None,
     ) -> dict[str, Any]:
-        return handlers.dispatch(
+        return dispatch(
             "assess_action",
             {
                 "action_type": action_type,
@@ -83,17 +129,18 @@ def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:
 
     @server.tool(name="assess_page")
     def assess_page(html: str, url: str = "") -> dict[str, Any]:
-        return handlers.dispatch("assess_page", {"html": html, "url": url})
+        return dispatch("assess_page", {"html": html, "url": url})
 
     @server.tool(name="assess_file_static")
     def assess_file_static(path: str) -> dict[str, Any]:
-        return handlers.dispatch("assess_file_static", {"path": path})
+        return dispatch("assess_file_static", {"path": path})
 
     @server.tool(name="summarize_risk_safely")
     def summarize_risk_safely(risk_score: float, evidence: list[str] | None = None) -> dict[str, Any]:
-        return handlers.dispatch(
+        return dispatch(
             "summarize_risk_safely",
             {"risk_score": risk_score, "evidence": evidence or []},
+            consume_scan=False,
         )
 
     return server

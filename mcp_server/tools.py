@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from backend.middleware import sanitize_text
+from backend.dependencies import get_inference_service
 from backend.services.inference_service import InferenceService
 from shared.schemas import AgentContext, Decision
 
@@ -166,7 +167,9 @@ class MCPTools:
         service: InferenceService | None = None,
         sandbox_dir: Path | None = None,
     ) -> None:
-        self.service = service or InferenceService()
+        # Reuse the gateway singleton so MCP loads the configured ai/models artifacts
+        # and the exact same thresholds/policy as web, extension, and desktop clients.
+        self.service = service or get_inference_service()
         self.sandbox_dir = (sandbox_dir or Path(os.getenv("MCP_SANDBOX_DIR", ".mcp-sandbox"))).resolve()
 
     @staticmethod
@@ -176,7 +179,6 @@ class MCPTools:
             "message": "done",
             "received": payload.request,
             "service": "prewise-mcp",
-            "authenticated": True,
         }
 
     def assess_url(self, payload: URLInput) -> dict[str, Any]:

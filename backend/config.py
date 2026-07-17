@@ -14,6 +14,12 @@ class Settings(BaseSettings):
 
     model_dir: str = "ai/models"
     deepfake_model_path: str = "ai/models/deepfake_image_q4.onnx"
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_model: str = ""
+    llm_timeout_seconds: float = 90
+    llm_max_tokens: int = 500
+    # Backward-compatible local Ollama settings. Used only when LLM_BASE_URL is empty.
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
     ip2whois_api_key: str = ""
@@ -35,6 +41,8 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 60
     anonymous_daily_scan_limit: int = 50
     max_upload_bytes: int = 10 * 1024 * 1024
+    shared_assessment_cache_enabled: bool = True
+    shared_assessment_cache_ttl_seconds: int = 900
 
     # SePay webhook authentication. Prefer HMAC-SHA256 using X-SePay-Signature.
     sepay_webhook_api_key: str = ""
@@ -67,6 +75,9 @@ class Settings(BaseSettings):
     mcp_allow_anonymous: bool = False
     mcp_api_key_rate_limit_per_min: int = 120
     mcp_anonymous_rate_limit_per_min: int = 10
+    mcp_public_url: str = "https://api.prewise.site"
+    mcp_oauth_access_token_minutes: int = 30
+    mcp_oauth_refresh_token_days: int = 90
 
     risk_threshold_block: float = 0.85
     risk_threshold_warn: float = 0.50
@@ -80,6 +91,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        # Desktop renderer served by Vite during Electron development.
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        # Packaged Electron loads its renderer from a local file, which sends
+        # the literal Origin header "null" for requests to the Core API.
+        "null",
     ]
 
     @model_validator(mode="after")
@@ -105,6 +122,8 @@ class Settings(BaseSettings):
             unsafe.append("MCP_ALLOW_ANONYMOUS=false")
         if self.mcp_api_key_rate_limit_per_min <= 0:
             unsafe.append("MCP_API_KEY_RATE_LIMIT_PER_MIN>0")
+        if self.llm_base_url and not self.llm_api_key:
+            unsafe.append("LLM_API_KEY when LLM_BASE_URL is configured")
         if unsafe:
             raise ValueError("Unsafe production configuration: " + ", ".join(unsafe))
         return self

@@ -5,6 +5,7 @@ repeated third-party requests and failures degrade to an explicit unavailable st
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 from dataclasses import dataclass
@@ -51,9 +52,21 @@ class DomainIntelligenceService:
 
         whoisxml, whoisxml_error = self._query_whoisxml(domain)
         whois, whois_error = (None, None) if whoisxml else self._query_ip2whois(domain)
-        rdap, rdap_error = (None, None) if (whoisxml or whois) else self._query_rdap(domain)
-        certificates, certificate_error = (None, None) if (whoisxml or whois) else self._query_certificates(domain)
-        reputation, reputation_error = self._query_reputation(domain)
+        if whoisxml or whois:
+            rdap, rdap_error = None, None
+            certificates, certificate_error = None, None
+            reputation, reputation_error = self._query_reputation(domain)
+        else:
+            # These independent public lookups used to run in series, making one URL
+            # assessment wait for every provider timeout. Run them concurrently so the
+            # request is bounded by the slowest provider instead of their total.
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                rdap_future = executor.submit(self._query_rdap, domain)
+                certificate_future = executor.submit(self._query_certificates, domain)
+                reputation_future = executor.submit(self._query_reputation, domain)
+                rdap, rdap_error = rdap_future.result()
+                certificates, certificate_error = certificate_future.result()
+                reputation, reputation_error = reputation_future.result()
         age_days, created_at = self._whoisxml_age(whoisxml)
         if age_days is None:
             age_days, created_at = self._ip2whois_age(whois)

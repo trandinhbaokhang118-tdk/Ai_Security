@@ -319,9 +319,9 @@ class InferenceEngine:
 
         core = assess_url_risk(url, model_score=model_score)
         if model_score is not None:
-            version = "url_lgbm.onnx+multilayer-url-core-3"
+            version = "url_lgbm.onnx+multilayer-url-core-4"
         else:
-            version = "multilayer-url-core-3"
+            version = "multilayer-url-core-4"
         return PredictionResult(_clip01(core.score), core.evidence, version)
 
     def _heuristic_url(self, url: str, features: list[float]) -> float:

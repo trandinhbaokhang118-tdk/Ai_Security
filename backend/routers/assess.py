@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session as DbSession
@@ -11,7 +13,9 @@ from backend.config import settings
 from backend.db import get_db
 from backend.dependencies import get_inference_service
 from backend.middleware import sanitize_text
+from backend.models import AssessmentCache
 from backend.routers.auth import BearerCredentials, require_api_key_scope, resolve_actor
+from backend.security_utils import input_sha256, utcnow
 from backend.services.inference_service import InferenceService
 from backend.services.quota_service import reserve_scan_quota
 from backend.services.scan_log_service import log_assessment
@@ -37,6 +41,30 @@ browser_sandbox_runner = BrowserSandboxRunner()
 exe_sandbox_runner = ExeSandboxRunner()
 
 
+def _cached_url_result(db: DbSession, url: str) -> AssessResponse | None:
+    if not settings.shared_assessment_cache_enabled:
+        return None
+    key = f"url:{input_sha256(url)}"
+    cached = db.get(AssessmentCache, key)
+    if cached is None or cached.expires_at <= utcnow():
+        return None
+    return AssessResponse.model_validate(cached.response).model_copy(
+        update={"request_id": str(uuid.uuid4()), "latency_ms": 0.0}
+    )
+
+
+def _store_url_result(db: DbSession, url: str, result: AssessResponse) -> None:
+    if not settings.shared_assessment_cache_enabled:
+        return
+    key = f"url:{input_sha256(url)}"
+    cached = db.get(AssessmentCache, key)
+    if cached is None:
+        cached = AssessmentCache(cache_key=key, modality="url", response={"risk_score": 0}, expires_at=utcnow())
+        db.add(cached)
+    cached.response = result.model_dump(mode="json")
+    cached.expires_at = utcnow() + timedelta(seconds=max(1, settings.shared_assessment_cache_ttl_seconds))
+
+
 @router.post("/url", response_model=AssessResponse)
 def assess_url(
     req: AssessURLRequest,
@@ -49,7 +77,10 @@ def assess_url(
     require_api_key_scope(actor, "assess:url")
     reserve_scan_quota(db, actor, request)
     url = sanitize_text(req.url)
-    result = svc.assess_url(url)
+    result = _cached_url_result(db, url)
+    if result is None:
+        result = svc.assess_url(url)
+        _store_url_result(db, url, result)
     log_assessment(db, result=result, actor=actor, request=request, raw_input=url, normalized_url=url)
     return result
 

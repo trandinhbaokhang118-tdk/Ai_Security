@@ -1,0 +1,33 @@
+services:
+  ai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    ports:
+      - "8001:8000"
+    environment:
+      LLM_MODEL_PATH: /models/current
+      LLM_SERVED_MODEL_NAME: ${LLM_MODEL:-prewise-security-v1}
+      LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY before starting the AI server}
+      LLM_MAX_MODEL_LEN: ${LLM_MAX_MODEL_LEN:-4096}
+      LLM_GPU_MEMORY_UTILIZATION: ${LLM_GPU_MEMORY_UTILIZATION:-0.90}
+      LLM_TENSOR_PARALLEL_SIZE: ${LLM_TENSOR_PARALLEL_SIZE:-1}
+      LLM_DTYPE: ${LLM_DTYPE:-auto}
+      LLM_QUANTIZATION: ${LLM_QUANTIZATION:-}
+      LLM_BASE_MODEL: ${LLM_BASE_MODEL:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./server/llm-models/current:/models/current:ro
+      - huggingface-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  huggingface-cache:

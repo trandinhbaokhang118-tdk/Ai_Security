@@ -10,6 +10,7 @@ import base64
 import ipaddress
 import socket
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -30,6 +31,13 @@ class FreeWebSandboxManager:
     def __init__(self) -> None:
         self._sessions: dict[str, FreeBrowserSession] = {}
         self._lock = threading.RLock()
+        # Playwright's synchronous API is thread-affine. FastAPI may execute each
+        # sync route in a different worker thread, so every browser operation must
+        # be marshalled onto the same dedicated thread.
+        self._executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="free-web-sandbox",
+        )
 
     @staticmethod
     def assert_public_url(raw_url: str) -> str:
@@ -42,12 +50,15 @@ class FreeWebSandboxManager:
         return url
 
     def create(self, session_id: str, expires_at: datetime) -> dict:
+        return self._executor.submit(self._create, session_id, expires_at).result()
+
+    def _create(self, session_id: str, expires_at: datetime) -> dict:
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as exc:
             raise RuntimeError("Chưa cài Playwright cho Free Web Sandbox") from exc
         with self._lock:
-            self.close(session_id)
+            self._close(session_id)
             pw = sync_playwright().start()
             browser = pw.chromium.launch(headless=True, args=[
                 "--disable-extensions", "--disable-sync", "--disable-quic",
@@ -74,47 +85,64 @@ class FreeWebSandboxManager:
             page.on("download", lambda download: download.cancel())
             page.goto("https://example.com", wait_until="domcontentloaded", timeout=15_000)
             self._sessions[session_id] = FreeBrowserSession(pw, browser, context, page, expires_at)
-            return self.state(session_id)
+            return self._state(session_id)
 
     def _get(self, session_id: str) -> FreeBrowserSession:
         session = self._sessions.get(session_id)
         if session is None:
             raise KeyError("free_browser_session_not_found")
         if session.expires_at <= datetime.utcnow():
-            self.close(session_id)
+            # Already running on the dedicated executor thread. Calling the
+            # public close() would submit back to the same executor and deadlock.
+            self._close(session_id)
             raise TimeoutError("free_browser_session_expired")
         return session
 
     def navigate(self, session_id: str, url: str) -> dict:
+        return self._executor.submit(self._navigate, session_id, url).result()
+
+    def _navigate(self, session_id: str, url: str) -> dict:
         with self._lock:
             session = self._get(session_id)
             target = self.assert_public_url(url)
             session.page.goto(target, wait_until="domcontentloaded", timeout=15_000)
-            return self.state(session_id)
+            return self._state(session_id)
 
     def click(self, session_id: str, x: float, y: float) -> dict:
+        return self._executor.submit(self._click, session_id, x, y).result()
+
+    def _click(self, session_id: str, x: float, y: float) -> dict:
         with self._lock:
             session = self._get(session_id)
             session.page.mouse.click(max(0, min(x, 1280)), max(0, min(y, 720)))
             session.page.wait_for_timeout(300)
-            return self.state(session_id)
+            return self._state(session_id)
 
     def key(self, session_id: str, key: str) -> dict:
         allowed = {"Enter", "Escape", "Tab", "Backspace", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"}
         if key not in allowed:
             raise ValueError("key_not_allowed")
+        return self._executor.submit(self._key, session_id, key).result()
+
+    def _key(self, session_id: str, key: str) -> dict:
         with self._lock:
             self._get(session_id).page.keyboard.press(key)
-            return self.state(session_id)
+            return self._state(session_id)
 
     def type_text(self, session_id: str, text: str) -> dict:
         if len(text) > 500 or any(ord(char) < 32 and char not in "\t\n" for char in text):
             raise ValueError("invalid_text")
+        return self._executor.submit(self._type_text, session_id, text).result()
+
+    def _type_text(self, session_id: str, text: str) -> dict:
         with self._lock:
             self._get(session_id).page.keyboard.type(text[:500])
-            return self.state(session_id)
+            return self._state(session_id)
 
     def state(self, session_id: str) -> dict:
+        return self._executor.submit(self._state, session_id).result()
+
+    def _state(self, session_id: str) -> dict:
         session = self._get(session_id)
         screenshot = session.page.screenshot(type="jpeg", quality=70)
         return {
@@ -124,6 +152,9 @@ class FreeWebSandboxManager:
         }
 
     def close(self, session_id: str) -> None:
+        self._executor.submit(self._close, session_id).result()
+
+    def _close(self, session_id: str) -> None:
         with self._lock:
             session = self._sessions.pop(session_id, None)
             if session is None:

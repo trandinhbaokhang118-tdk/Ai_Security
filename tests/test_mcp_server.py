@@ -27,7 +27,6 @@ def test_connection_tool_replies_done() -> None:
         "message": "done",
         "received": "agent test",
         "service": "prewise-mcp",
-        "authenticated": True,
     }
 
 

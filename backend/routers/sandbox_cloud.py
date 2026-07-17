@@ -7,12 +7,13 @@ import hmac
 import json
 import re
 import secrets
-from datetime import date, datetime, timedelta
+import time
+from datetime import timedelta
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from backend.config import settings
@@ -25,6 +26,10 @@ from security.free_web_sandbox import free_web_sandbox
 
 router = APIRouter(prefix="/v1/sandbox-cloud", tags=["sandbox-cloud"])
 TIER_RANK = {"free": 0, "pro": 1, "max": 2}
+FREE_DAILY_SESSION_LIMIT = 10
+PRO_MONTHLY_PRICE_VND = 99_000
+# The billing page advertises 79,000 VND/month when paid yearly (20% off).
+PRO_YEARLY_PRICE_VND = 79_000 * 12
 TIER_CAPABILITIES = {
     "free": {"web": True, "exe": False, "gpu": False, "minutes": 10, "provider": "local"},
     "pro": {"web": True, "exe": True, "gpu": False, "minutes": 15, "provider": "aws"},
@@ -65,8 +70,41 @@ class FreeTypeInput(BaseModel):
 class SePayWebhook(BaseModel):
     id: str | int | None = None
     transferAmount: int | float = 0
+    transferType: str = ""
     content: str = ""
     referenceCode: str | None = None
+
+
+def verify_sepay_webhook_hmac(
+    raw_body: bytes,
+    signature: str | None,
+    timestamp: str | None,
+    secret: str,
+    *,
+    now: int | None = None,
+) -> bool:
+    """Verify SePay's ``sha256={hex}`` signature and reject replayed requests."""
+    if not signature or not timestamp:
+        return False
+    signed_timestamp = timestamp.strip()
+    try:
+        timestamp_seconds = int(signed_timestamp)
+    except (TypeError, ValueError):
+        return False
+    current_time = int(time.time()) if now is None else now
+    if abs(current_time - timestamp_seconds) > 300:
+        return False
+    expected = "sha256=" + hmac.new(
+        secret.encode("utf-8"),
+        f"{signed_timestamp}.".encode("utf-8") + raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(signature.strip(), expected)
+
+
+def is_incoming_sepay_transaction(transfer_type: str) -> bool:
+    """Only incoming transfers can settle an order, even if a webhook is misconfigured."""
+    return transfer_type.strip().lower() in {"in", "income", "incoming"}
 
 
 def wallet_for(db: DbSession, user_id: str) -> SandboxWallet:
@@ -162,6 +200,12 @@ def get_status(auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
             CloudSandboxSession.status.in_(("provisioning", "ready")),
         ).order_by(CloudSandboxSession.created_at.desc())
     ).scalar_one_or_none()
+    if active is not None and active.expires_at <= utcnow():
+        if active.sandbox_tier == "free":
+            free_web_sandbox.close(active.id)
+        active.status = "expired"
+        active.terminated_at = utcnow()
+        active = None
     db.commit()
     return {
         "accountTier": plan, "credits": wallet.credits,
@@ -200,7 +244,7 @@ def create_subscription_payment(
 ) -> dict:
     if not settings.sepay_bank_account or not settings.sepay_bank_name:
         raise HTTPException(503, "Thanh toán SePay chưa được cấu hình.")
-    amount = 990_000 if payload.billingPeriod == "yearly" else 99_000
+    amount = PRO_YEARLY_PRICE_VND if payload.billingPeriod == "yearly" else PRO_MONTHLY_PRICE_VND
     reference = f"PP{secrets.token_hex(6).upper()}"
     order = PaymentOrder(
         user_id=auth.user.id,
@@ -235,14 +279,13 @@ async def sepay_webhook(
     db: DbSession = Depends(get_db),
     authorization: str | None = Header(default=None),
     x_sepay_signature: str | None = Header(default=None),
+    x_sepay_timestamp: str | None = Header(default=None),
 ) -> dict:
     raw_body = await request.body()
     if settings.sepay_webhook_secret:
-        expected = hmac.new(
-            settings.sepay_webhook_secret.encode("utf-8"), raw_body, hashlib.sha256,
-        ).hexdigest()
-        supplied_signature = (x_sepay_signature or "").strip()
-        if not supplied_signature or not hmac.compare_digest(supplied_signature, expected):
+        if not verify_sepay_webhook_hmac(
+            raw_body, x_sepay_signature, x_sepay_timestamp, settings.sepay_webhook_secret,
+        ):
             raise HTTPException(401, "Chữ ký webhook không hợp lệ")
     else:
         supplied = (authorization or "").removeprefix("Apikey ").removeprefix("Bearer ").strip()
@@ -252,6 +295,8 @@ async def sepay_webhook(
         payload = SePayWebhook.model_validate(json.loads(raw_body))
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(400, "Dữ liệu webhook JSON không hợp lệ") from exc
+    if not is_incoming_sepay_transaction(payload.transferType):
+        return {"success": True, "ignored": "not_incoming"}
     match = re.search(r"\b((?:PW|PP)[A-F0-9]{12})\b", payload.content.upper())
     if not match:
         return {"success": True, "ignored": "missing_reference"}
@@ -319,14 +364,22 @@ async def create_session(
 
     capability = TIER_CAPABILITIES[requested]
     if requested == "free":
-        start = datetime.combine(date.today(), datetime.min.time())
-        used = db.execute(select(CloudSandboxSession).where(
-            CloudSandboxSession.user_id == auth.user.id,
-            CloudSandboxSession.sandbox_tier == "free",
-            CloudSandboxSession.created_at >= start,
-        )).scalars().first()
-        if used:
-            raise HTTPException(429, "Bạn đã dùng phiên Free hôm nay")
+        start = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        used = db.scalar(
+            select(func.count())
+            .select_from(CloudSandboxSession)
+            .where(
+                CloudSandboxSession.user_id == auth.user.id,
+                CloudSandboxSession.sandbox_tier == "free",
+                CloudSandboxSession.created_at >= start,
+                CloudSandboxSession.status != "failed",
+            )
+        ) or 0
+        if used >= FREE_DAILY_SESSION_LIMIT:
+            raise HTTPException(
+                429,
+                f"Bạn đã dùng hết {FREE_DAILY_SESSION_LIMIT} phiên Free hôm nay",
+            )
         row = CloudSandboxSession(
             user_id=auth.user.id, sandbox_tier="free", provider="local", status="ready",
             remote_url=None,
@@ -359,10 +412,19 @@ async def create_session(
 
 @router.get("/sessions/{session_id}/browser")
 def free_browser_state(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
-    require_free_session(db, session_id, auth.user.id)
+    row = require_free_session(db, session_id, auth.user.id)
     try:
         return free_web_sandbox.state(session_id)
-    except (KeyError, TimeoutError) as exc:
+    except KeyError:
+        # Local browser state is in memory and disappears when uvicorn reloads.
+        # Recreate the temporary profile for a still-valid persisted session.
+        if row.expires_at <= utcnow():
+            raise HTTPException(410, "free_browser_session_expired") from None
+        try:
+            return free_web_sandbox.create(row.id, row.expires_at)
+        except Exception as exc:
+            raise HTTPException(503, f"Không khôi phục được Free Sandbox: {exc}") from exc
+    except TimeoutError as exc:
         raise HTTPException(410, str(exc)) from exc
 
 

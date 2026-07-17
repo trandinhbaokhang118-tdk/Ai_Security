@@ -16,13 +16,11 @@ type Payment = {
 
 const apiBase = () => (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 const formatMoney = (amount: number) => new Intl.NumberFormat("vi-VN").format(amount) + "đ";
-const previewQrUrl = (amount: number) => `https://vietqr.app/img?acc=100876855977&bank=VietinBank&amount=${amount}&des=SEVQR%20TKPCFC`;
 
-function QrPreview({ period }: { period: Period }) {
-  const amount = period === "yearly" ? 990_000 : 99_000;
+function QrPreview() {
   return <main className="checkout-page"><section className="checkout-card">
     <header><span>THANH TOÁN / VIETQR</span><h1>Quét QR để thanh toán PRO.</h1><p>Mã QR đã sẵn sàng. Hệ thống đang khởi tạo đơn thanh toán bảo mật.</p></header>
-    <div className="checkout-grid"><div className="sepay-qr"><div className="qr-frame"><Image src={previewQrUrl(amount)} unoptimized width={320} height={320} alt={`Mã QR VietQR thanh toán ${formatMoney(amount)}`} priority /></div><b>{formatMoney(amount)}</b><small>Quét bằng ứng dụng ngân hàng hỗ trợ VietQR</small></div><dl className="payment-details"><div><dt>Ngân hàng</dt><dd>VietinBank</dd></div><div><dt>Số tài khoản</dt><dd>100876855977</dd></div><div><dt>Trạng thái</dt><dd className="payment-pending"><i />Đang tạo mã đơn</dd></div></dl></div>
+    <div className="checkout-grid"><div className="sepay-qr"><div className="qr-frame"><strong>Đang tạo QR bảo mật…</strong></div><small>Vui lòng chờ mã đơn riêng được tạo</small></div><dl className="payment-details"><div><dt>Trạng thái</dt><dd className="payment-pending"><i />Đang tạo mã đơn</dd></div></dl></div>
   </section></main>;
 }
 
@@ -68,7 +66,7 @@ function CheckoutContent() {
   }, [payment?.orderId, payment?.status]);
 
   const copyContent = async () => { if (payment) await navigator.clipboard?.writeText(payment.transferContent); };
-  if (loading) return <QrPreview period={period} />;
+  if (loading) return <QrPreview />;
   if (error) return <main className="checkout-page"><section className="checkout-card checkout-error"><span>THANH TOÁN / SEPAY</span><h1>Không thể tạo mã thanh toán</h1><p>{error}</p><Link href="/auth">Đăng nhập</Link><Link href="/account/billing">Quay lại chọn gói</Link></section></main>;
   if (!payment) return null;
   if (payment.status === "paid") return <main className="checkout-page"><section className="checkout-card checkout-success"><span>THANH TOÁN THÀNH CÔNG</span><h1>Gói PRO đã được kích hoạt.</h1><p>Quyền truy cập của bạn đã được cập nhật. Bạn có thể bắt đầu dùng các tính năng Pro ngay bây giờ.</p><Link href="/account">Đi tới tài khoản →</Link></section></main>;

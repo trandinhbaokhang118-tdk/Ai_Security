@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import time
 import uuid
+import hashlib
+import threading
 from dataclasses import asdict
 from urllib.parse import urlsplit
 
@@ -44,6 +46,9 @@ class InferenceService:
     def __init__(self, engine: InferenceEngine | None = None, policy: PolicyEngine | None = None):
         self.engine = engine or InferenceEngine()
         self.policy = policy or PolicyEngine()
+        self._recent_results: dict[str, tuple[float, AssessResponse]] = {}
+        self._recent_results_lock = threading.Lock()
+        self._recent_results_ttl = 5 * 60
 
     @property
     def models_loaded(self) -> bool:
@@ -103,6 +108,10 @@ class InferenceService:
     # ------------------------------------------------------------------ url
     def assess_url(self, url: str) -> AssessResponse:
         t0 = time.perf_counter()
+        cache_key = self._cache_key("url", url)
+        cached = self._cached_result(cache_key)
+        if cached is not None:
+            return cached
         pred = self.engine.predict_url(url)
         score = self._finalize_score(pred.risk_score, pred.evidence)
         decision = self.policy.evaluate_human(score)
@@ -144,6 +153,7 @@ class InferenceService:
         response.scoring_version = risk.scan_version
         response.raw_score = round(risk.base_risk_score / 100, 4)
         response.final_score = round(risk.risk_score / 100, 4)
+        self._store_result(cache_key, response)
         return response
 
     def assess_sandbox_report(self, url: str, report: object, *, browser: bool = False) -> RiskCoreTrace:
@@ -260,6 +270,25 @@ class InferenceService:
         return f"Hành động '{action_type}' ở mức rủi ro thấp."
 
     # ------------------------------------------------------------------ util
+    @staticmethod
+    def _cache_key(modality: str, content: str) -> str:
+        normalized = " ".join(content.strip().split()).lower()
+        return f"{modality}:{hashlib.sha256(normalized.encode('utf-8')).hexdigest()}"
+
+    def _cached_result(self, key: str) -> AssessResponse | None:
+        now = time.monotonic()
+        with self._recent_results_lock:
+            cached = self._recent_results.get(key)
+            if cached is None or now - cached[0] >= self._recent_results_ttl:
+                self._recent_results.pop(key, None)
+                return None
+            response = cached[1].model_copy(deep=True)
+        return response.model_copy(update={"request_id": str(uuid.uuid4()), "latency_ms": 0.0})
+
+    def _store_result(self, key: str, response: AssessResponse) -> None:
+        with self._recent_results_lock:
+            self._recent_results[key] = (time.monotonic(), response.model_copy(deep=True))
+
     def _build(self, score, decision, evidence, modality, version, t0) -> AssessResponse:
         return AssessResponse(
             risk_score=round(score, 4),

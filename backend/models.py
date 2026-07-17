@@ -105,6 +105,63 @@ class ApiKey(Base):
     user: Mapped[User] = relationship(back_populates="api_keys", foreign_keys=[user_id])
 
 
+class OAuthClient(Base):
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    client_secret_hash: Mapped[str | None] = mapped_column(String(64))
+    client_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthAuthorizationRequest(Base):
+    __tablename__ = "oauth_authorization_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str | None] = mapped_column(Text)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(180), nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    consumed_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthAuthorizationCode(Base):
+    __tablename__ = "oauth_authorization_codes"
+
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(180), nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    used_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthTokenRecord(Base):
+    __tablename__ = "oauth_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    family_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    access_token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    refresh_token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    access_expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    refresh_expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    revoked_at: Mapped[object | None] = mapped_column(DateTime)
+    rotated_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class Plan(Base):
     __tablename__ = "plans"
 
@@ -213,6 +270,17 @@ class ScanEvidence(Base):
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     scan_event: Mapped[ScanEvent] = relationship(back_populates="evidence")
+
+
+class AssessmentCache(Base):
+    __tablename__ = "assessment_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    modality: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    response: Mapped[dict] = mapped_column(JSON, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class PaymentOrder(Base):

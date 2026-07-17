@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, type FormEvent, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { PrewiseShell, RiskDial, demoFindings } from "@/components/PrewiseUI";
 import { displayValue, mapRiskResult, type RiskCoreRecord } from "@/lib/risk-core";
+import { getApiClient } from "@/lib/api";
+import type { ChatMessageModel } from "@/lib/types";
 
 type Finding = { title: string; detail: string; evidence: string; severity: "high" | "medium" | "low" };
 type ScoreLayer = { layer?: string; score?: number; status?: "completed" | "skipped" | "unavailable"; summary?: string; signals?: number; details?: CriterionDetail[] };
@@ -14,6 +16,7 @@ type StoredRecord = {
   id?: string;
   score?: number;
   content?: string;
+  llmContext?: string;
   isDemo?: boolean;
   dataSource?: string;
   result?: {
@@ -32,6 +35,69 @@ type StoredRecord = {
     reasons?: string[];
   };
 };
+
+type AnalystMessage = { id: string; role: "user" | "assistant"; text: string };
+
+function AIAnalyst({ record, modality }: { record: StoredRecord | null; modality: "url" | "email" | "text" }) {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<AnalystMessage[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const canAsk = Boolean(record?.content) && !busy;
+
+  async function ask(event?: FormEvent) {
+    event?.preventDefault();
+    const prompt = question.trim();
+    if (!prompt || !record?.content || busy) return;
+    const userMessage: AnalystMessage = { id: crypto.randomUUID(), role: "user", text: prompt };
+    const assistantId = crypto.randomUUID();
+    const assistantMessage: AnalystMessage = { id: assistantId, role: "assistant", text: "" };
+    const previous = messages;
+    setMessages([...previous, userMessage, assistantMessage]);
+    setQuestion(""); setError(""); setBusy(true);
+    try {
+      const history: ChatMessageModel[] = previous.map((message) => ({
+        id: message.id,
+        role: message.role,
+        text: message.text,
+        createdAt: Date.now(),
+      }));
+      const stream = getApiClient().openChatStream({
+        question: prompt,
+        context: {
+          content: record.content,
+          modality,
+          operator_context: record.llmContext || "",
+          analysis_id: record.id,
+        },
+        history,
+      });
+      let answer = "";
+      for await (const chunk of stream) {
+        answer += chunk.delta;
+        setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, text: answer } : message));
+      }
+      if (!answer) throw new Error("AI server không trả về nội dung.");
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Không thể kết nối trợ lý AI.";
+      setError(message);
+      setMessages((current) => current.map((item) => item.id === assistantId ? { ...item, text: "Không thể tạo giải thích lúc này. Hãy kiểm tra kết nối backend và AI server." } : item));
+    } finally { setBusy(false); }
+  }
+
+  function useSuggestion(value: string) {
+    setQuestion(value);
+  }
+
+  return <section className="ai-analyst" aria-labelledby="ai-analyst-title">
+    <header><div><span>CONTEXTUAL AI · REMOTE INFERENCE</span><h2 id="ai-analyst-title">Hỏi trợ lý về kết quả này</h2><p>Risk Core được chạy lại tại backend; LLM chỉ nhận bản tóm tắt và bằng chứng đã làm sạch.</p></div><i className={busy ? "thinking" : ""}>{busy ? "ĐANG SUY LUẬN" : "SẴN SÀNG"}</i></header>
+    <div className="analyst-context"><b>Ngữ cảnh bạn cung cấp</b><p>{record?.llmContext || "Chưa có ngữ cảnh bổ sung cho lần phân tích này."}</p><span>{record?.llmContext ? `${record.llmContext.length}/2000 ký tự` : "Không gửi thêm dữ liệu"}</span></div>
+    {messages.length > 0 && <div className="analyst-log" aria-live="polite">{messages.map((message) => <article className={message.role} key={message.id}><span>{message.role === "user" ? "BẠN" : "PREWISE AI"}</span><p>{message.text || "Đang kết nối tới mô hình…"}</p></article>)}</div>}
+    {messages.length === 0 && <div className="analyst-suggestions"><button type="button" onClick={() => useSuggestion("Giải thích ngắn gọn vì sao kết quả này có mức rủi ro như vậy.")}>Vì sao có mức rủi ro này?</button><button type="button" onClick={() => useSuggestion("Tôi nên thực hiện những bước nào tiếp theo?")}>Tôi nên làm gì tiếp theo?</button><button type="button" onClick={() => useSuggestion("Bằng chứng nào quan trọng nhất trong kết quả này?")}>Bằng chứng nào quan trọng nhất?</button></div>}
+    <form onSubmit={ask}><label htmlFor="analyst-question" className="sr-only">Câu hỏi cho trợ lý AI</label><textarea id="analyst-question" value={question} maxLength={500} disabled={!record?.content || busy} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void ask(); } }} placeholder={record?.content ? "Hỏi về điểm rủi ro, bằng chứng hoặc bước xử lý tiếp theo…" : "Không tìm thấy dữ liệu phân tích để tạo context…"} /><button type="submit" disabled={!canAsk || !question.trim()}>{busy ? "Đang trả lời…" : "Gửi câu hỏi →"}</button></form>
+    {error && <p className="analyst-error" role="alert">⚠ {error}</p>}
+  </section>;
+}
 
 const STATUS_LABEL = { completed: "ĐÃ KIỂM TRA", skipped: "CHƯA CHẠY", unavailable: "KHÔNG KHẢ DỤNG" } as const;
 function localCriterionDetails(rawUrl: string | undefined, layerIndex: number): CriterionDetail[] {
@@ -146,11 +212,14 @@ function ResultContent() {
   const description = risk.source === "risk_core_v2" ? `Mức ${risk.level || "chưa xác định"} · Quyết định ${risk.decision || "chưa được cung cấp"}. UI giữ nguyên kết luận của Risk Core v2.` : score >= 70 ? "Trang đích có tín hiệu rủi ro cao. Không nhập mật khẩu, OTP, dữ liệu thẻ hoặc thông tin định danh." : score >= 40 ? "Có một số tín hiệu cần xác minh qua kênh chính thức trước khi thao tác." : "Kết quả legacy: mức rủi ro và khuyến nghị được UI suy từ điểm do payload cũ chưa có policy v2.";
   const checkedLayers = layers.filter((layer) => layer.status === "completed").length;
   const analysisKind = sandbox ? "Phân tích URL + browser sandbox" : "Phân tích URL ngoại tuyến";
+  const chatModality = type === "url" ? "url" : type === "email" ? "email" : "text";
 
   return <PrewiseShell><main id="main-content" className="report">
     <div className="report-title"><div><p className="eyebrow"><i /> ANALYSIS REPORT · {type.toUpperCase()}</p><span className="demo-badge">{isDemo ? "KẾT QUẢ MINH HỌA" : "KẾT QUẢ BACKEND THẬT"}</span><h1>Đánh giá rủi ro hoàn tất</h1><p>{isDemo ? "Prewise đã phát hiện nhiều tín hiệu cần được xem xét trước khi bạn tiếp tục." : "Báo cáo bên dưới cho biết chính xác những lớp nào đã chạy, tín hiệu nào được phát hiện và lớp nào chưa được thực hiện."}</p></div><div className="report-actions" aria-label="Tác vụ báo cáo"><button type="button" disabled title="Chưa khả dụng">↓ Xuất báo cáo</button><button type="button" disabled title="Chưa khả dụng">↗ Chia sẻ</button></div></div>
 
     <section className="report-overview" aria-label="Tổng quan kết quả"><RiskDial score={score} /><div className="verdict"><span>KHUYẾN NGHỊ</span><h2>{verdict}</h2><p>{description}</p><div><b>Điểm model/core <span className="info-tip" tabIndex={0} role="note" aria-label="Giải thích điểm">?<span>Đây là điểm rủi ro do model và các luật URL kết hợp, không phải xác suất website chắc chắn độc hại.</span></span></b><strong>{confidence}</strong><i aria-hidden><em /></i></div></div><div className="signal-visual" aria-hidden><div className="report-core" /><small>{findings.length} SIGNALS CORRELATED</small></div></section>
+
+    <AIAnalyst record={record} modality={chatModality} />
 
     {!isDemo && <section className="scan-proof" aria-labelledby="scan-proof-title"><div className="section-label"><span id="scan-proof-title">PHẠM VI ĐÃ KIỂM TRA</span><b>{checkedLayers}/{layers.length || 3} lớp hoàn tất</b></div><div className="scan-meta"><div><span>URL được kiểm tra</span><code title={record?.content}>{record?.content || "Không đọc được từ bộ nhớ trình duyệt"}</code></div><div><span>Kiểu phân tích</span><strong>{analysisKind}</strong></div><div><span>Thời gian backend</span><strong>{result?.analysis_time_ms ?? "—"} ms</strong></div><div><span>Core/model</span><strong>{result?.ai_detection?.model_version || "Không được cung cấp"}</strong></div></div><div className="layer-grid">{layers.map((layer, index) => { const status = layer.status || "completed"; const layerScore = Math.round((layer.score || 0) * 100); return <article role="button" tabIndex={0} aria-label={`Mở chi tiết ${layer.layer || `lớp ${index + 1}`}`} onClick={() => setSelectedLayer(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedLayer(index); } }} className={`layer-card layer-card-clickable ${status}`} key={`${layer.layer}-${index}`}><header><span>L{index + 1}</span><em>{STATUS_LABEL[status]}</em></header><h3>{layer.layer || `Lớp kiểm tra ${index + 1}`}</h3><p>{layer.summary || "Không có mô tả."}</p><div><span>Mức tín hiệu <b>{layerScore}/100</b></span><span>{layer.signals || 0} phát hiện</span></div><i aria-hidden><em style={{ width: `${layerScore}%` }} /></i><button type="button" tabIndex={-1} aria-hidden>Chi tiết tiêu chí ↗</button></article>; })}</div><div className="criteria-table-wrap"><table className="criteria-table"><thead><tr><th>Lớp</th><th>Phạm vi thực tế</th><th>Các bước / tiêu chí xét</th><th>Kết quả lần quét này</th></tr></thead><tbody>{LAYER_CRITERIA.map((criteria, index) => { const layer = layers[index]; const status = layer?.status || (index < 2 ? "completed" : "skipped"); return <tr key={`criteria-${index}`} className={status}><td><strong>L{index + 1}</strong><span>{index === 0 ? "Danh tính URL" : index === 1 ? "Ý đồ & né tránh" : "Browser sandbox"}</span></td><td>{criteria.scope}</td><td><ol>{criteria.steps.map((step, stepIndex) => <li key={step}><i>{stepIndex + 1}</i>{step}</li>)}</ol></td><td><em>{STATUS_LABEL[status]}</em><span>{layer ? `${layer.signals || 0} tín hiệu · ${Math.round((layer.score || 0) * 100)}/100` : "Không có dữ liệu lớp"}</span></td></tr>; })}</tbody></table></div>{!sandbox && <div className="coverage-warning"><b>⚠ Chưa mở nội dung website</b><p>Kết quả nhanh vì chế độ này chạy model ONNX và luật trên cấu trúc URL ngay trong bộ nhớ; không tải HTML, không theo redirect live và không chạy JavaScript. Chọn <b>Chuyên sâu</b> ở trang Analyze nếu muốn chạy browser sandbox.</p>{result?.deep_analysis_recommended && <strong>Core khuyến nghị chạy phân tích chuyên sâu cho URL này.</strong>}</div>}{sandbox && <div className="sandbox-summary"><b>Browser sandbox đã chạy</b><span>{sandbox.behaviors?.length || 0} hành vi</span><span>{sandbox.redirects?.length || 0} redirect/navigation</span><span>{sandbox.scripts_executed?.length || 0} script</span><span>{sandbox.network_calls?.length || 0} network request</span><span>{sandbox.dom_modifications?.length || 0} DOM mutation</span><span>{sandbox.analysis_time_ms ?? "—"} ms</span>{sandbox.error && <p>Sandbox báo lỗi: {sandbox.error}</p>}</div>}</section>}
 

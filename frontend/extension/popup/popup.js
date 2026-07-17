@@ -1,7 +1,7 @@
 import { getRiskLevel } from "../shared/risk.js";
 const $ = (id) => document.getElementById(id);
 const sections = ["disabled", "loading", "unsupported", "result", "offline"];
-const stepIds = ["step-page", "step-gateway", "step-analysis", "step-result"];
+const stepIds = ["step-page", "step-gateway", "step-analysis"];
 let currentTab = null;
 let loadingTimer = null;
 let loadingStartedAt = 0;
@@ -38,6 +38,34 @@ function queryActiveTab() {
   });
   return withTimeout(request, 2000, "Không đọc được tab hiện tại.");
 }
+function initEyeScrollbar() {
+  const track = $("eye-scroll-track");
+  const thumb = $("eye-scroll-thumb");
+  const root = document.scrollingElement;
+  const thumbHeight = 40;
+  let dragging = false;
+  let grabOffset = thumbHeight / 2;
+  const metrics = () => ({ maxScroll: Math.max(0, root.scrollHeight - root.clientHeight), travel: Math.max(1, track.clientHeight - thumbHeight) });
+  const paint = () => {
+    const { maxScroll, travel } = metrics();
+    track.hidden = maxScroll < 2;
+    thumb.style.transform = `translateY(${maxScroll ? root.scrollTop / maxScroll * travel : 0}px)`;
+  };
+  const scrollToPointer = (clientY) => {
+    const { maxScroll, travel } = metrics();
+    const y = Math.max(0, Math.min(travel, clientY - track.getBoundingClientRect().top - grabOffset));
+    root.scrollTop = y / travel * maxScroll;
+  };
+  document.addEventListener("scroll", paint, { passive: true });
+  addEventListener("resize", paint);
+  new ResizeObserver(paint).observe(document.body);
+  track.addEventListener("pointerdown", (event) => { if (event.target === track) { grabOffset = thumbHeight / 2; scrollToPointer(event.clientY); } });
+  thumb.addEventListener("pointerdown", (event) => { dragging = true; grabOffset = Math.max(0, Math.min(thumbHeight, event.clientY - thumb.getBoundingClientRect().top)); thumb.setPointerCapture(event.pointerId); event.preventDefault(); });
+  thumb.addEventListener("pointermove", (event) => { if (dragging) scrollToPointer(event.clientY); });
+  thumb.addEventListener("pointerup", () => { dragging = false; });
+  thumb.addEventListener("pointercancel", () => { dragging = false; });
+  paint();
+}
 
 function show(id) {
   sections.forEach((name) => { $(name).hidden = name !== id; });
@@ -59,13 +87,12 @@ function updateLoading() {
   let active = 0;
   if (elapsed >= 350) active = 1;
   if (elapsed >= 1000) active = 2;
-  if (elapsed >= 3200) active = 3;
-  const titles = ["Đang đọc trang hiện tại", "Đang kết nối Gateway", "Đang phân tích rủi ro", "Đang hoàn thiện kết quả"];
-  const details = ["Xác định URL và trạng thái tab…", "Gateway đã nhận yêu cầu, đang chờ phản hồi…", "Mô hình đang đánh giá các tín hiệu của URL…", "Đang chuẩn hóa điểm, lý do và bằng chứng…"];
+  const titles = ["Đang đọc trang hiện tại", "Đang kết nối Gateway", "Đang phân tích rủi ro"];
+  const details = ["Xác định URL và trạng thái tab…", "Gateway đã nhận yêu cầu, đang chờ phản hồi…", "Đối chiếu tín hiệu URL và nguồn intelligence…"];
   $("loading-title").textContent = titles[active];
   $("loading-detail").textContent = details[active];
   $("loading-elapsed").textContent = `${seconds.toFixed(1)}s`;
-  $("loading-progress").style.width = `${Math.min(92, [12, 32, 62, 84][active] + seconds * 1.5)}%`;
+  $("loading-progress").style.width = `${Math.min(92, [14, 42, 70][active] + seconds * 1.5)}%`;
   stepIds.forEach((id, index) => { $(id).className = index < active ? "done" : index === active ? "active" : ""; });
   $("loading-warning").hidden = elapsed < 3500;
   if (elapsed >= 3500) $("loading-warning").textContent = elapsed < 6000
@@ -101,8 +128,8 @@ function render(entry, tab) {
   const level = getRiskLevel(entry.score);
   $("risk-card").style.setProperty("--risk", level.color);
   $("score").textContent = entry.score;
-  $("risk-label").textContent = level.label;
-  $("risk-summary").textContent = { safe: "Trang này có vẻ an toàn", warn: "Hãy thận trọng với trang này", danger: "Trang này có rủi ro cao" }[level.key];
+  $("risk-label").textContent = { safe: "RỦI RO THẤP", warn: "CẦN THẬN TRỌNG", danger: "RỦI RO CAO" }[level.key];
+  $("risk-summary").textContent = { safe: "Không thấy tín hiệu rủi ro cao", warn: "Trang này cần được thận trọng", danger: "Trang này có rủi ro cao" }[level.key];
   $("scan-time").textContent = `Hoàn tất trong ${((entry.latencyMs || 0) / 1000).toFixed(1)}s · ${new Date(entry.completedAt).toLocaleTimeString("vi-VN")}`;
   let parsed; try { parsed = new URL(tab.url); } catch { parsed = { hostname: "" }; }
   $("hostname").textContent = parsed.hostname; $("url").textContent = tab.url;
@@ -113,7 +140,7 @@ function render(entry, tab) {
 }
 async function waitForTabResult(token) {
   try {
-    for (let count = 0; count < 30 && token === loadingToken; count += 1) {
+    for (let count = 0; count < 75 && token === loadingToken; count += 1) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       const entry = await send({ type: "GET_TAB_RESULT", tabId: currentTab.id, url: currentTab.url }, 1500);
       if (entry && entry.status !== "loading") { render(entry, currentTab); return; }
@@ -127,7 +154,7 @@ async function scan(force = false) {
   if (!currentTab || !validPage(currentTab.url)) return show("unsupported");
   const token = ++loadingToken; startLoading();
   try {
-    const entry = await send({ type: "ASSESS_URL", url: currentTab.url, tabId: currentTab.id, force }, 6500);
+    const entry = await send({ type: "ASSESS_URL", url: currentTab.url, tabId: currentTab.id, force }, 17000);
     if (token === loadingToken) render(entry, currentTab);
   } catch { if (token === loadingToken) showError({ type: "runtime", message: "Mất kết nối với tiến trình nền của extension. Hãy tải lại extension." }); }
 }
@@ -159,4 +186,5 @@ window.addEventListener("unhandledrejection", (event) => {
   showError({ type: "runtime", message: `Lỗi tiến trình: ${message}` });
 });
 startLoading();
+initEyeScrollbar();
 init().catch((error) => showError({ type: "runtime", message: error?.message || "Không thể khởi tạo popup." }));

@@ -5,6 +5,8 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from backend.main import app
+from backend.db import SessionLocal
+from backend.models import User
 from backend.routers import admin
 
 client = TestClient(app)
@@ -40,6 +42,13 @@ def test_admin_dependency_rejects_non_admin() -> None:
 
 def test_admin_api_requires_admin_session() -> None:
     assert client.get("/admin/specs").status_code == 401
+
+    # The public demo account intentionally remains a normal user.  Promote
+    # it only inside this isolated authorization test.
+    with SessionLocal() as db:
+        demo = db.query(User).filter(User.email == "demo@aisec.local").one()
+        demo.role = "admin"
+        db.commit()
 
     login = client.post(
         "/v1/auth/login",

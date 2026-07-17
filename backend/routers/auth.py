@@ -115,6 +115,7 @@ class UserProfile(BaseModel):
     email: str
     displayName: str
     avatarUrl: str | None = None
+    role: str = "user"
 
 
 class PlanInfo(BaseModel):
@@ -325,7 +326,7 @@ def build_session(db: DbSession, user: User, request: Request | None = None) -> 
     db.commit()
     return Session(
         token=token,
-        user=UserProfile(id=user.id, email=user.email, displayName=user.display_name),
+        user=UserProfile(id=user.id, email=user.email, displayName=user.display_name, role=user.role),
         plan=build_plan_info(db, user.id),
     )
 
@@ -458,7 +459,7 @@ def verify_extension_key(
     remaining = max(0, limit - used) if limit < 999_999 else 999_999
     return ExtensionActivation(
         valid=True,
-        user=UserProfile(id=actor.user.id, email=actor.user.email, displayName=actor.user.display_name),
+        user=UserProfile(id=actor.user.id, email=actor.user.email, displayName=actor.user.display_name, role=actor.user.role),
         plan=plan,
         quota=QuotaInfo(usageDay=today.isoformat(), usedToday=used, dailyScanLimit=limit, remaining=remaining),
         keyPrefix=actor.api_key.key_prefix,
@@ -541,6 +542,22 @@ def get_plan(auth: CurrentSession, db: DbSession = Depends(get_db)) -> PlanInfo:
     return build_plan_info(db, auth.user.id)
 
 
+@router.get("/account/profile", response_model=UserProfile)
+def get_profile(auth: CurrentSession) -> UserProfile:
+    """Return the current server-authoritative identity and role.
+
+    Desktop clients persist a session locally, so roles must be refreshed from
+    the database rather than trusting the role saved at the time of login.
+    """
+    return UserProfile(
+        id=auth.user.id,
+        email=auth.user.email,
+        displayName=auth.user.display_name,
+        avatarUrl=auth.user.avatar_url,
+        role=auth.user.role,
+    )
+
+
 @router.post("/account/subscription/cancel", response_model=PlanInfo)
 def cancel_subscription(auth: CurrentSession, db: DbSession = Depends(get_db)) -> PlanInfo:
     subscription = _active_subscription(db, auth.user.id)
@@ -567,6 +584,7 @@ def update_profile(
         email=auth.user.email,
         displayName=auth.user.display_name,
         avatarUrl=auth.user.avatar_url,
+        role=auth.user.role,
     )
 
 

@@ -158,6 +158,11 @@ def initialize_database() -> None:
                     )
 
             demo = db.execute(select(User).where(User.email == "demo@aisec.local")).scalar_one_or_none()
+            # The demo account is an end-user account.  It must never grant
+            # access to system administration merely because it is convenient
+            # for local development.
+            if settings.seed_demo_user and demo is not None and demo.role != "user":
+                demo.role = "user"
             if settings.seed_demo_user and demo is None:
                 salt = create_password_salt()
                 demo = User(
@@ -165,7 +170,7 @@ def initialize_database() -> None:
                     display_name="Demo User",
                     password_salt=salt,
                     password_hash=hash_password("Demo@123456", salt),
-                    role="admin",
+                    role="user",
                 )
                 db.add(demo)
                 db.flush()

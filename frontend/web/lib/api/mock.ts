@@ -453,6 +453,7 @@ function buildPlanInfo(tier: PlanTier): PlanInfo {
         free: "FREE",
         pro: "PRO",
         team: "TEAM",
+        enterprise: "ENTERPRISE",
     };
     return {
         tier,
@@ -748,9 +749,15 @@ export class MockApiClient implements ApiClient {
     /** Tạo một ApiKeyInfo giả lập mới. */
     private createApiKey(): ApiKeyInfo {
         const raw = generateId().replace(/-/g, "");
+        const key = `pw_live_mock_${raw}`;
         return {
-            key: `sk-mock-${raw}`,
+            key,
             createdAt: formatScanTimestamp(new Date()),
+            prefix: key.slice(0, 16),
+            lastUsedAt: null,
+            scopes: ["mcp:invoke"],
+            status: "active",
+            secretAvailable: true,
         };
     }
 

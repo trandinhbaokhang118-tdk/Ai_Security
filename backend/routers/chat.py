@@ -29,6 +29,7 @@ async def chat_ws(ws: WebSocket):
             context = payload.get("context") or {}
             content = sanitize_text(context.get("content", "")) if context else ""
             modality = context.get("modality", "text") if context else "text"
+            operator_context = sanitize_text(context.get("operator_context", ""))
 
             assessment = None
             if content:
@@ -39,7 +40,16 @@ async def chat_ws(ws: WebSocket):
 
             evidence = assessment.evidence if assessment else []
             excerpt = content or question
-            async for token in expl.generate(evidence, excerpt, question):
+            assessment_context = (
+                assessment.model_dump(mode="json") if assessment else None
+            )
+            async for token in expl.generate(
+                evidence,
+                excerpt,
+                question,
+                operator_context=operator_context,
+                assessment_context=assessment_context,
+            ):
                 await ws.send_text(json.dumps({"type": "delta", "delta": token}))
 
             final = {

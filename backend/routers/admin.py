@@ -9,11 +9,11 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db import SessionLocal, get_db
-from backend.models import AdminJob, AdminJobEvent, ModelVersion
+from backend.models import AdminJob, AdminJobEvent, ModelVersion, ScanEvent, User
 from backend.routers.auth import require_admin
 from backend.security_utils import utcnow
 
@@ -32,6 +32,10 @@ class SpecExecutionRequest(BaseModel):
 class ModelTrainingRequest(BaseModel):
     dataPath: str
     models: list[Literal["text", "prompt", "url"]] = Field(min_length=1, max_length=1)
+
+
+class UserStatusRequest(BaseModel):
+    status: Literal["active", "suspended"]
 
 
 def _contained_file(base: Path, candidate: Path, *, suffixes: set[str]) -> Path:
@@ -151,6 +155,57 @@ async def list_specs():
         except Exception as exc:
             logger.error("Error parsing spec %s: %s", spec_path, exc)
     return {"specs": specs}
+
+
+@router.get("/overview")
+def get_overview(db: DbSession = Depends(get_db)) -> dict:
+    """Compact operational snapshot used by the desktop administration console."""
+    users_total = db.scalar(select(func.count()).select_from(User)) or 0
+    active_users = db.scalar(select(func.count()).select_from(User).where(User.status == "active")) or 0
+    scans_total = db.scalar(select(func.count()).select_from(ScanEvent)) or 0
+    dangerous_scans = db.scalar(select(func.count()).select_from(ScanEvent).where(ScanEvent.risk_level == "danger")) or 0
+    avg_latency = db.scalar(select(func.avg(ScanEvent.latency_ms))) or 0
+    return {
+        "metrics": {"usersTotal": users_total, "activeUsers": active_users, "scansTotal": scans_total,
+                    "dangerousScans": dangerous_scans, "averageLatencyMs": round(float(avg_latency))},
+        "recentScans": [
+            {"id": scan.id, "createdAt": scan.created_at.isoformat(), "modality": scan.modality,
+             "riskLevel": scan.risk_level, "score": round(scan.risk_score), "target": scan.normalized_url or scan.input_preview or "Nội dung đã ẩn"}
+            for scan in db.execute(select(ScanEvent).order_by(ScanEvent.created_at.desc()).limit(8)).scalars()
+        ],
+        "recentJobs": [
+            {"id": job.id, "type": job.job_type, "status": job.status, "progress": job.progress,
+             "message": job.message or job.current_step, "createdAt": job.created_at.isoformat()}
+            for job in db.execute(select(AdminJob).order_by(AdminJob.created_at.desc()).limit(6)).scalars()
+        ],
+        "models": [
+            {"id": model.id, "name": model.model_name, "modality": model.modality, "status": model.status,
+             "f1": model.f1, "accuracy": model.accuracy, "createdAt": model.created_at.isoformat()}
+            for model in db.execute(select(ModelVersion).order_by(ModelVersion.created_at.desc()).limit(8)).scalars()
+        ],
+    }
+
+
+@router.get("/users")
+def list_users(db: DbSession = Depends(get_db)) -> dict:
+    return {"users": [
+        {"id": user.id, "displayName": user.display_name, "email": user.email, "role": user.role,
+         "status": user.status, "createdAt": user.created_at.isoformat(),
+         "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None}
+        for user in db.execute(select(User).order_by(User.created_at.desc()).limit(100)).scalars()
+    ]}
+
+
+@router.patch("/users/{user_id}/status")
+def update_user_status(user_id: str, payload: UserStatusRequest, auth=Depends(require_admin), db: DbSession = Depends(get_db)) -> dict:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+    if user.id == auth.user.id and payload.status != "active":
+        raise HTTPException(status_code=400, detail="Không thể tự khóa tài khoản quản trị đang dùng.")
+    user.status = payload.status
+    db.commit()
+    return {"id": user.id, "status": user.status}
 
 
 @router.post("/specs/execute")

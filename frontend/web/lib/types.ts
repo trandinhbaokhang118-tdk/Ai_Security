@@ -173,7 +173,12 @@ export interface ChatMessageModel {
 
 export interface ChatRequest {
     question: string;
-    context?: { content: string; modality: "url" | "email" | "text" };
+    context?: {
+        content: string;
+        modality: "url" | "email" | "text";
+        operator_context?: string;
+        analysis_id?: string;
+    };
     history: ChatMessageModel[];
 }
 
@@ -190,7 +195,7 @@ export interface ChatFinal {
 // Model: Session, PlanInfo, ScanRecord, ApiKeyInfo
 // ---------------------------------------------------------------------------
 
-export type PlanTier = "free" | "pro" | "team";
+export type PlanTier = "free" | "pro" | "team" | "enterprise";
 
 export interface Session {
     token: string;
@@ -203,6 +208,7 @@ export interface UserProfile {
     email: string;
     displayName: string;
     avatarUrl?: string;
+    role?: "user" | "admin";
 }
 
 export interface PasswordChangeInput {
@@ -228,6 +234,12 @@ export interface ScanRecord {
 export interface ApiKeyInfo {
     key: string;
     createdAt: string;
+    prefix: string;
+    lastUsedAt?: string | null;
+    scopes: string[];
+    status: string;
+    /** True only in the one-time response immediately after key rotation. */
+    secretAvailable: boolean;
 } // dùng cho Team/MCP
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@
   "use strict";
   const cache = new Map();
   const TTL = 5 * 60e3;
+  // Temporarily disabled while the interaction policy is being redesigned.
+  const LINK_PROTECTION_TEMPORARILY_DISABLED = true;
   let active = null, lastFocus = null, contextAlive = true;
   let protectionEnabled = false, linkProtection = false;
 
@@ -17,7 +19,7 @@
   function disableStaleContext() { contextAlive = false; close(); document.removeEventListener("click", handleClick, true); host.remove(); }
   function hasRuntime() { try { return contextAlive && typeof chrome !== "undefined" && Boolean(chrome.runtime?.id) && typeof chrome.runtime.sendMessage === "function"; } catch { return false; } }
   function send(message, timeoutMs = 5000) { return new Promise((resolve, reject) => { if (!hasRuntime()) { disableStaleContext(); return reject(new Error("context_invalid")); } let done = false; const timer = setTimeout(() => { if (!done) { done = true; reject(new Error("timeout")); } }, timeoutMs); try { chrome.runtime.sendMessage(message, (response) => { if (done) return; done = true; clearTimeout(timer); const error = chrome.runtime?.lastError; if (error) { if (/context invalidated|receiving end/i.test(error.message || "")) disableStaleContext(); reject(new Error(error.message)); } else resolve(response); }); } catch (error) { clearTimeout(timer); disableStaleContext(); reject(error); } }); }
-  function syncSettings() { send({ type: "GET_SETTINGS" }, 2000).then((settings) => { protectionEnabled = settings?.protectionEnabled === true; linkProtection = settings?.linkProtection === true; if (!protectionEnabled || !linkProtection) close(); }).catch(() => {}); }
+  function syncSettings() { send({ type: "GET_SETTINGS" }, 2000).then((settings) => { protectionEnabled = settings?.protectionEnabled === true; linkProtection = !LINK_PROTECTION_TEMPORARILY_DISABLED && settings?.linkProtection === true; if (!protectionEnabled || !linkProtection) close(); }).catch(() => {}); }
 
   function dialog(level, url, reason, onContinue) {
     if (!protectionEnabled || !linkProtection || document.visibilityState !== "visible") return;
@@ -35,13 +37,13 @@
     const anchor = event.target.closest?.("a[href]"); if (!anchor || !/^https?:/.test(anchor.href) || anchor.hasAttribute("download")) return;
     const hit = cache.get(anchor.href); if (hit && Date.now() - hit.time < TTL && hit.level === "safe") return;
     event.preventDefault(); event.stopImmediatePropagation();
-    let response; try { response = await send({ type: "ASSESS_URL", url: anchor.href }, 6500); } catch { return navigate(anchor, event); }
+    let response; try { response = await send({ type: "ASSESS_URL", url: anchor.href }, 17000); } catch { return navigate(anchor, event); }
     if (!protectionEnabled || !linkProtection) return navigate(anchor, event);
     if (response?.disabled || response?.error) return navigate(anchor, event);
     cache.set(anchor.href, { level: response.level, time: Date.now() });
     if (response.level === "safe") navigate(anchor, event); else dialog(response.level, anchor.href, response.result?.reasons?.[0], () => navigate(anchor, event));
   }
-  if (hasRuntime() && chrome.storage?.onChanged) chrome.storage.onChanged.addListener((changes) => { if (changes.protectionEnabled) protectionEnabled = changes.protectionEnabled.newValue === true; if (changes.linkProtection) linkProtection = changes.linkProtection.newValue === true; if (!protectionEnabled || !linkProtection) close(); });
-  if (hasRuntime()) chrome.runtime.onMessage.addListener((message) => { if (message?.type === "PROTECTION_STATE_CHANGED") { protectionEnabled = message.enabled === true; linkProtection = message.linkProtection === true; if (!protectionEnabled || !linkProtection) close(); } });
+  if (hasRuntime() && chrome.storage?.onChanged) chrome.storage.onChanged.addListener((changes) => { if (changes.protectionEnabled) protectionEnabled = changes.protectionEnabled.newValue === true; if (changes.linkProtection) linkProtection = !LINK_PROTECTION_TEMPORARILY_DISABLED && changes.linkProtection.newValue === true; if (!protectionEnabled || !linkProtection) close(); });
+  if (hasRuntime()) chrome.runtime.onMessage.addListener((message) => { if (message?.type === "PROTECTION_STATE_CHANGED") { protectionEnabled = message.enabled === true; linkProtection = !LINK_PROTECTION_TEMPORARILY_DISABLED && message.linkProtection === true; if (!protectionEnabled || !linkProtection) close(); } });
   syncSettings(); document.addEventListener("click", handleClick, true);
 })();

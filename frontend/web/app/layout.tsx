@@ -12,6 +12,7 @@ import "./eye-v2.css";
 import "./hero-cta.css";
 import "./evidence-effects.css";
 import "./gaze-safe.css";
+import "./sandbox-session.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import AppChrome from "@/components/AppChrome";

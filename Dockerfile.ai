@@ -1,0 +1,7 @@
+ARG VLLM_IMAGE=vllm/vllm-openai:latest
+FROM ${VLLM_IMAGE}
+
+WORKDIR /app
+COPY ai_server/ /app/ai_server/
+
+ENTRYPOINT ["python3", "-m", "ai_server.launcher"]

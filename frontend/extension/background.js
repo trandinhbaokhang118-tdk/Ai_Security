@@ -5,9 +5,31 @@ const tabResults = new Map();
 const urlCache = new Map();
 const inFlight = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_STORAGE_KEY = "urlAssessmentCacheV1";
+const MAX_CACHED_URLS = 100;
 let requestSequence = 0;
 let rateLimitedUntil = 0;
 let rateLimitTimer = null;
+
+const cacheReady = (async () => {
+  try {
+    const stored = await chrome.storage.local.get(CACHE_STORAGE_KEY);
+    const entries = Object.entries(stored[CACHE_STORAGE_KEY] || {});
+    const now = Date.now();
+    for (const [url, entry] of entries) {
+      if (entry?.status === "complete" && entry.url === url && now - entry.completedAt < CACHE_TTL) urlCache.set(url, entry);
+    }
+  } catch { /* The in-memory cache still works if storage is unavailable. */ }
+})();
+async function persistUrlCache() {
+  const now = Date.now();
+  const entries = [...urlCache.entries()]
+    .filter(([, entry]) => entry?.status === "complete" && now - entry.completedAt < CACHE_TTL)
+    .sort(([, a], [, b]) => b.completedAt - a.completedAt)
+    .slice(0, MAX_CACHED_URLS);
+  urlCache.clear(); entries.forEach(([url, entry]) => urlCache.set(url, entry));
+  try { await chrome.storage.local.set({ [CACHE_STORAGE_KEY]: Object.fromEntries(entries) }); } catch { /* Cache persistence is an optimization. */ }
+}
 
 async function settings() {
   return chrome.storage.local.get({ protectionEnabled: false, linkProtection: true, gmailProtection: true });
@@ -52,6 +74,7 @@ function beginCooldown(retryAfter) {
 async function handleAssessUrl(url, tabId, force = false) {
   if (!(await settings()).protectionEnabled) return { disabled: true };
   if (!/^https?:\/\//i.test(url || "")) return { unsupported: true };
+  await cacheReady;
   if (Date.now() < rateLimitedUntil) {
     clearBadge(tabId);
     return { status: "cooldown", url, error: { type: "http", status: 429, message: "Gateway đang tạm giới hạn lượt quét.", retryAfter: Math.ceil((rateLimitedUntil - Date.now()) / 1000) } };
@@ -71,6 +94,7 @@ async function handleAssessUrl(url, tabId, force = false) {
       const level = getRiskLevel(toDisplayScore(result.risk_score));
       const entry = { status: "complete", url, score: toDisplayScore(result.risk_score), level: level.key, result, requestId, startedAt, completedAt: Date.now(), latencyMs: Date.now() - startedAt };
       urlCache.set(url, entry);
+      await persistUrlCache();
       if (tabId != null && tabResults.get(tabId)?.requestId === requestId) { tabResults.set(tabId, entry); setBadge(tabId, entry); }
       return entry;
     } catch (error) {
@@ -111,7 +135,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           await chrome.storage.local.set({ protectionEnabled: message.enabled === true });
           const current = await settings(); const tabs = await chrome.tabs.query({});
           await Promise.all(tabs.filter((tab) => tab.id != null).map((tab) => chrome.tabs.sendMessage(tab.id, { type: "PROTECTION_STATE_CHANGED", enabled: current.protectionEnabled, linkProtection: current.linkProtection }).catch(() => null)));
-          if (!message.enabled) { tabResults.clear(); urlCache.clear(); rateLimitedUntil = 0; clearTimeout(rateLimitTimer); tabs.forEach((tab) => clearBadge(tab.id)); }
+          if (!message.enabled) { tabResults.clear(); urlCache.clear(); await chrome.storage.local.remove(CACHE_STORAGE_KEY); rateLimitedUntil = 0; clearTimeout(rateLimitTimer); tabs.forEach((tab) => clearBadge(tab.id)); }
           else {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab?.id != null && /^https?:/.test(activeTab.url || "")) void handleAssessUrl(activeTab.url, activeTab.id, true);

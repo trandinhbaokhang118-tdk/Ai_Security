@@ -1,6 +1,7 @@
 """Bounded DNS-over-HTTPS collector for current DNS and email-security posture."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,13 +30,16 @@ class DNSIntelligenceService:
     def inspect(self, domain: str) -> DNSIntelligence:
         records: dict[str, list[str]] = {}
         errors: list[str] = []
-        for name, kind in ((domain, "A"), (domain, "AAAA"), (domain, "NS"),
-                           (domain, "MX"), (domain, "TXT"), (f"_dmarc.{domain}", "TXT"),
-                           (f"default._domainkey.{domain}", "TXT")):
-            values, error = self._query(name, kind)
-            records[f"{name}:{kind}"] = values
-            if error:
-                errors.append(error)
+        queries = ((domain, "A"), (domain, "AAAA"), (domain, "NS"),
+                   (domain, "MX"), (domain, "TXT"), (f"_dmarc.{domain}", "TXT"),
+                   (f"default._domainkey.{domain}", "TXT"))
+        with ThreadPoolExecutor(max_workers=len(queries)) as executor:
+            futures = [(name, kind, executor.submit(self._query, name, kind)) for name, kind in queries]
+            for name, kind, future in futures:
+                values, error = future.result()
+                records[f"{name}:{kind}"] = values
+                if error:
+                    errors.append(error)
         root_txt = records[f"{domain}:TXT"]
         dmarc_txt = records[f"_dmarc.{domain}:TXT"]
         dkim_txt = records[f"default._domainkey.{domain}:TXT"]

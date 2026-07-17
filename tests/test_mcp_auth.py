@@ -8,10 +8,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.db import Base
-from backend.models import ApiKey, User
+from backend.models import ApiKey, DailyQuotaUsage, User
 from backend.security_utils import create_api_key_value, hash_api_key, utcnow
 from mcp_server import auth as mcp_auth
-from mcp_server.auth import MCPApiKeyMiddleware
+from mcp_server.auth import (
+    MCPApiKeyMiddleware,
+    MCPIdentity,
+    current_mcp_identity,
+    reserve_mcp_scan_quota,
+)
 
 
 class Downstream:
@@ -126,3 +131,25 @@ def test_mcp_http_rejects_revoked_and_expired_keys(monkeypatch) -> None:
         raw, _ = issue_key(factory, **options)
         messages, _ = asyncio.run(invoke(MCPApiKeyMiddleware(Downstream()), f"Bearer {raw}"))
         assert status(messages) == 401
+
+
+def test_mcp_scan_consumes_authenticated_users_plan_quota(monkeypatch) -> None:
+    factory = setup_db(monkeypatch)
+    _, key_id = issue_key(factory)
+    with factory() as db:
+        key = db.get(ApiKey, key_id)
+        assert key is not None
+        user_id = key.user_id
+
+    token = current_mcp_identity.set(
+        MCPIdentity(user_id, key_id, "127.0.0.1", "mcp-test")
+    )
+    try:
+        reserve_mcp_scan_quota()
+    finally:
+        current_mcp_identity.reset(token)
+
+    with factory() as db:
+        usage = db.query(DailyQuotaUsage).filter_by(user_id=user_id).one()
+        assert usage.api_key_id == key_id
+        assert usage.scan_count == 1
