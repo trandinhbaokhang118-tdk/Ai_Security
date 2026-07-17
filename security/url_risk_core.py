@@ -113,6 +113,22 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         lexical += 0.10
         evidence.append(_e("Shortlink che giấu đích đến; cần mở rộng redirect trong sandbox.",
                            Severity.MEDIUM, "is_shortlink", 0.10))
+    if signals.long_url:
+        evasion += 0.05
+        evidence.append(_e(
+            "URL dài bất thường; cần kiểm tra phần đích và tham số đã được che khuất.",
+            Severity.LOW,
+            "long_url",
+            0.05,
+        ))
+    if signals.excessive_dots:
+        evasion += 0.06
+        evidence.append(_e(
+            "Hostname có nhiều lớp subdomain, có thể làm người dùng đọc nhầm tên miền đăng ký.",
+            Severity.LOW,
+            "excessive_subdomains",
+            0.06,
+        ))
 
     # Layer 2: credential theft intent and URL obfuscation/evasion.
     # Decode repeatedly (bounded) so percent-encoding cannot hide another URL or
@@ -138,10 +154,67 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         intent += min(0.26, 0.09 * len(matched_sensitive))
         evidence.append(_e("URL nhắm tới dữ liệu nhạy cảm: " + ", ".join(sorted(matched_sensitive)) + ".",
                            Severity.HIGH, "credential_theft_intent", intent))
-    if len(signals.suspicious_keywords) >= 3:
-        intent += 0.10
-        evidence.append(_e("Nhiều từ khóa xác minh/đăng nhập xuất hiện đồng thời.",
-                           Severity.HIGH, "credential_lure_cluster", 0.10))
+    if signals.suspicious_keywords:
+        # Keep this monotonic: three coordinated lure terms must never contribute
+        # less risk than one or two. Cap at three to avoid unlimited accumulation.
+        keyword_contribution = 0.12 * min(len(signals.suspicious_keywords), 3)
+        intent += keyword_contribution
+        evidence.append(_e(
+            "URL chứa cụm từ dụ xác thực/đăng nhập: "
+            + ", ".join(sorted(signals.suspicious_keywords)),
+            Severity.HIGH if len(signals.suspicious_keywords) >= 3 else Severity.MEDIUM,
+            "credential_lure_cluster" if len(signals.suspicious_keywords) >= 3 else "suspicious_keywords",
+            keyword_contribution,
+        ))
+    if signals.suspicious_keywords and (
+        signals.brand_mismatch or (0.0 < brand_distance <= 0.25)
+    ):
+        intent += 0.38
+        evidence.append(_e(
+            "Tên miền giả/gần giống thương hiệu được kết hợp với lời dụ đăng nhập, "
+            "xác minh hoặc thanh toán.",
+            Severity.CRITICAL,
+            "brand_credential_lure_combination",
+            0.38,
+        ))
+    if signals.dangerous_download:
+        intent += 0.14
+        evidence.append(_e(
+            "URL trỏ trực tiếp tới loại tệp có thể thực thi; không tải hoặc chạy ngoài sandbox.",
+            Severity.HIGH,
+            "dangerous_download",
+            0.14,
+        ))
+    if signals.disguised_download:
+        evasion += 0.72
+        evidence.append(_e(
+            "Tên tệp dùng đuôi tài liệu giả trước đuôi thực thi (ví dụ PDF.EXE), phù hợp mẫu phát tán mã độc ngụy trang.",
+            Severity.CRITICAL,
+            "disguised_executable_download",
+            0.72,
+        ))
+    if signals.archive_lure:
+        intent += 0.22
+        evidence.append(_e(
+            "Tệp nén gắn với ngữ cảnh CV/hóa đơn/tài liệu hoặc dùng đuôi kép; cần phân tích trong sandbox.",
+            Severity.HIGH,
+            "archive_download_lure",
+            0.22,
+        ))
+    shared_hosting_abuse = signals.shared_hosting and (
+        signals.brand_mismatch
+        or len(signals.suspicious_keywords) >= 2
+        or signals.dangerous_download
+        or signals.archive_lure
+    )
+    if shared_hosting_abuse:
+        evasion += 0.16
+        evidence.append(_e(
+            "Hosting dùng chung đi kèm dấu hiệu mạo danh/dụ tải; nền tảng không bị coi là độc nếu đứng riêng.",
+            Severity.HIGH,
+            "shared_hosting_abuse_context",
+            0.16,
+        ))
     if signals.at_symbol:
         evasion += 0.22
         evidence.append(_e("Ký tự @ có thể làm người dùng hiểu sai đích thực của URL.",
@@ -172,7 +245,14 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         # ML augments the deterministic score but cannot reduce a strong rule verdict.
         score = _clip(max(rule_score, model_value, (rule_score * 0.75) + (model_value * 0.25)))
     uncertain = 0.30 <= score < 0.70
-    high_impact = bool(matched_sensitive or signals.shortlink or signals.brand_mismatch)
+    high_impact = bool(
+        matched_sensitive
+        or signals.shortlink
+        or signals.brand_mismatch
+        or signals.dangerous_download
+        or signals.archive_lure
+        or shared_hosting_abuse
+    )
     requires_deep = uncertain or signals.shortlink or (high_impact and score >= 0.45)
     if uncorroborated_model:
         evidence.append(_e(

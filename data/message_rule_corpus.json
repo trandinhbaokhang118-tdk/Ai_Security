@@ -1,0 +1,121 @@
+{
+  "schema_version": "1",
+  "purpose": "Synthetic offline regression corpus for email and SMS threat rules",
+  "notes": [
+    "Reserved .test domains are used; tests never visit malicious infrastructure.",
+    "Cases encode behavior clusters, not single-keyword labels.",
+    "Benign controls protect legitimate OTP, delivery and newsletter messages from regressions."
+  ],
+  "cases": [
+    {
+      "id": "email_hidden_destination_mismatch",
+      "modality": "email",
+      "text": "<a href=\"https://paypa1-verify.test/login\">https://paypal.com/security</a>",
+      "metadata": {"subject": "Security notice", "sender": "PayPal <notice@gmail.com>"},
+      "min_score": 0.85,
+      "required_features": ["display_href_domain_mismatch", "embedded_url_risk"]
+    },
+    {
+      "id": "email_disguised_executable_attachment",
+      "modality": "email",
+      "text": "Please review the attached invoice.",
+      "metadata": {
+        "subject": "Invoice",
+        "sender": "Billing <billing@example.com>",
+        "attachments": ["invoice.pdf.exe"]
+      },
+      "min_score": 0.85,
+      "required_features": ["disguised_executable_attachment"]
+    },
+    {
+      "id": "email_business_email_compromise",
+      "modality": "email",
+      "text": "CEO requests an urgent bank account change. Keep this confidential and wire the invoice payment today.",
+      "metadata": {
+        "subject": "Urgent payment",
+        "sender": "CEO <ceo@gmail.com>",
+        "reply_to": "finance@outside.test"
+      },
+      "min_score": 0.85,
+      "required_features": ["business_email_compromise_cluster", "reply_to_domain_mismatch"]
+    },
+    {
+      "id": "email_brand_spoof_authentication_failures",
+      "modality": "email",
+      "text": "Verify your Microsoft account now.",
+      "metadata": {
+        "subject": "Microsoft security alert",
+        "sender": "Microsoft Support <notice@gmail.com>",
+        "authentication_results": "spf=fail; dkim=fail; dmarc=fail"
+      },
+      "min_score": 0.85,
+      "required_features": [
+        "sender_brand_mismatch",
+        "email_authentication_failure",
+        "email_sender_spoofing_cluster"
+      ]
+    },
+    {
+      "id": "sms_unpaid_toll_payment",
+      "modality": "sms",
+      "text": "Thong bao phi duong bo chua thanh toan. Thanh toan ngay tai https://vnetc-fee.test/pay de tranh bi phat.",
+      "min_score": 0.85,
+      "required_features": ["sms_delivery_toll_payment_cluster"]
+    },
+    {
+      "id": "sms_delivery_fee_brand_impersonation",
+      "modality": "sms",
+      "text": "Buu kien cua ban dang bi giu. Dong phi giao hang 12.000d tai hxxps://vnpost[.]redelivery-login.test/thanhtoan",
+      "min_score": 0.85,
+      "required_features": ["embedded_url_risk", "sms_delivery_toll_payment_cluster"]
+    },
+    {
+      "id": "sms_task_job_deposit",
+      "modality": "sms",
+      "text": "Viec lam online: lam nhiem vu nhan hoa hong. Nap 500k USDT de mo khoa tai https://task-bonus.test",
+      "min_score": 0.85,
+      "required_features": ["sms_task_investment_deposit_cluster"]
+    },
+    {
+      "id": "sms_account_takeover_link",
+      "modality": "sms",
+      "text": "Tai khoan cua ban se bi khoa. Xac minh ngay tai https://account-check.test/login",
+      "min_score": 0.75,
+      "required_features": ["sms_account_takeover_cluster"]
+    },
+    {
+      "id": "benign_sms_otp_protective",
+      "modality": "sms",
+      "text": "Ma OTP cua ban la 123456. Khong chia se ma nay voi bat ky ai. Khong bam vao lien ket.",
+      "max_score": 0.15,
+      "forbidden_features": ["credential_request", "sms_smishing_pattern"]
+    },
+    {
+      "id": "benign_sms_delivery_completed",
+      "modality": "sms",
+      "text": "VNPost: Buu kien AB123 da giao thanh cong luc 10:30. Cam on quy khach.",
+      "max_score": 0.15,
+      "forbidden_features": ["sms_delivery_toll_payment_cluster"]
+    },
+    {
+      "id": "benign_email_newsletter",
+      "modality": "email",
+      "text": "Read our July release notes at https://github.com/openai",
+      "metadata": {"subject": "July release notes", "sender": "OpenAI <news@openai.com>"},
+      "max_score": 0.20,
+      "forbidden_features": ["embedded_url_risk", "sender_brand_mismatch"]
+    },
+    {
+      "id": "benign_email_pdf_attachment",
+      "modality": "email",
+      "text": "Monthly statement is attached for your records.",
+      "metadata": {
+        "subject": "Monthly statement",
+        "sender": "Accounts <accounts@example.com>",
+        "attachments": ["statement-july.pdf"]
+      },
+      "max_score": 0.20,
+      "forbidden_features": ["disguised_executable_attachment", "active_attachment"]
+    }
+  ]
+}

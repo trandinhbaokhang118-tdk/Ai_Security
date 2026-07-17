@@ -24,8 +24,8 @@ from ai.adapters.url_adapter import (
     is_ip_host,
 )
 from security.prompt_firewall import assess_prompt_firewall
-from security.url_risk_core import assess_url as assess_url_risk
 from security.text_risk_core import assess_text_risk
+from security.url_risk_core import assess_url as assess_url_risk
 from shared.constants import HIGH_RISK_TLDS, URGENCY_KEYWORDS_VI
 from shared.schemas import Evidence, Severity
 
@@ -62,6 +62,8 @@ class InferenceEngine:
             name: self._read_metadata(name)
             for name in (
                 "url_lgbm.onnx",
+                "url_rf.onnx",
+                "url_xgb.onnx",
                 "mdeberta_text.onnx",
                 "protectai_prompt.onnx",
                 "mdeberta_text_transformer.onnx",
@@ -70,6 +72,8 @@ class InferenceEngine:
         }
         self._quality_gate_text_transformer()
         self.url_session = self._maybe_load("url_lgbm.onnx")
+        self.url_rf_session = self._maybe_load("url_rf.onnx")
+        self.url_xgb_session = self._maybe_load("url_xgb.onnx")
         # Stable filenames are the lightweight string-input classifiers.
         self.text_session = self._maybe_load("mdeberta_text.onnx")
         self.prompt_session = self._maybe_load("protectai_prompt.onnx")
@@ -85,7 +89,10 @@ class InferenceEngine:
     @property
     def models_loaded(self) -> bool:
         return bool(
-            self.url_session is not None
+            any(
+                session is not None
+                for session in (self.url_session, self.url_rf_session, self.url_xgb_session)
+            )
             and self._text_model_ready()
             and self._prompt_model_ready()
         )
@@ -102,12 +109,17 @@ class InferenceEngine:
                 "transformers_version": self._package_version("transformers"),
             },
             "modalities_ready": {
-                "url": self.url_session is not None,
+                "url": any(
+                    session is not None
+                    for session in (self.url_session, self.url_rf_session, self.url_xgb_session)
+                ),
                 "text": self._text_model_ready(),
                 "prompt": self._prompt_model_ready(),
             },
             "models": {
                 "url_lgbm": self._session_status("url_lgbm.onnx", self.url_session),
+                "url_random_forest": self._session_status("url_rf.onnx", self.url_rf_session),
+                "url_xgboost": self._session_status("url_xgb.onnx", self.url_xgb_session),
                 "text_lightweight": self._session_status("mdeberta_text.onnx", self.text_session),
                 "text_transformer": self._session_status(
                     "mdeberta_text_transformer.onnx",
@@ -292,10 +304,11 @@ class InferenceEngine:
         return f"hybrid-{modality}[{'+'.join(components)}]"
 
     # ------------------------------------------------------------------ URL
-    def predict_url(self, url: str) -> PredictionResult:
+    def predict_url(
+        self, url: str, context: dict[str, object] | None = None
+    ) -> PredictionResult:
         try:
-            features = extract_url_features(url)
-            rule_score = self._heuristic_url(url, features)
+            legacy_features = extract_url_features(url)
         except Exception as e:
             # Handle invalid URLs gracefully
             return PredictionResult(
@@ -310,16 +323,41 @@ class InferenceEngine:
                 model_version="heuristic-url-2-error"
             )
 
-        model_score: float | None = None
-        if self.url_session is not None:  # pragma: no cover - needs model
+        model_scores: list[tuple[str, float, float]] = []
+        sessions = (
+            ("url_lgbm.onnx", self.url_session, 0.5),
+            ("url_rf.onnx", self.url_rf_session, 0.25),
+            ("url_xgb.onnx", self.url_xgb_session, 0.25),
+        )
+        for model_name, session, weight in sessions:
+            if session is None:
+                continue
             try:
-                model_score = self._run_lgbm(self.url_session, features)
+                metadata = self.model_metadata.get(model_name, {})
+                names = metadata.get("feature_names")
+                feature_names = names if isinstance(names, list) and names else None
+                features = (
+                    extract_url_features(
+                        url,
+                        feature_names=feature_names,
+                        context=context,
+                    )
+                    if feature_names
+                    else legacy_features
+                )
+                model_scores.append((model_name, self._run_lgbm(session, features), weight))
             except Exception:
-                model_score = None
+                continue
+
+        model_score: float | None = None
+        if model_scores:
+            total_weight = sum(item[2] for item in model_scores)
+            model_score = sum(score * weight for _, score, weight in model_scores) / total_weight
 
         core = assess_url_risk(url, model_score=model_score)
         if model_score is not None:
-            version = "url_lgbm.onnx+multilayer-url-core-3"
+            components = "+".join(name.removeprefix("url_").removesuffix(".onnx") for name, _, _ in model_scores)
+            version = f"url-ensemble[{components}]+multilayer-url-core-3"
         else:
             version = "multilayer-url-core-3"
         return PredictionResult(_clip01(core.score), core.evidence, version)
@@ -484,9 +522,11 @@ class InferenceEngine:
                 transformer_score = None
         score = self._hybrid_score(transformer_score, lightweight_score, heuristic_score)
         # The phishing core contributes independent explainable signals from sender
-        # metadata, social-engineering language and embedded URLs.
+        # metadata, social-engineering language and embedded URLs. It receives the
+        # raw message so HTML href targets remain available for comparison; ML still
+        # receives the sanitized ``clean`` form.
         core = assess_text_risk(
-            clean,
+            text,
             modality=str((metadata or {}).get("modality", "email")),
             metadata=metadata,
             model_score=score,
@@ -497,6 +537,15 @@ class InferenceEngine:
             lightweight_score=lightweight_score,
             transformer_score=transformer_score,
         )
+        if any(item.feature == "protective_otp_context" for item in core.evidence):
+            model_evidence = [
+                item
+                for item in model_evidence
+                if item.feature not in {
+                    "text_model_probability",
+                    "text_transformer_probability",
+                }
+            ]
         evidence = [
             *core.evidence,
             *(item for item in model_evidence if item.severity != Severity.INFO),
@@ -548,7 +597,7 @@ class InferenceEngine:
 
         if re.findall(r"(?:https?://|www\.)\S+", text):
             ev.append(Evidence(source="text_adapter", message="Chứa liên kết trong nội dung",
-                               severity=Severity.MEDIUM, feature="link_present", contribution=0.2))
+                               severity=Severity.INFO, feature="link_present", contribution=0.0))
         inj, patterns = detect_injection(text)
         if inj >= 0.5:
             ev.append(Evidence(source="prompt_adapter",

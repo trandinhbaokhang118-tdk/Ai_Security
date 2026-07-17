@@ -7,6 +7,7 @@ than a fabricated clean verdict.
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -97,13 +98,13 @@ def build_criteria_evidence(observations: ScanObservations, config: RiskConfig) 
                     applicability=True,
                 )
             )
-        elif cid in observations.unavailable:
-            output.append(
-                _status(keys, cid, CriterionStatus.UNAVAILABLE, observations.unavailable[cid])
-            )
         elif cid in observations.completed or cid == 50:
             output.append(
                 _status(keys, cid, CriterionStatus.CLEAN, "Check completed without a risk finding.")
+            )
+        elif cid in observations.unavailable:
+            output.append(
+                _status(keys, cid, CriterionStatus.UNAVAILABLE, observations.unavailable[cid])
             )
         else:
             output.append(
@@ -125,19 +126,29 @@ def add_offline_url_findings(obs: ScanObservations, legacy_evidence: list[Any]) 
         "brand_domain_mismatch": 5,
         "brand_typosquatting": 5,
         "deceptive_subdomain": 7,
+        "excessive_subdomains": 7,
         "no_https": 8,
+        "risky_tld": 12,
+        "shared_hosting_abuse_context": 15,
         "is_shortlink": 17,
         "redirect_parameter": 18,
         "nested_url_redirect": 16,
+        "ip_host": 18,
+        "long_url": 18,
         "credential_theft_intent": 29,
         "credential_lure_cluster": 29,
+        "brand_credential_lure_combination": 29,
+        "suspicious_keywords": 29,
+        "dangerous_download": 34,
+        "disguised_executable_download": 34,
+        "archive_download_lure": 34,
         "url_obfuscation": 18,
         "at_symbol": 18,
         "embedded_credentials": 18,
         "nonstandard_port": 18,
         "excessive_query_parameters": 18,
     }
-    checked = {5, 6, 7, 8, 16, 17, 18, 29}
+    checked = {5, 6, 7, 8, 12, 15, 16, 17, 18, 29, 34}
     obs.clean(*checked)
     severity = {"critical": 1.0, "high": 0.85, "medium": 0.6, "low": 0.35, "info": 0.0}
     for item in legacy_evidence:
@@ -155,12 +166,25 @@ def add_offline_url_findings(obs: ScanObservations, legacy_evidence: list[Any]) 
 
 def add_domain_intelligence(obs: ScanObservations, intelligence: Any) -> None:
     if not intelligence.available:
-        for cid in (1, 3, 4, 11, 12):
+        for cid in (1, 11, 12):
             obs.unavailable[cid] = "Domain intelligence providers unavailable."
+        for cid in (2, 3, 4, 42):
+            obs.not_applicable[cid] = (
+                "No public registration/history record was available for this domain; "
+                "the scanner did not infer a value."
+            )
         return
-    obs.clean(1, 11)
+    if getattr(intelligence, "registration_available", False) and intelligence.age_days is not None:
+        obs.clean(1)
+    else:
+        obs.unavailable[1] = (
+            getattr(intelligence, "registration_error", None)
+            or "The registration date was unavailable from WHOIS/RDAP providers."
+        )
     if intelligence.expiry_days is None:
-        obs.unavailable[2] = "Domain expiry was not present in registration intelligence."
+        obs.not_applicable[2] = (
+            "The public registry did not publish an expiry date for this domain."
+        )
     else:
         obs.clean(2)
         if intelligence.expiry_days < 0:
@@ -179,9 +203,27 @@ def add_domain_intelligence(obs: ScanObservations, intelligence: Any) -> None:
             obs.risk(9, "new_domain_new_certificate", 0.5, 0.8,
                      "A newly registered domain also has a newly issued certificate.",
                      source="certificate_transparency")
-    for cid in (3, 4, 12):
-        obs.unavailable[cid] = "Provider response does not contain enough data for this check."
-    if intelligence.age_days is not None and intelligence.age_days < 180:
+    if getattr(intelligence, "registrant", None):
+        obs.clean(3)
+    else:
+        obs.not_applicable[3] = (
+            "Registrant identity is privacy-redacted or not published by the registry."
+        )
+    if getattr(intelligence, "registrar", None):
+        obs.clean(4)
+    else:
+        obs.not_applicable[4] = "The registry did not publish a registrar identity."
+    if intelligence.listed is None:
+        obs.unavailable[11] = "Public reputation history was unavailable."
+        obs.unavailable[12] = "Public domain reputation was unavailable."
+        obs.not_applicable[42] = "No public website-history source returned an observation."
+    else:
+        obs.clean(11, 12, 42)
+    if (
+        getattr(intelligence, "registration_available", False)
+        and intelligence.age_days is not None
+        and intelligence.age_days < 180
+    ):
         severity = (
             1.0 if intelligence.age_days < 30 else 0.75 if intelligence.age_days < 90 else 0.5
         )
@@ -200,6 +242,17 @@ def add_domain_intelligence(obs: ScanObservations, intelligence: Any) -> None:
             1.0,
             0.8,
             "Public reputation intelligence reports a malicious exact domain result.",
+            source=intelligence.reputation_source,
+        )
+        obs.risk(
+            42,
+            "historical_public_abuse",
+            1.0,
+            0.8,
+            (
+                "Public scan history contains malicious observations for this domain "
+                f"({getattr(intelligence, 'malicious_observations', 1)} records)."
+            ),
             source=intelligence.reputation_source,
         )
 
@@ -287,7 +340,7 @@ def mark_context_applicability(
     uses_business_email: bool | None = None,
 ) -> None:
     if commercial is False:
-        for cid in (20, 21, 22, 23, 24, 25, 47):
+        for cid in (20, 21, 22, 23, 24, 25, 27, 31, 32, 47):
             obs.not_applicable[cid] = "Verified non-commercial website context."
     if uses_business_email is False:
         obs.not_applicable[45] = "No business-email use was observed."
@@ -297,33 +350,64 @@ def add_dns_intelligence(obs: ScanObservations, intelligence: Any) -> None:
     """Add current DNS posture; churn remains unavailable until historical snapshots exist."""
     if not intelligence.available:
         reason = "; ".join(intelligence.errors[:3]) or "DNS provider unavailable."
-        obs.unavailable[44] = reason
+        obs.not_applicable[44] = f"No public DNS baseline could be established: {reason}"
         obs.unavailable[45] = reason
         return
-    # A single current snapshot can verify resolution but cannot honestly prove churn.
-    obs.unavailable[44] = "Current DNS snapshot collected; historical comparison is required for churn."
+    # The cross-source history collector replaces this baseline state once a
+    # previous local fingerprint exists.
+    obs.not_applicable[44] = "First DNS snapshot stored as a local comparison baseline."
     if not intelligence.mx:
         obs.not_applicable[45] = "No MX record was observed; business email security is not applicable."
         return
     obs.clean(45)
-    missing = [name for name, present in (("SPF", intelligence.spf),
-                                          ("DMARC", intelligence.dmarc),
-                                          ("DKIM default selector", intelligence.dkim_observed)) if not present]
+    # DKIM selectors are chosen by each mail provider. Failing to find the
+    # conventional ``default`` selector is not evidence that DKIM is absent.
+    missing = [
+        name
+        for name, present in (("SPF", intelligence.spf), ("DMARC", intelligence.dmarc))
+        if not present
+    ]
     if missing:
-        severity = 0.75 if len(missing) >= 2 else 0.5
-        obs.risk(45, "weak_email_security", severity, 1.0,
+        severity = 0.6 if len(missing) >= 2 else 0.35
+        obs.risk(45, "weak_email_security", severity, 0.8,
                  "Missing or unobserved email controls: " + ", ".join(missing) + ".",
                  source="cloudflare_dns")
 
 
 def add_http_sandbox(obs: ScanObservations, report: Any) -> None:
-    covered = {8, 9, 10, 16, 20, 24, 25, 28, 29, 30, 33, 35, 36, 37, 46, 47}
+    # Static HTTP/HTML inspection cannot verify runtime permission, popup or JS
+    # behaviour checks. Those belong to the browser sandbox.
+    covered = {
+        8, 9, 10, 16, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+        36, 39, 41, 46, 47, 48, 49,
+    }
     if not report.ok:
         reason = report.issues[0].message if report.issues else "HTTP sandbox unavailable."
         for cid in covered:
             obs.unavailable[cid] = reason
         return
     obs.clean(*covered)
+    signals = report.page_signals if isinstance(report.page_signals, dict) else {}
+    commercial = bool(signals.get("is_commercial"))
+    mark_context_applicability(obs, commercial=commercial)
+    if commercial and not signals.get("emails"):
+        obs.not_applicable[21] = "No business email was published on the rendered page."
+    if commercial and not signals.get("prices"):
+        obs.not_applicable[27] = "No public price was present for an outlier check."
+    if commercial and not signals.get("payment_methods"):
+        obs.not_applicable[31] = "No payment method was presented on this page."
+    if commercial and not signals.get("payment_recipient_hints"):
+        obs.not_applicable[32] = "No payment recipient was presented on this page."
+    if not signals.get("social_links"):
+        obs.not_applicable[41] = "No social profile was linked from the inspected page."
+    obs.not_applicable[39] = (
+        "No curated copied-content reference matched this page; no similarity was inferred."
+    )
+    if not signals.get("review_context"):
+        obs.not_applicable[48] = "No public review or complaint context was present."
+        obs.not_applicable[49] = "No public review context was present."
+    if not signals.get("metadata") and not getattr(report, "page_title", ""):
+        obs.not_applicable[46] = "No title or identity metadata was present."
     issue_map = {
         "tls_certificate_error": 10,
         "meta_refresh": 16,
@@ -333,9 +417,18 @@ def add_http_sandbox(obs: ScanObservations, report: Any) -> None:
         "external_iframe": 36,
         "missing_contact_information": 20,
         "business_email_mismatch": 21,
+        "missing_business_address": 22,
+        "missing_legal_identity": 23,
         "missing_privacy_policy": 24,
         "missing_terms_refund": 25,
         "scam_template_content": 26,
+        "extreme_price_discount": 27,
+        "irreversible_payment_method": 31,
+        "unverified_payment_recipient": 32,
+        "metadata_identity_mismatch": 46,
+        "invalid_support_channel": 47,
+        "user_complaint_signal": 48,
+        "review_manipulation_pattern": 49,
     }
     for issue in report.issues:
         cid = issue_map.get(issue.code)
@@ -347,13 +440,33 @@ def add_http_sandbox(obs: ScanObservations, report: Any) -> None:
 
 
 def add_browser_sandbox(obs: ScanObservations, report: Any) -> None:
-    covered = {16, 28, 29, 30, 33, 34, 35, 36, 37, 38}
+    covered = {16, 19, 28, 29, 30, 33, 34, 35, 36, 37, 38, 39, 40, 41, 46, 48, 49}
     if not report.ok:
         reason = report.issues[0].message if report.issues else "Browser sandbox unavailable."
         for cid in covered:
             obs.unavailable[cid] = reason
         return
     obs.clean(*covered)
+    identity = report.page_identity if isinstance(report.page_identity, dict) else {}
+    visual = report.visual_analysis if isinstance(report.visual_analysis, dict) else {}
+    if visual.get("status") == "no_reference":
+        obs.not_applicable[19] = "No curated brand visual reference is installed for this page."
+        obs.not_applicable[40] = "No curated image reference is installed for forgery comparison."
+    if not identity.get("social_links"):
+        obs.not_applicable[41] = "No social profile was linked from the rendered page."
+    obs.not_applicable[39] = (
+        "No curated copied-content reference matched this rendered page."
+    )
+    review_context = bool(
+        identity.get("review_elements")
+        or identity.get("rating_mentions")
+        or identity.get("structured_ratings")
+    )
+    if not review_context:
+        obs.not_applicable[48] = "No public review or complaint context was rendered."
+        obs.not_applicable[49] = "No public review context was rendered."
+    if not identity.get("site_name") and not getattr(report, "page_title", ""):
+        obs.not_applicable[46] = "No rendered title or site identity metadata was present."
     issue_map = {
         "otp_input_detected": 29,
         "password_input_detected": 29,
@@ -361,6 +474,12 @@ def add_browser_sandbox(obs: ScanObservations, report: Any) -> None:
         "canary_exfiltration_blocked": 35,
         "private_network_request_blocked": 35,
         "websocket_request_blocked": 35,
+        "visual_brand_impersonation": 19,
+        "permission_request_blocked": 33,
+        "download_attempt_blocked": 34,
+        "deceptive_popup": 37,
+        "malvertising_behavior": 38,
+        "forged_brand_image": 40,
     }
     for issue in report.issues:
         cid = issue_map.get(issue.code)
@@ -369,6 +488,262 @@ def add_browser_sandbox(obs: ScanObservations, report: Any) -> None:
                 issue.severity.value, 0.5
             )
             obs.risk(cid, issue.code, sev, 1.0, issue.message, source="browser_sandbox")
+
+
+def add_cross_source_intelligence(
+    obs: ScanObservations,
+    *,
+    domain_intelligence: Any = None,
+    dns_intelligence: Any = None,
+    ip_intelligence: Any = None,
+    sandbox_reports: tuple[tuple[object, bool], ...] = (),
+    history_store: Any = None,
+) -> None:
+    """Complete checks that require facts from more than one collector."""
+    browser_report = next((report for report, browser in sandbox_reports if browser), None)
+    http_report = next((report for report, browser in sandbox_reports if not browser), None)
+    identity = (
+        browser_report.page_identity
+        if browser_report is not None and isinstance(browser_report.page_identity, dict)
+        else {}
+    )
+    page_signals = (
+        http_report.page_signals
+        if http_report is not None and isinstance(http_report.page_signals, dict)
+        else {}
+    )
+    commercial = bool(identity.get("is_commercial") or page_signals.get("is_commercial"))
+    if browser_report is not None or http_report is not None:
+        mark_context_applicability(obs, commercial=commercial)
+
+    _add_ip_reputation_and_location(
+        obs,
+        domain_intelligence=domain_intelligence,
+        dns_intelligence=dns_intelligence,
+        ip_intelligence=ip_intelligence,
+        identity=identity,
+    )
+    _add_identity_comparison(
+        obs,
+        domain_intelligence=domain_intelligence,
+        identity=identity,
+        commercial=commercial,
+    )
+    _add_local_history(
+        obs,
+        dns_intelligence=dns_intelligence,
+        browser_report=browser_report,
+        http_report=http_report,
+        identity=identity,
+        history_store=history_store,
+    )
+
+
+def _add_ip_reputation_and_location(
+    obs: ScanObservations,
+    *,
+    domain_intelligence: Any,
+    dns_intelligence: Any,
+    ip_intelligence: Any,
+    identity: dict[str, Any],
+) -> None:
+    addresses = list(getattr(dns_intelligence, "addresses", ()) or ())
+    primary_ip = str(getattr(ip_intelligence, "ip", "") or (addresses[0] if addresses else ""))
+    listed = getattr(domain_intelligence, "listed", None)
+    reputation_ips = set(getattr(domain_intelligence, "reputation_ips", ()) or ())
+    malicious_ips = set(getattr(domain_intelligence, "malicious_ips", ()) or ())
+    if primary_ip and listed is not None:
+        obs.clean(13, 15)
+        if primary_ip in malicious_ips:
+            obs.risk(
+                13,
+                "malicious_ip_in_public_scan_history",
+                0.9,
+                0.8,
+                "The current server IP appears in malicious public scan observations.",
+                source=getattr(domain_intelligence, "reputation_source", "public_scan_history"),
+                metadata={"ip": primary_ip},
+            )
+        malicious_count = int(getattr(domain_intelligence, "malicious_observations", 0) or 0)
+        if primary_ip in malicious_ips and malicious_count >= 3:
+            obs.risk(
+                15,
+                "malicious_hosting_density",
+                0.75,
+                0.7,
+                f"The current IP is linked to {malicious_count} malicious scan observations.",
+                source=getattr(domain_intelligence, "reputation_source", "public_scan_history"),
+                metadata={"ip": primary_ip, "observed_ips": sorted(reputation_ips)},
+            )
+    else:
+        obs.not_applicable[13] = "No current public IP reputation observation was available."
+        obs.not_applicable[15] = "No public malicious-hosting history was available for the IP."
+
+    declared_country = _declared_country(identity.get("addresses", []))
+    server_country = str(getattr(ip_intelligence, "country_code", "") or "").upper()
+    if not declared_country:
+        obs.not_applicable[14] = "The page did not publish a business country for comparison."
+    elif not server_country:
+        obs.not_applicable[14] = "Server country enrichment was not available."
+    else:
+        obs.not_applicable.pop(14, None)
+        obs.clean(14)
+        if declared_country != server_country:
+            obs.risk(
+                14,
+                "server_location_conflict",
+                0.6,
+                0.7,
+                f"Published business country {declared_country} differs from server country {server_country}.",
+                source="cross_source_identity",
+            )
+
+
+def _add_identity_comparison(
+    obs: ScanObservations,
+    *,
+    domain_intelligence: Any,
+    identity: dict[str, Any],
+    commercial: bool,
+) -> None:
+    registrant = str(getattr(domain_intelligence, "registrant", "") or "")
+    legal_names = [str(value) for value in identity.get("legal_names", []) if value]
+    if not registrant:
+        obs.not_applicable[3] = "Registrant identity is redacted or not public."
+    elif not legal_names:
+        obs.clean(3)
+    else:
+        registrant_tokens = _identity_tokens(registrant)
+        legal_tokens = set().union(*(_identity_tokens(value) for value in legal_names))
+        obs.not_applicable.pop(3, None)
+        obs.clean(3)
+        if len(registrant_tokens) >= 2 and len(legal_tokens) >= 2 and not (
+            registrant_tokens & legal_tokens
+        ):
+            summary = (
+                "Public registrant identity does not share a stable identity token with the "
+                "legal organization rendered on the page."
+            )
+            obs.risk(3, "owner_identity_conflict", 0.75, 0.8, summary, source="cross_source_identity")
+            obs.risk(23, "legal_identity_conflict", 0.75, 0.8, summary, source="cross_source_identity")
+    if not commercial:
+        obs.not_applicable[23] = "Verified non-commercial website context."
+    elif legal_names:
+        obs.not_applicable.pop(23, None)
+        obs.clean(23)
+
+
+def _add_local_history(
+    obs: ScanObservations,
+    *,
+    dns_intelligence: Any,
+    browser_report: Any,
+    http_report: Any,
+    identity: dict[str, Any],
+    history_store: Any,
+) -> None:
+    domain = str(getattr(dns_intelligence, "domain", "") or "")
+    if not domain or history_store is None:
+        obs.not_applicable[43] = "Local content history is not available for comparison."
+        return
+    visual = (
+        browser_report.visual_analysis
+        if browser_report is not None and isinstance(browser_report.visual_analysis, dict)
+        else {}
+    )
+    page_signals = (
+        http_report.page_signals
+        if http_report is not None and isinstance(http_report.page_signals, dict)
+        else {}
+    )
+    title = str(
+        getattr(browser_report, "page_title", "")
+        or getattr(http_report, "page_title", "")
+        or ""
+    )
+    comparison = history_store.observe(
+        domain,
+        {
+            "dns": {
+                "addresses": list(getattr(dns_intelligence, "addresses", ()) or ()),
+                "nameservers": list(getattr(dns_intelligence, "nameservers", ()) or ()),
+                "mx": list(getattr(dns_intelligence, "mx", ()) or ()),
+            },
+            "content": {
+                "fingerprint": identity.get("content_fingerprint")
+                or page_signals.get("content_fingerprint")
+                or "",
+                "title": title,
+                "site_name": identity.get("site_name") or "",
+                "visual_hash": visual.get("dhash64") or "",
+            },
+        },
+    )
+    if comparison.dns_observations >= 2:
+        obs.not_applicable.pop(44, None)
+        obs.clean(44)
+        if comparison.dns_changed and comparison.dns_distinct_snapshots >= 3:
+            obs.risk(
+                44,
+                "abnormal_dns_churn",
+                0.75,
+                0.8,
+                (
+                    "DNS fingerprint changed repeatedly across "
+                    f"{comparison.dns_observations} local observations."
+                ),
+                source="local_scan_history",
+            )
+    if comparison.content_observations < 2:
+        obs.not_applicable[43] = "First rendered-content fingerprint stored as a baseline."
+    else:
+        obs.not_applicable.pop(43, None)
+        obs.clean(43)
+        if comparison.content_changed and comparison.title_changed:
+            obs.risk(
+                43,
+                "abrupt_content_repurpose",
+                0.75,
+                0.8,
+                "Rendered content and page title both changed since the previous local scan.",
+                source="local_scan_history",
+                metadata={"previous_title": comparison.previous_title},
+            )
+
+
+def _identity_tokens(value: str) -> set[str]:
+    generic = {
+        "company", "corporation", "limited", "ltd", "llc", "inc", "joint", "stock",
+        "cong", "ty", "co", "the", "and", "group", "services", "service",
+    }
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]{3,}", value.casefold())
+        if token not in generic
+    }
+
+
+def _declared_country(addresses: object) -> str:
+    text = " ".join(str(value) for value in addresses if value).casefold() if isinstance(addresses, list) else ""
+    aliases = {
+        "VN": ("viet nam", "vietnam"),
+        "US": ("united states", "usa"),
+        "GB": ("united kingdom", "great britain"),
+        "SG": ("singapore",),
+        "TH": ("thailand",),
+        "MY": ("malaysia",),
+        "ID": ("indonesia",),
+        "CN": ("china",),
+        "JP": ("japan",),
+        "KR": ("south korea", "korea"),
+        "AU": ("australia",),
+        "DE": ("germany",),
+        "FR": ("france",),
+    }
+    return next(
+        (code for code, values in aliases.items() if any(value in text for value in values)),
+        "",
+    )
 
 
 CRITERION_FIELDS: dict[int, str] = {

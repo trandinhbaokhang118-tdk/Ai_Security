@@ -19,6 +19,87 @@ class Settings(BaseSettings):
     ip2whois_api_key: str = ""
     whoisxml_api_key: str = ""
 
+    # Basic IP enrichment. The keyless IP2Location endpoint is intentionally
+    # bounded by a short timeout and receives only a public IP address, never
+    # the full URL or query string.
+    ip_geolocation_enabled: bool = True
+    ip2location_api_key: str = ""
+    ip_geolocation_timeout_seconds: float = 3.0
+    ip_geolocation_cache_ttl_seconds: int = 21600
+
+    # Optional external URL intelligence. Values are read server-side only.
+    hudson_rock_api_url: str = ""
+    hudson_rock_api_key: str = ""
+    phishtank_api_url: str = ""
+    phishtank_api_key: str = ""
+    phishtank_enabled: bool = False
+    ipqs_api_url: str = ""
+    ipqs_api_key: str = ""
+    google_web_risk_api_url: str = ""
+    google_web_risk_api_key: str = ""
+    google_safe_browsing_api_key: str = ""
+    apivoid_api_url: str = ""
+    apivoid_api_key: str = ""
+    phishdestroy_api_url: str = ""
+    phishdestroy_api_key: str = ""
+    phishdestroy_enabled: bool = False
+    # url.vet remains a separately deployed AGPL service and is consumed over HTTP.
+    urlvet_enabled: bool = False
+    urlvet_api_url: str = "http://127.0.0.1:8080"
+    urlvet_timeout_seconds: float = 12.0
+
+    # Local threat-feed pipeline. Sources remain opt-in because each provider has
+    # its own API key, rate limit, and terms of use.
+    threat_feed_scheduler_enabled: bool = False
+    threat_feed_scheduler_interval_minutes: int = 60
+    threat_feed_request_timeout_seconds: float = 45.0
+    threat_feed_max_download_bytes: int = 64 * 1024 * 1024
+    threat_feed_max_records_per_source: int = 250_000
+    threat_feed_retention_days: int = 30
+    threat_feed_user_agent: str = "AI-Security-Armor/0.2 threat-feed-collector"
+    threat_feed_allow_custom_endpoints: bool = False
+    threat_feed_phishtank_enabled: bool = False
+    threat_feed_phishtank_url: str = "http://data.phishtank.com/data/online-valid.csv.gz"
+    threat_feed_phishtank_app_key: str = ""
+    threat_feed_openphish_enabled: bool = False
+    threat_feed_openphish_url: str = (
+        "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt"
+    )
+    threat_feed_urlhaus_enabled: bool = False
+    threat_feed_urlhaus_url: str = (
+        "https://urlhaus-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
+    )
+    threat_feed_urlhaus_auth_key: str = ""
+    threat_feed_openphish_interval_hours: int = 12
+
+    # Candidate-only scheduled retraining. New artifacts are never promoted
+    # automatically; an administrator must review their holdout metrics first.
+    model_retrain_scheduler_enabled: bool = False
+    model_retrain_interval_hours: int = 168
+    model_retrain_dataset_path: str = "data/url_dataset.csv"
+    model_retrain_algorithms: list[str] = ["lightgbm", "random_forest", "xgboost"]
+    model_retrain_timeout_seconds: int = 7200
+
+    # Optional self-hosted MISP and Telegram bot webhook integrations.
+    misp_enabled: bool = False
+    misp_base_url: str = ""
+    misp_api_key: str = ""
+    misp_verify_tls: bool = True
+    misp_timeout_seconds: float = 8.0
+    misp_lookup_last: str = "90d"
+    telegram_bot_enabled: bool = False
+    telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
+    telegram_allowed_chat_ids: list[str] = []
+    telegram_timeout_seconds: float = 10.0
+    threat_feed_phishing_database_path: str = ".aisec-data/Phishing.Database"
+
+    # Privacy-preserving endpoint telemetry. Raw sensor identifiers are never stored.
+    telemetry_sensor_pepper: str = "dev-telemetry-pepper-change-in-production"
+    telemetry_retention_days: int = 30
+    telemetry_consensus_window_days: int = 14
+    telemetry_min_independent_sensors: int = 2
+
     database_url: str = "sqlite:///./.aisec-data/armor.db"
     database_auto_create: bool = True
     database_echo: bool = False
@@ -105,6 +186,8 @@ class Settings(BaseSettings):
             unsafe.append("MCP_ALLOW_ANONYMOUS=false")
         if self.mcp_api_key_rate_limit_per_min <= 0:
             unsafe.append("MCP_API_KEY_RATE_LIMIT_PER_MIN>0")
+        if len(self.telemetry_sensor_pepper.encode("utf-8")) < 32:
+            unsafe.append("TELEMETRY_SENSOR_PEPPER>=32 bytes")
         if unsafe:
             raise ValueError("Unsafe production configuration: " + ", ".join(unsafe))
         return self

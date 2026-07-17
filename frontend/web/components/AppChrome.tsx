@@ -10,7 +10,7 @@
 import { type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
-import { EyeScrollbar } from "@/components/PrewiseUI";
+import { PrewiseShell } from "@/components/PrewiseUI";
 
 export interface AppChromeProps {
     children: ReactNode;
@@ -19,9 +19,10 @@ export interface AppChromeProps {
 export default function AppChrome({ children }: AppChromeProps): JSX.Element {
     const pathname = usePathname();
 
-    // The landing page retains only its dedicated visual scrollbar, not legacy chrome.
+    // Keep the product work rail available from the landing page as well. The
+    // landing page still owns its header and footer inside this shared shell.
     if (pathname === "/") {
-        return <>{children}<EyeScrollbar topOffset={88} bottomOffset={20} /></>;
+        return <PrewiseShell>{children}</PrewiseShell>;
     }
 
     return <>{children}</>;

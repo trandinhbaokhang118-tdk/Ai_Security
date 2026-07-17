@@ -1,0 +1,18 @@
+/* Keep the shared product rail visible on the storytelling landing page. */
+.app-ui:has(> .app-section-content > .witness) > .skip-link {
+  display: none;
+}
+
+.app-ui:has(> .app-section-content > .witness) > .app-section-rail {
+  z-index: 90;
+}
+
+.app-ui:has(> .app-section-content > .witness) .w-nav {
+  left: 65px;
+}
+
+@media (max-width: 600px) {
+  .app-ui:has(> .app-section-content > .witness) .w-nav {
+    left: 0;
+  }
+}

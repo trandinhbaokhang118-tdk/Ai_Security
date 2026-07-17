@@ -8,8 +8,10 @@ tools = MCPTools()
 def test_tool_definitions_schema():
     names = {t["name"] for t in TOOL_DEFINITIONS}
     assert names == {
+        "prewise_connection_test",
         "assess_url",
         "assess_text",
+        "assess_tool_output",
         "scan_prompt_injection",
         "assess_action",
         "assess_page",

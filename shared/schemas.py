@@ -6,6 +6,7 @@ Imported by the backend gateway, MCP server, and AI modules. Kept dependency-fre
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -126,6 +127,28 @@ class AssessTextRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class URLTelemetryEvent(BaseModel):
+    event_id: str = Field(..., min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    sensor_id: str = Field(..., min_length=8, max_length=200)
+    url: str = Field(..., min_length=1, max_length=2048)
+    verdict: Literal["suspicious", "malicious"]
+    event_type: Literal["dns", "http", "browser", "endpoint", "sandbox"] = "endpoint"
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    observed_at: datetime
+    malware_family: str | None = Field(default=None, max_length=120)
+    tags: list[str] = Field(default_factory=list, max_length=16)
+
+
+class URLTelemetryBatchRequest(BaseModel):
+    events: list[URLTelemetryEvent] = Field(..., min_length=1, max_length=100)
+
+
+class URLTelemetryBatchResponse(BaseModel):
+    accepted: int
+    duplicates: int
+    rejected: int = 0
+
+
 class AgentContext(BaseModel):
     agent_type: Literal["chat", "browser_agent", "desktop_agent", "coding_agent", "generic"] = (
         "generic"
@@ -166,6 +189,36 @@ class ScanPromptRequest(BaseModel):
 
 
 # --------------------------------------------------------------------- responses
+class IntelligenceSourceStatus(BaseModel):
+    source: str
+    status: Literal["completed", "not_configured", "unavailable", "redacted"]
+    detail: str = ""
+
+
+class URLBasicIntelligence(BaseModel):
+    """Provenance-aware registration, DNS and public-IP facts for a URL."""
+
+    domain: str
+    ip_addresses: list[str] = Field(default_factory=list)
+    primary_ip: str | None = None
+    ip_location: str | None = None
+    city: str | None = None
+    region: str | None = None
+    country: str | None = None
+    country_code: str | None = None
+    asn: str | None = None
+    provider: str | None = None
+    registrar: str | None = None
+    registrant: str | None = None
+    registrant_phone: str | None = None
+    registered_at: str | None = None
+    expires_at: str | None = None
+    nameservers: list[str] = Field(default_factory=list)
+    mx_records: list[str] = Field(default_factory=list)
+    collected_at: str
+    sources: list[IntelligenceSourceStatus] = Field(default_factory=list)
+
+
 class AssessResponse(BaseModel):
     risk_score: float = Field(..., ge=0.0, le=1.0, description="Normalized 0..1")
     risk_level: RiskLevel
@@ -185,6 +238,7 @@ class AssessResponse(BaseModel):
     raw_score: float | None = Field(default=None, ge=0.0, le=1.0)
     final_score: float | None = Field(default=None, ge=0.0, le=1.0)
     risk_core: RiskCoreTrace | None = None
+    url_intelligence: URLBasicIntelligence | None = None
 
 
 class SandboxIssue(BaseModel):
@@ -287,6 +341,9 @@ class BrowserSandboxURLResponse(BaseModel):
     network_events: list[SandboxNetworkEvent] = Field(default_factory=list)
     browser_events: list[dict[str, Any]] = Field(default_factory=list)
     console_errors: list[str] = Field(default_factory=list)
+    visual_analysis: dict[str, Any] = Field(default_factory=dict)
+    page_identity: dict[str, Any] = Field(default_factory=dict)
+    screenshot_data_url: str | None = None
     issues: list[SandboxIssue] = Field(default_factory=list)
     scan_steps: list[SandboxScanStep] = Field(default_factory=list)
     elapsed_ms: float = 0.0

@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.config import settings
 from backend.db import get_db
-from backend.models import ApiKey, DailyQuotaUsage, PasswordResetToken, ScanEvent, SessionRecord, Subscription, User
+from backend.models import (
+    ApiKey,
+    DailyQuotaUsage,
+    PasswordResetToken,
+    ScanEvent,
+    SessionRecord,
+    Subscription,
+    User,
+)
 from backend.security_utils import (
     create_api_key_value,
     create_password_salt,
@@ -162,7 +170,7 @@ class ApiKeyRotateInput(BaseModel):
     def validate_scopes(cls, scopes: list[str]) -> list[str]:
         allowed = {
             "assess:url", "assess:content", "assess:prompt", "assess:file",
-            "assess:action", "mcp:invoke", "logs:read",
+            "assess:action", "mcp:invoke", "logs:read", "telemetry:write",
         }
         normalized = list(dict.fromkeys(scopes))
         if not normalized or any(scope not in allowed for scope in normalized):

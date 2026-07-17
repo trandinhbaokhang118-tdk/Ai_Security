@@ -5,7 +5,8 @@ Run: uvicorn backend.main:app --reload --port 8000
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,13 +14,46 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.db import initialize_database
 from backend.middleware import RateLimiterMiddleware
-from backend.routers import admin, agent_security, assess, auth, chat, demo, health, sandbox_cloud
+from backend.routers import (
+    admin,
+    agent_security,
+    assess,
+    auth,
+    chat,
+    demo,
+    health,
+    integrations,
+    sandbox_cloud,
+    telemetry,
+)
+from backend.services.model_retrain_scheduler import run_model_retrain_scheduler
+from backend.services.threat_feed_scheduler import run_threat_feed_scheduler
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
-    yield
+    feed_task = None
+    retrain_task = None
+    if settings.threat_feed_scheduler_enabled:
+        feed_task = asyncio.create_task(
+            run_threat_feed_scheduler(), name="threat-feed-scheduler"
+        )
+    if settings.model_retrain_scheduler_enabled:
+        retrain_task = asyncio.create_task(
+            run_model_retrain_scheduler(), name="model-retrain-scheduler"
+        )
+    try:
+        yield
+    finally:
+        if feed_task is not None:
+            feed_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await feed_task
+        if retrain_task is not None:
+            retrain_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await retrain_task
 
 
 app = FastAPI(
@@ -46,6 +80,8 @@ app.include_router(auth.router)
 app.include_router(sandbox_cloud.router)
 app.include_router(demo.router)
 app.include_router(admin.router)
+app.include_router(telemetry.router)
+app.include_router(integrations.router)
 
 
 @app.get("/")

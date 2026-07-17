@@ -27,5 +27,8 @@ def evaluate_overrides(
             matches.append(
                 OverrideResult(rule.rule_id, rule.floor, rule.minimum_decision, ids, rule.reason)
             )
-    matches.sort(key=lambda m: (-m.floor, m.rule_id))
+    # Prefer the strongest floor, then the most specific matching rule.  Stable
+    # name ordering remains the final tie-breaker for deterministic traces.
+    specificity = {rule.rule_id: len(rule.required_finding_types) for rule in rules}
+    matches.sort(key=lambda m: (-m.floor, -specificity.get(m.rule_id, 0), m.rule_id))
     return matches, matches[0] if matches else None

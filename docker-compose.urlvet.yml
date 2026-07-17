@@ -1,0 +1,57 @@
+name: ai-security-urlvet
+
+services:
+  urlvet:
+    build:
+      context: ./urlvet/server
+      dockerfile: ../docker/prod/go.Dockerfile
+    environment:
+      CACHE_ADDR: urlvet-valkey:6379
+      CACHE_PASSWORD: ${URLVET_CACHE_PASSWORD:?set URLVET_CACHE_PASSWORD}
+      CACHE_DB: "0"
+      ADMIN_JWT_SECRET: ${URLVET_ADMIN_JWT_SECRET:?set URLVET_ADMIN_JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      CHROME_URL: ws://urlvet-chrome:9222
+      LOG_TIMEZONE: Asia/Ho_Chi_Minh
+      PORT: "8080"
+    depends_on:
+      urlvet-valkey:
+        condition: service_healthy
+      urlvet-chrome:
+        condition: service_started
+    ports:
+      - 127.0.0.1:8080:8080
+    restart: unless-stopped
+    networks: [urlvet-private]
+
+  urlvet-chrome:
+    image: chromedp/headless-shell:latest
+    restart: unless-stopped
+    networks: [urlvet-private]
+
+  urlvet-valkey:
+    image: valkey/valkey:8.0
+    environment:
+      REDISCLI_AUTH: ${URLVET_CACHE_PASSWORD:?set URLVET_CACHE_PASSWORD}
+    command:
+      - valkey-server
+      - /usr/local/etc/valkey.conf
+      - --requirepass
+      - ${URLVET_CACHE_PASSWORD:?set URLVET_CACHE_PASSWORD}
+    volumes:
+      - urlvet-cache:/data
+      - ./urlvet/docker/prod/valkey.conf:/usr/local/etc/valkey.conf:ro
+    healthcheck:
+      test: [CMD, redis-cli, -h, localhost, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 8
+    restart: unless-stopped
+    networks: [urlvet-private]
+
+networks:
+  urlvet-private:
+    driver: bridge
+
+volumes:
+  urlvet-cache:

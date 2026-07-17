@@ -71,7 +71,11 @@ HIGH_RISK_TLDS: frozenset[str] = frozenset(
 KNOWN_BRANDS: tuple[str, ...] = (
     "paypal", "facebook", "google", "apple", "microsoft", "amazon",
     "vietcombank", "techcombank", "mbbank", "tpbank", "bidv", "agribank",
-    "netflix", "instagram",
+    "vietinbank", "vpbank", "sacombank", "hdbank", "seabank", "netflix",
+    "instagram", "shopee", "tiki", "zalo", "momo", "zalopay", "vnpost",
+    "viettelpost", "binance", "coinbase", "vneid", "dichvucong",
+    # Common short identities are matched with token boundaries by the adapters.
+    "vcb", "acb", "vib", "msb", "ocb", "ghn", "ghtk", "dhl", "fedex",
 )
 
 # --- Vietnamese urgency / social-engineering keywords ---------------------------

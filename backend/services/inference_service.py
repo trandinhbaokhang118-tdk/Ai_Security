@@ -9,19 +9,28 @@ from __future__ import annotations
 
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
+from typing import Any
 from urllib.parse import urlsplit
 
 from ai.adapters.file_adapter import analyze_file_bytes
+from ai.adapters.url_adapter import parse_url_parts
 from ai.inference.engine import InferenceEngine
+from backend.config import settings
+from backend.services.threat_feed_service import collect_local_threat_feed_evidence
+from backend.services.url_telemetry_service import collect_distributed_url_evidence
 from security.dns_intelligence import dns_intelligence_service
 from security.domain_intelligence import domain_intelligence_service
+from security.ip_intelligence import ip_intelligence_service
+from security.misp_adapter import collect_misp
 from security.policy_engine import PolicyEngine, score_to_level
 from security.risk_core import PolicyEngineV2, default_config
 from security.risk_core import assess as assess_risk_v2
 from security.risk_core.detectors import (
     ScanObservations,
     add_browser_sandbox,
+    add_cross_source_intelligence,
     add_dns_intelligence,
     add_domain_intelligence,
     add_http_sandbox,
@@ -29,6 +38,10 @@ from security.risk_core.detectors import (
     build_criteria_evidence,
 )
 from security.risk_core.external_adapters import collect_external
+from security.risk_core.url_overrides import URL_OVERRIDE_RULES
+from security.scan_history import local_scan_history
+from security.url_basic_intelligence import build_url_basic_intelligence
+from security.urlvet_adapter import collect_urlvet
 from shared.schemas import (
     AgentContext,
     AgentRiskResponse,
@@ -38,6 +51,45 @@ from shared.schemas import (
     Modality,
     RiskCoreTrace,
 )
+
+
+def _url_model_feature_context(
+    domain_intelligence: object | None,
+    dns_intelligence: object | None,
+    urlvet_evidence: list[Any],
+    local_feed_evidence: list[Any],
+) -> dict[str, object]:
+    """Build the shared dynamic feature context from completed collectors."""
+    context: dict[str, object] = {
+        "local_feed_checked": 1.0,
+        "local_feed_hit": float(bool(local_feed_evidence)),
+    }
+    if dns_intelligence is not None:
+        available = bool(getattr(dns_intelligence, "available", False))
+        addresses = tuple(getattr(dns_intelligence, "addresses", ()) or ())
+        nameservers = tuple(getattr(dns_intelligence, "nameservers", ()) or ())
+        mx_records = tuple(getattr(dns_intelligence, "mx", ()) or ())
+        context.update(
+            {
+                "dns_available": float(available),
+                "dns_resolves": float(bool(addresses)),
+                "dns_record_count": float(len(addresses) + len(nameservers) + len(mx_records)),
+            }
+        )
+    if domain_intelligence is not None:
+        age_days = getattr(domain_intelligence, "age_days", None)
+        context.update(
+            {
+                "rdap_available": float(age_days is not None),
+                "domain_age_days": float(age_days or 0),
+            }
+        )
+    for item in urlvet_evidence:
+        metadata = getattr(item, "metadata", {})
+        values = metadata.get("feature_context") if isinstance(metadata, dict) else None
+        if isinstance(values, dict):
+            context.update(values)
+    return context
 
 
 class InferenceService:
@@ -101,30 +153,138 @@ class InferenceService:
         return round(max(0.2, min(0.98, confidence)), 4)
 
     # ------------------------------------------------------------------ url
-    def assess_url(self, url: str) -> AssessResponse:
+    def assess_url(
+        self,
+        url: str,
+        *,
+        sandbox_reports: tuple[tuple[object, bool], ...] = (),
+    ) -> AssessResponse:
         t0 = time.perf_counter()
-        pred = self.engine.predict_url(url)
+        observations = ScanObservations(url)
+        urlvet_evidence = []
+        misp_evidence = []
+        domain_result = None
+        dns_result = None
+        ip_result = None
+        host = urlsplit(url if "://" in url else f"https://{url}").hostname
+        domain = parse_url_parts(url).registrable_domain if host else None
+        if domain and host:
+            with ThreadPoolExecutor(max_workers=5, thread_name_prefix="url-enrichment") as pool:
+                domain_future = pool.submit(domain_intelligence_service.inspect, domain, url)
+                dns_future = pool.submit(dns_intelligence_service.inspect, host)
+                urlvet_future = pool.submit(
+                    collect_urlvet,
+                    url,
+                    base_url=settings.urlvet_api_url,
+                    enabled=settings.urlvet_enabled,
+                    timeout=settings.urlvet_timeout_seconds,
+                )
+                misp_future = pool.submit(
+                    collect_misp,
+                    url,
+                    enabled=settings.misp_enabled,
+                    base_url=settings.misp_base_url,
+                    api_key=settings.misp_api_key,
+                    verify_tls=settings.misp_verify_tls,
+                    timeout=settings.misp_timeout_seconds,
+                    last=settings.misp_lookup_last,
+                )
+                ip_future = None
+                try:
+                    dns_result = dns_future.result()
+                    add_dns_intelligence(observations, dns_result)
+                    if dns_result.addresses:
+                        primary_address = next(
+                            (address for address in dns_result.addresses if ":" not in address),
+                            dns_result.addresses[0],
+                        )
+                        ip_future = pool.submit(
+                            ip_intelligence_service.inspect,
+                            primary_address,
+                        )
+                except Exception as exc:
+                    for criterion_id in (44, 45):
+                        observations.unavailable[criterion_id] = (
+                            f"DNS intelligence unavailable: {type(exc).__name__}"
+                        )
+                try:
+                    domain_result = domain_future.result()
+                    add_domain_intelligence(observations, domain_result)
+                except Exception as exc:
+                    for criterion_id in (1, 3, 4, 11, 12):
+                        observations.unavailable[criterion_id] = (
+                            f"Domain intelligence unavailable: {type(exc).__name__}"
+                        )
+                if ip_future is not None:
+                    try:
+                        ip_result = ip_future.result()
+                    except Exception:
+                        ip_result = None
+                urlvet_evidence = urlvet_future.result()
+                misp_evidence = misp_future.result()
+        else:
+            urlvet_evidence = collect_urlvet(
+                url,
+                base_url=settings.urlvet_api_url,
+                enabled=settings.urlvet_enabled,
+                timeout=settings.urlvet_timeout_seconds,
+            )
+            misp_evidence = collect_misp(
+                url,
+                enabled=settings.misp_enabled,
+                base_url=settings.misp_base_url,
+                api_key=settings.misp_api_key,
+                verify_tls=settings.misp_verify_tls,
+                timeout=settings.misp_timeout_seconds,
+                last=settings.misp_lookup_last,
+            )
+        local_feed_evidence = collect_local_threat_feed_evidence(url)
+        feature_context = _url_model_feature_context(
+            domain_result,
+            dns_result,
+            urlvet_evidence,
+            local_feed_evidence,
+        )
+        try:
+            pred = self.engine.predict_url(url, context=feature_context)
+        except TypeError as exc:
+            if "unexpected keyword argument 'context'" not in str(exc):
+                raise
+            pred = self.engine.predict_url(url)
         score = self._finalize_score(pred.risk_score, pred.evidence)
         decision = self.policy.evaluate_human(score)
-        response = self._build(score, decision, pred.evidence, Modality.URL, pred.model_version, t0)
-        observations = ScanObservations(url)
+        response = self._build(
+            score,
+            decision,
+            pred.evidence,
+            Modality.URL,
+            pred.model_version,
+            t0,
+        )
         add_offline_url_findings(observations, pred.evidence)
-        try:
-            domain = urlsplit(url if "://" in url else f"https://{url}").hostname
-            if domain:
-                add_domain_intelligence(
-                    observations, domain_intelligence_service.inspect(domain, url)
-                )
-                add_dns_intelligence(observations, dns_intelligence_service.inspect(domain))
-        except Exception as exc:
-            for criterion_id in (1, 3, 4, 11, 12):
-                observations.unavailable[criterion_id] = (
-                    f"Domain intelligence unavailable: {type(exc).__name__}"
-                )
+        for sandbox_report, is_browser_report in sandbox_reports:
+            detector = add_browser_sandbox if is_browser_report else add_http_sandbox
+            detector(observations, sandbox_report)
+        add_cross_source_intelligence(
+            observations,
+            domain_intelligence=domain_result,
+            dns_intelligence=dns_result,
+            ip_intelligence=ip_result,
+            sandbox_reports=sandbox_reports,
+            history_store=local_scan_history,
+        )
         config = default_config()
         v2_evidence = build_criteria_evidence(observations, config)
-        v2_evidence.extend(collect_external(url, config))
-        risk = assess_risk_v2(v2_evidence, config=config)
+        v2_evidence.extend(local_feed_evidence)
+        v2_evidence.extend(collect_external(url, config, provider_config=settings.model_dump()))
+        v2_evidence.extend(urlvet_evidence)
+        v2_evidence.extend(misp_evidence)
+        v2_evidence.extend(collect_distributed_url_evidence(url))
+        risk = assess_risk_v2(
+            v2_evidence,
+            config=config,
+            override_rules=URL_OVERRIDE_RULES,
+        )
         policy = PolicyEngineV2().decide(risk)
         trace = asdict(risk)
         trace.update(
@@ -144,6 +304,31 @@ class InferenceService:
         response.scoring_version = risk.scan_version
         response.raw_score = round(risk.base_risk_score / 100, 4)
         response.final_score = round(risk.risk_score / 100, 4)
+        # Risk Core v2 is the authoritative score. Keep the legacy top-level
+        # fields in sync so every API/UI consumer receives the same verdict.
+        response.risk_score = response.final_score
+        response.risk_level = score_to_level(response.risk_score)
+        response.confidence = round(risk.confidence_score / 100, 4)
+        response.decision = {
+            "allow": Decision.ALLOW,
+            "warn": Decision.WARN,
+            "require_review": Decision.ASK_USER_CONFIRMATION,
+            "soft_block": Decision.BLOCK,
+            "hard_block": Decision.BLOCK,
+        }[policy.decision.value]
+        scored_reasons = [
+            item.reason
+            for item in sorted(risk.criteria, key=lambda item: item.adjusted_score, reverse=True)
+            if item.adjusted_score > 0 and item.reason
+        ]
+        response.reasons = scored_reasons[:3] or risk.reasoning[:3]
+        if domain:
+            response.url_intelligence = build_url_basic_intelligence(
+                domain,
+                domain_result,
+                dns_result,
+                ip_result,
+            )
         return response
 
     def assess_sandbox_report(self, url: str, report: object, *, browser: bool = False) -> RiskCoreTrace:

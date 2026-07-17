@@ -13,8 +13,17 @@ def test_email_security_missing_controls_is_risk():
     obs = ScanObservations("https://example.test")
     add_dns_intelligence(obs, intel)
     by_id = {e.criterion_id: e for e in build_criteria_evidence(obs, default_config())}
-    assert by_id[45].status == CriterionStatus.MALICIOUS
-    assert by_id[44].status == CriterionStatus.UNAVAILABLE
+    assert by_id[45].status == CriterionStatus.SUSPICIOUS
+    assert by_id[44].status == CriterionStatus.NOT_APPLICABLE
+
+
+def test_missing_default_dkim_selector_does_not_create_false_positive():
+    intel = DNSIntelligence("example.test", ("203.0.113.1",), ("ns.example",),
+                            ("mx.example",), True, True, False, True, ())
+    obs = ScanObservations("https://example.test")
+    add_dns_intelligence(obs, intel)
+    by_id = {e.criterion_id: e for e in build_criteria_evidence(obs, default_config())}
+    assert by_id[45].status == CriterionStatus.CLEAN
 
 
 def test_no_mx_is_not_applicable_not_clean():

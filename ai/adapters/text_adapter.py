@@ -1,6 +1,6 @@
 """Text/Email Risk Adapter (module-specification.md M2).
 
-Preprocessing (HTML strip, Unicode NFC, zero-width removal) + hierarchical chunking
+Preprocessing (HTML strip, Unicode NFKC, invisible-control removal) + hierarchical chunking
 for long documents (design.md §4.2). Pure-Python; the transformer tokenizer is only
 used by the training/serving path when transformers is installed.
 """
@@ -10,7 +10,17 @@ from __future__ import annotations
 import re
 import unicodedata
 
-_ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff"), None)
+_INVISIBLE = dict.fromkeys(
+    map(
+        ord,
+        # Zero-width characters, soft hyphen and bidi controls are frequently
+        # inserted to split phishing keywords or reverse the visual order of text.
+        "\u00ad\u200b\u200c\u200d\u2060\ufeff"
+        "\u202a\u202b\u202c\u202d\u202e"
+        "\u2066\u2067\u2068\u2069",
+    ),
+    None,
+)
 _HTML_TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?。？！])\s+|\n+")
@@ -18,14 +28,29 @@ _LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": 
 
 
 def normalize_unicode(text: str) -> str:
-    """NFC normalize and strip zero-width characters (anti-obfuscation)."""
-    return unicodedata.normalize("NFC", text).translate(_ZERO_WIDTH)
+    """Compatibility-normalize text and strip invisible spoofing controls."""
+    return unicodedata.normalize("NFKC", text).translate(_INVISIBLE)
 
 
 def normalize_for_detection(text: str) -> str:
     """Normalize common leetspeak for matching while preserving displayed text."""
 
     return normalize_unicode(text).lower().translate(_LEET_TRANSLATION)
+
+
+def fold_for_detection(text: str) -> str:
+    """Return an accent-insensitive form used only by deterministic rules.
+
+    The displayed/original text is retained for evidence.  Folding is useful for
+    Vietnamese scam messages that deliberately add, remove, or mix diacritics.
+    """
+
+    normalized = normalize_for_detection(text)
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", normalized)
+        if unicodedata.category(char) != "Mn"
+    )
 
 
 def strip_html(text: str) -> str:

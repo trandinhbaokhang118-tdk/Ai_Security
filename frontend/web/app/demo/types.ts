@@ -55,6 +55,7 @@ export interface URLScoreLayer {
 
 export interface URLAnalysisResponse {
   url: string;
+  score_scale: "0..100";
   risk_score: number;
   threat_level: ThreatLevel;
   analysis_time_ms: number;
@@ -63,6 +64,8 @@ export interface URLAnalysisResponse {
   evidence: Evidence[];
   score_layers: URLScoreLayer[];
   deep_analysis_recommended: boolean;
+  warning_required: boolean;
+  auto_deep_analysis: boolean;
   sandbox_report?: SandboxReport;
 }
 

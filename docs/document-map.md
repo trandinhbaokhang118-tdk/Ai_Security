@@ -24,3 +24,6 @@ Tài liệu gốc đang nằm ở thư mục root. Bản đồ này giúp chọn
 | File | Noi dung chinh |
 |---|---|
 | `docs/postgresql-production-design.md` | Thiet ke PostgreSQL E2E production: schema, auth, quota, scan history, admin jobs, audit, deploy, backup |
+| `docs/url-phishing-detection.md` | Lõi phát hiện URL giả mạo, nguồn danh tiếng và giới hạn vận hành |
+| `docs/message-threat-detection.md` | Lõi phát hiện email/SMS, metadata, corpus hồi quy và nguồn chính thức |
+| `docs/urlvet-distributed-intelligence.md` | Tích hợp URLVet riêng, đồng thuận IOC đa máy, chống poisoning và trạng thái ✓/✕ |

@@ -48,6 +48,7 @@ class BrowserSandboxRunner:
             "LANG",
             "SSL_CERT_FILE",
             "SSL_CERT_DIR",
+            "BRAND_VISUAL_HASH_REGISTRY",
         )
         for name in keep_env:
             if value := os.environ.get(name):

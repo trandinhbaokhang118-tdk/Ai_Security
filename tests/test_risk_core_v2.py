@@ -56,3 +56,18 @@ def test_override_is_floor_not_addition():
     result = assess([ev()], override_rules=(rule,))
     assert result.risk_score == 70
     assert result.base_risk_score < result.risk_score
+
+
+def test_high_confidence_access_hazard_gets_immediate_danger_floor():
+    dangerous = replace(
+        ev(criterion=29),
+        finding_type="credential_exfiltration",
+        evidence_quality=0.9,
+    )
+    result = assess([dangerous])
+
+    assert result.base_risk_score < 60
+    assert result.risk_score == 60
+    assert result.risk_level == "dangerous"
+    assert result.effective_override is not None
+    assert result.effective_override.rule_id == "high-confidence-dangerous-criterion-v1"

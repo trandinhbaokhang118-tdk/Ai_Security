@@ -23,6 +23,8 @@ def _audit_metadata(result: AssessResponse, metadata: dict | None) -> dict:
         merged["risk_core"] = risk_core.model_dump(mode="json")
         merged["schema_version"] = result.schema_version
         merged["scoring_version"] = result.scoring_version or risk_core.scoring_version
+    if result.url_intelligence is not None:
+        merged["url_intelligence"] = result.url_intelligence.model_dump(mode="json")
     return merged
 
 

@@ -25,3 +25,33 @@ def test_multilayer_core_keeps_benign_domain_low_risk():
 
     assert result.score < 0.3
     assert result.requires_deep_analysis is False
+
+
+def test_credential_lure_score_is_monotonic():
+    two_terms = assess_url("https://example.test/login/verify")
+    three_terms = assess_url("https://example.test/login/verify/account")
+
+    assert three_terms.layer_scores["credential_intent"] >= two_terms.layer_scores[
+        "credential_intent"
+    ]
+    assert any(item.feature == "credential_lure_cluster" for item in three_terms.evidence)
+
+
+def test_disguised_executable_is_high_risk_and_requires_sandbox():
+    result = assess_url("https://files.example.test/CV-Nguyen.pdf.exe")
+
+    assert result.score >= 0.85
+    assert result.requires_deep_analysis is True
+    assert {item.feature for item in result.evidence} >= {
+        "dangerous_download",
+        "disguised_executable_download",
+    }
+
+
+def test_shared_hosting_only_scores_when_lure_context_exists():
+    benign = assess_url("https://legitimate-project.pages.dev/docs")
+    phishing = assess_url("https://microsoft-login.pages.dev/account/verify")
+
+    assert not any(item.feature == "shared_hosting_abuse_context" for item in benign.evidence)
+    assert phishing.score >= 0.85
+    assert any(item.feature == "shared_hosting_abuse_context" for item in phishing.evidence)

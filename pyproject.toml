@@ -25,6 +25,7 @@ dependencies = [
 ml = [
     "onnxscript>=0.1.0",
     "lightgbm>=4.3.0",
+    "xgboost>=2.0.0",
     "tldextract>=5.1.0",
     "shap>=0.45.0",
 ]

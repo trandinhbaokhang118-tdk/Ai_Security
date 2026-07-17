@@ -36,12 +36,14 @@ def test_url_assess_deceptive_subdomain_brand_mismatch():
     assert any(e.get("feature") == "deceptive_subdomain" for e in body["evidence"])
 
 
-def test_url_assess_e2e_benign():
-    # Demo case #2: benign
+def test_url_assess_e2e_benign_low_confidence_warns():
+    # A low risk score is not promoted to ALLOW when most deep checks have not run.
     r = client.post("/v1/assess/url", json={"url": "https://github.com"})
     assert r.status_code == 200
-    assert r.json()["risk_score"] < 0.3
-    assert r.json()["decision"] == "ALLOW"
+    body = r.json()
+    assert body["risk_score"] < 0.3
+    assert body["confidence"] < 0.4
+    assert body["decision"] == "WARN"
 
 
 def test_confidence_varies_with_risk_and_evidence():
@@ -132,8 +134,14 @@ def test_judge_demo_phishing_comparison_uses_live_detector():
     body = response.json()
     assert body["traditional_detection"]["detected"] is False
     assert body["ai_detection"]["detected"] is True
-    assert body["risk_score"] >= 0.7
+    assert body["score_scale"] == "0..100"
+    assert body["risk_score"] >= 70
     assert body["ai_detection"]["model_version"]
+    assert body["risk_core"]["schema_version"] == "2"
+    assert body["auto_deep_analysis"] is True
+    assert body["warning_required"] is True
+    assert body["access_analysis"]["performed"] is True
+    assert body["access_analysis"]["verdict"] == "dangerous"
 
 
 def test_judge_demo_prompt_injection_before_after():

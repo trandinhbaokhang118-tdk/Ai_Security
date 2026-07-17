@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PrewiseShell } from "@/components/PrewiseUI";
+import { persistResultRecord } from "@/lib/result-storage";
 
 type Mode = "url" | "email" | "sms";
 type ApiEvidence = { source: string; message: string; severity: string; feature?: string };
@@ -22,11 +23,11 @@ function AnalyzeContent() {
     if (mode !== "url") { setError("Luồng kiểm tra thật hiện đã được bật cho Website / URL. Email và SMS sẽ được kết nối ở bước tiếp theo."); return; }
     setError(""); setLoading(true); setStep(0);
     try {
-      const response = await fetch("/api/demo/url/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: value, deep_analysis: depth === "deep", advanced_analysis: depth === "deep" }) });
+      const response = await fetch("/api/demo/url/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: value, deep_analysis: depth !== "quick", advanced_analysis: depth === "deep" }) });
       const data = await response.json() as UrlResponse & { detail?: string };
       if (!response.ok) throw new Error(data.detail || "Máy chủ không thể phân tích URL này.");
-      const record = { id: crypto.randomUUID(), type: "url", content: value, score: Math.round(data.risk_score * 100), date: new Date().toISOString(), findings: data.evidence, isDemo: false, dataSource: "backend", result: data };
-      try { const old = JSON.parse(localStorage.getItem("prewise-history") || "[]"); localStorage.setItem("prewise-history", JSON.stringify([record, ...old].slice(0, 20))); localStorage.setItem(`prewise-result:${record.id}`, JSON.stringify(record)); } catch { /* Storage unavailable: result is still carried by query. */ }
+      const record = { id: crypto.randomUUID(), type: "url", content: value, score: Math.round(data.risk_score), date: new Date().toISOString(), findings: data.evidence, isDemo: false, dataSource: "backend", result: data };
+      persistResultRecord(record.id, record);
       router.push(`/result/${record.id}?score=${record.score}&type=url&demo=0`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể kết nối dịch vụ phân tích."); }
     finally { setLoading(false); }

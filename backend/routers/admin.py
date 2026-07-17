@@ -12,10 +12,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
+from backend.config import settings
 from backend.db import SessionLocal, get_db
 from backend.models import AdminJob, AdminJobEvent, ModelVersion
 from backend.routers.auth import require_admin
 from backend.security_utils import utcnow
+from backend.services.misp_sync_service import export_local_iocs_to_misp
+from backend.services.threat_feed_service import feed_status, sync_all_feeds
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -32,6 +35,44 @@ class SpecExecutionRequest(BaseModel):
 class ModelTrainingRequest(BaseModel):
     dataPath: str
     models: list[Literal["text", "prompt", "url"]] = Field(min_length=1, max_length=1)
+
+
+class ThreatFeedSyncRequest(BaseModel):
+    force: bool = False
+
+
+class MISPExportRequest(BaseModel):
+    event_id: str = Field(pattern=r"^\d{1,10}$")
+    source: Literal["", "phishtank", "openphish", "urlhaus"] = ""
+    limit: int = Field(default=100, ge=1, le=1000)
+
+
+@router.get("/threat-feeds")
+def get_threat_feed_status(db: DbSession = Depends(get_db)):
+    return {
+        "scheduler_enabled": settings.threat_feed_scheduler_enabled,
+        "scheduler_interval_minutes": settings.threat_feed_scheduler_interval_minutes,
+        "feeds": feed_status(db),
+    }
+
+
+@router.post("/threat-feeds/sync")
+async def sync_threat_feeds(request: ThreatFeedSyncRequest):
+    results = await asyncio.to_thread(sync_all_feeds, force=request.force)
+    return {"results": [result.__dict__ for result in results]}
+
+
+@router.post("/misp/export-local-iocs")
+async def export_misp_iocs(request: MISPExportRequest):
+    try:
+        return await asyncio.to_thread(
+            export_local_iocs_to_misp,
+            event_id=request.event_id,
+            source=request.source,
+            limit=request.limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _contained_file(base: Path, candidate: Path, *, suffixes: set[str]) -> Path:
@@ -300,7 +341,7 @@ async def run_model_training(job_id: str, data_path: str, models: list[str]) -> 
                 "ai/training/train_real_prompt_classifier.py",
                 ["--train", data_path, "--validation", data_path, "--test", data_path],
             ),
-            "url": ("ai/training/train_url_lgbm.py", ["--data", data_path]),
+            "url": ("ai/training/train_url_ensemble.py", ["--data", data_path]),
         }
 
         results: list[dict] = []

@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 import httpx
 
@@ -31,6 +32,18 @@ class DomainIntelligence:
     available: bool
     expiry_days: int | None = None
     certificate_age_days: int | None = None
+    expires_at: str | None = None
+    updated_at: str | None = None
+    registrant: str | None = None
+    registrant_phone: str | None = None
+    registration_nameservers: tuple[str, ...] = ()
+    registration_statuses: tuple[str, ...] = ()
+    registration_source: str = "RDAP"
+    registration_available: bool = False
+    registration_error: str | None = None
+    reputation_ips: tuple[str, ...] = ()
+    malicious_ips: tuple[str, ...] = ()
+    malicious_observations: int = 0
 
 
 class DomainIntelligenceService:
@@ -41,6 +54,8 @@ class DomainIntelligenceService:
         self.cache_ttl_seconds = cache_ttl_seconds
         self._cache: dict[tuple[str, str], tuple[float, DomainIntelligence]] = {}
         self._lock = threading.Lock()
+        self._rdap_bootstrap: tuple[float, dict[str, str]] | None = None
+        self._rdap_lock = threading.Lock()
 
     def inspect(self, domain: str, url: str) -> DomainIntelligence:
         key = (domain.lower(), url)
@@ -49,22 +64,58 @@ class DomainIntelligenceService:
             if cached and time.monotonic() - cached[0] < self.cache_ttl_seconds:
                 return cached[1]
 
-        whoisxml, whoisxml_error = self._query_whoisxml(domain)
-        whois, whois_error = (None, None) if whoisxml else self._query_ip2whois(domain)
-        rdap, rdap_error = (None, None) if (whoisxml or whois) else self._query_rdap(domain)
-        certificates, certificate_error = (None, None) if (whoisxml or whois) else self._query_certificates(domain)
-        reputation, reputation_error = self._query_reputation(domain)
+        # Registration, certificate transparency, and reputation are independent
+        # network sources. Query them concurrently so a quick scan is bounded by
+        # the slowest provider rather than the sum of all provider timeouts.
+        with ThreadPoolExecutor(max_workers=3, thread_name_prefix="domain-intel") as pool:
+            registration_future = pool.submit(self._query_registration, domain)
+            certificate_future = pool.submit(self._query_certificates, domain)
+            reputation_future = pool.submit(self._query_reputation, domain)
+            (
+                whoisxml,
+                whoisxml_error,
+                whois,
+                whois_error,
+                rdap,
+                rdap_error,
+            ) = registration_future.result()
+            certificates, certificate_error = certificate_future.result()
+            reputation, reputation_error = reputation_future.result()
         age_days, created_at = self._whoisxml_age(whoisxml)
         if age_days is None:
             age_days, created_at = self._ip2whois_age(whois)
         if age_days is None:
             age_days, created_at = self._domain_age(rdap)
-        if age_days is None:
-            age_days, created_at = self._certificate_age(certificates)
+        registration_created_at = created_at
         registrar = self._whoisxml_registrar(whoisxml) or self._ip2whois_registrar(whois) or self._registrar(rdap)
         expiry_days = self._expiry_days(whoisxml, whois, rdap)
+        expires_at = self._expiry_date(whoisxml, whois, rdap)
+        updated_at = self._updated_date(whoisxml, whois, rdap)
+        registrant = (
+            self._whoisxml_registrant(whoisxml)
+            or self._ip2whois_registrant(whois)
+            or self._rdap_entity_name(rdap, "registrant")
+        )
+        registrant_phone = (
+            self._whoisxml_registrant_phone(whoisxml)
+            or self._ip2whois_registrant_phone(whois)
+            or self._rdap_entity_phone(rdap, "registrant")
+        )
+        registration_nameservers = self._registration_nameservers(whoisxml, whois, rdap)
+        registration_statuses = tuple(
+            str(value) for value in ((rdap or {}).get("status") or []) if value
+        )
+        registration_source = (
+            "WhoisXML API" if whoisxml else "IP2WHOIS" if whois else "RDAP"
+        )
+        registration_errors = [
+            error for error in (whoisxml_error, whois_error, rdap_error) if error
+        ]
         certificate_age_days, _ = self._certificate_age(certificates)
         listed = self._reputation_listed(reputation)
+        reputation_ips = self._reputation_ips(reputation)
+        malicious_ips = self._reputation_ips(reputation, malicious_only=True)
+        malicious_observations = self._malicious_observation_count(reputation)
         reasons: list[str] = []
         score = 0.0
         if age_days is not None:
@@ -89,7 +140,7 @@ class DomainIntelligenceService:
         result = DomainIntelligence(
             domain=domain,
             age_days=age_days,
-            created_at=created_at,
+            created_at=registration_created_at,
             registrar=registrar,
             reputation_status="listed" if listed else "not_listed" if listed is False else "unavailable",
             reputation_source="urlscan.io",
@@ -99,10 +150,37 @@ class DomainIntelligenceService:
             available=bool(whoisxml or whois or rdap or certificates or reputation),
             expiry_days=expiry_days,
             certificate_age_days=certificate_age_days,
+            expires_at=expires_at,
+            updated_at=updated_at,
+            registrant=registrant,
+            registrant_phone=registrant_phone,
+            registration_nameservers=registration_nameservers,
+            registration_statuses=registration_statuses,
+            registration_source=registration_source,
+            registration_available=bool(whoisxml or whois or rdap),
+            registration_error="; ".join(registration_errors) or None,
+            reputation_ips=reputation_ips,
+            malicious_ips=malicious_ips,
+            malicious_observations=malicious_observations,
         )
         with self._lock:
             self._cache[key] = (time.monotonic(), result)
         return result
+
+    def _query_registration(
+        self, domain: str
+    ) -> tuple[
+        dict[str, Any] | None,
+        str | None,
+        dict[str, Any] | None,
+        str | None,
+        dict[str, Any] | None,
+        str | None,
+    ]:
+        whoisxml, whoisxml_error = self._query_whoisxml(domain)
+        whois, whois_error = (None, None) if whoisxml else self._query_ip2whois(domain)
+        rdap, rdap_error = (None, None) if (whoisxml or whois) else self._query_rdap(domain)
+        return whoisxml, whoisxml_error, whois, whois_error, rdap, rdap_error
 
     def _query_whoisxml(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
         if not settings.whoisxml_api_key:
@@ -115,7 +193,7 @@ class DomainIntelligenceService:
                     "apiKey": settings.whoisxml_api_key,
                     "outputFormat": "JSON",
                 },
-                timeout=max(self.timeout_seconds, 12.0),
+                timeout=self.timeout_seconds,
                 headers={"Content-Type": "application/json", "Accept": "application/json"},
             )
             if response.status_code != 200:
@@ -152,24 +230,46 @@ class DomainIntelligenceService:
         value = registry.get("registrarName") or data.get("registrarName")
         return str(value) if value else None
 
+    @classmethod
+    def _whoisxml_registrant(cls, data: dict[str, Any] | None) -> str | None:
+        if not data:
+            return None
+        registry = data.get("registryData") or {}
+        for record in (registry.get("registrant"), data.get("registrant")):
+            value = cls._contact_name(record)
+            if value:
+                return value
+        return None
+
+    @classmethod
+    def _whoisxml_registrant_phone(cls, data: dict[str, Any] | None) -> str | None:
+        if not data:
+            return None
+        registry = data.get("registryData") or {}
+        for record in (registry.get("registrant"), data.get("registrant")):
+            value = cls._contact_phone(record)
+            if value:
+                return value
+        return None
+
     def _query_ip2whois(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
         if not settings.ip2whois_api_key:
             return None, "IP2WHOIS_API_KEY chưa cấu hình"
         try:
             response = httpx.get(
                 "https://api.ip2whois.com/v2",
-                params={"key": settings.ip2whois_api_key, "domain": domain},
-                timeout=max(self.timeout_seconds, 8.0),
+                params={"key": settings.ip2whois_api_key, "domain": domain, "format": "json"},
+                timeout=self.timeout_seconds,
                 headers={"Accept": "application/json", "User-Agent": "Prewise/0.2"},
             )
-            if response.status_code != 200:
-                return None, f"IP2WHOIS HTTP {response.status_code}"
             data = response.json()
             error = data.get("error")
             if isinstance(error, dict):
                 return None, f"IP2WHOIS {error.get('error_message') or error.get('error_code') or 'unknown error'}"
             if error or data.get("error_code"):
                 return None, f"IP2WHOIS {data.get('error_message') or error or data.get('error_code')}"
+            if response.status_code != 200:
+                return None, f"IP2WHOIS HTTP {response.status_code}"
             return data, None
         except Exception as exc:
             return None, f"IP2WHOIS {type(exc).__name__}"
@@ -214,19 +314,72 @@ class DomainIntelligenceService:
             return str(registrar.get("name") or registrar.get("organization") or "") or None
         return str(registrar) if registrar else None
 
+    @classmethod
+    def _ip2whois_registrant(cls, data: dict[str, Any] | None) -> str | None:
+        if not data:
+            return None
+        return cls._contact_name(data.get("registrant"))
+
+    @classmethod
+    def _ip2whois_registrant_phone(cls, data: dict[str, Any] | None) -> str | None:
+        if not data:
+            return None
+        return cls._contact_phone(data.get("registrant"))
+
     def _query_rdap(self, domain: str) -> tuple[dict[str, Any] | None, str | None]:
         try:
+            base_url, bootstrap_error = self._rdap_base_url(domain)
+            endpoint = (
+                urljoin(base_url.rstrip("/") + "/", f"domain/{quote(domain, safe='')}")
+                if base_url
+                else f"https://rdap.org/domain/{quote(domain, safe='')}"
+            )
             response = httpx.get(
-                f"https://rdap.org/domain/{quote(domain, safe='')}",
+                endpoint,
                 timeout=self.timeout_seconds,
                 follow_redirects=True,
                 headers={"Accept": "application/rdap+json", "User-Agent": "Prewise/0.2"},
             )
             if response.status_code == 200:
                 return response.json(), None
-            return None, f"RDAP HTTP {response.status_code}"
+            suffix = f"; {bootstrap_error}" if bootstrap_error else ""
+            return None, f"RDAP HTTP {response.status_code}{suffix}"
         except Exception as exc:
             return None, f"RDAP {type(exc).__name__}"
+
+    def _rdap_base_url(self, domain: str) -> tuple[str | None, str | None]:
+        tld = domain.rstrip(".").rsplit(".", 1)[-1].lower()
+        now = time.monotonic()
+        with self._rdap_lock:
+            cached = self._rdap_bootstrap
+            if cached and now - cached[0] < 86400:
+                return cached[1].get(tld), None
+            try:
+                response = httpx.get(
+                    "https://data.iana.org/rdap/dns.json",
+                    timeout=self.timeout_seconds,
+                    headers={"Accept": "application/json", "User-Agent": "Prewise/0.2"},
+                )
+                if response.status_code != 200:
+                    return None, f"IANA bootstrap HTTP {response.status_code}"
+                data = response.json()
+                mapping: dict[str, str] = {}
+                for service in data.get("services", []):
+                    if not isinstance(service, list) or len(service) < 2:
+                        continue
+                    tlds, urls = service[0], service[1]
+                    base_url = next(
+                        (str(value) for value in urls if str(value).startswith("https://")),
+                        None,
+                    )
+                    if not base_url:
+                        continue
+                    for value in tlds:
+                        mapping[str(value).lower()] = base_url
+                self._rdap_bootstrap = (now, mapping)
+                return mapping.get(tld), None if tld in mapping else f"IANA bootstrap thiếu TLD {tld}"
+            except Exception as exc:
+                return None, f"IANA bootstrap {type(exc).__name__}"
 
     def _query_urlhaus(self, url: str) -> tuple[dict[str, Any] | None, str | None]:
         try:
@@ -247,7 +400,7 @@ class DomainIntelligenceService:
             response = httpx.get(
                 "https://crt.sh/",
                 params={"q": f"%.{domain}", "output": "json"},
-                timeout=max(self.timeout_seconds, 8.0),
+                timeout=self.timeout_seconds,
                 headers={"User-Agent": "Prewise/0.2"},
             )
             if response.status_code == 200:
@@ -261,7 +414,7 @@ class DomainIntelligenceService:
             response = httpx.get(
                 "https://urlscan.io/api/v1/search/",
                 params={"q": f"domain:{domain}", "size": 20},
-                timeout=max(self.timeout_seconds, 8.0),
+                timeout=self.timeout_seconds,
                 headers={"User-Agent": "Prewise/0.2"},
             )
             if response.status_code == 200:
@@ -294,6 +447,33 @@ class DomainIntelligenceService:
         return any(bool(item.get("verdicts", {}).get("overall", {}).get("malicious")) for item in results)
 
     @staticmethod
+    def _reputation_ips(
+        data: dict[str, Any] | None, *, malicious_only: bool = False
+    ) -> tuple[str, ...]:
+        values: set[str] = set()
+        for item in (data or {}).get("results", []):
+            if not isinstance(item, dict):
+                continue
+            if malicious_only and not bool(
+                item.get("verdicts", {}).get("overall", {}).get("malicious")
+            ):
+                continue
+            page = item.get("page") if isinstance(item.get("page"), dict) else {}
+            ip = str(page.get("ip") or "").strip()
+            if ip:
+                values.add(ip)
+        return tuple(sorted(values))
+
+    @staticmethod
+    def _malicious_observation_count(data: dict[str, Any] | None) -> int:
+        return sum(
+            1
+            for item in (data or {}).get("results", [])
+            if isinstance(item, dict)
+            and bool(item.get("verdicts", {}).get("overall", {}).get("malicious"))
+        )
+
+    @staticmethod
     def _domain_age(data: dict[str, Any] | None) -> tuple[int | None, str | None]:
         if not data:
             return None, None
@@ -310,6 +490,13 @@ class DomainIntelligenceService:
     @classmethod
     def _expiry_days(cls, whoisxml: dict[str, Any] | None,
                      whois: dict[str, Any] | None, rdap: dict[str, Any] | None) -> int | None:
+        raw = cls._expiry_date(whoisxml, whois, rdap)
+        expires = cls._parse_date(raw)
+        return (expires - datetime.now(UTC)).days if expires else None
+
+    @classmethod
+    def _expiry_date(cls, whoisxml: dict[str, Any] | None,
+                     whois: dict[str, Any] | None, rdap: dict[str, Any] | None) -> str | None:
         registry = (whoisxml or {}).get("registryData") or {}
         raw = (registry.get("expiresDateNormalized") or registry.get("expiresDate")
                or (whoisxml or {}).get("expiresDateNormalized")
@@ -320,8 +507,22 @@ class DomainIntelligenceService:
                 if event.get("eventAction") in {"expiration", "expiry", "expires"}:
                     raw = event.get("eventDate")
                     break
-        expires = cls._parse_date(raw)
-        return (expires - datetime.now(UTC)).days if expires else None
+        return str(raw) if raw else None
+
+    @classmethod
+    def _updated_date(cls, whoisxml: dict[str, Any] | None,
+                      whois: dict[str, Any] | None, rdap: dict[str, Any] | None) -> str | None:
+        registry = (whoisxml or {}).get("registryData") or {}
+        raw = (registry.get("updatedDateNormalized") or registry.get("updatedDate")
+               or (whoisxml or {}).get("updatedDateNormalized")
+               or (whoisxml or {}).get("updatedDate")
+               or (whois or {}).get("update_date") or (whois or {}).get("updated_date"))
+        if not raw and rdap:
+            for event in rdap.get("events", []):
+                if event.get("eventAction") in {"last changed", "last update of RDAP database", "updated"}:
+                    raw = event.get("eventDate")
+                    break
+        return str(raw) if raw else None
 
     @staticmethod
     def _registrar(data: dict[str, Any] | None) -> str | None:
@@ -334,6 +535,124 @@ class DomainIntelligenceService:
                 if row and row[0] == "fn" and len(row) > 3:
                     return str(row[3])
         return None
+
+    @classmethod
+    def _rdap_entity_name(cls, data: dict[str, Any] | None, role: str) -> str | None:
+        if not data:
+            return None
+        for entity in data.get("entities", []):
+            if role not in entity.get("roles", []):
+                continue
+            rows = entity.get("vcardArray", [None, []])
+            if not isinstance(rows, list) or len(rows) < 2:
+                continue
+            for field in ("org", "fn"):
+                for row in rows[1]:
+                    if row and row[0] == field and len(row) > 3:
+                        value = row[3]
+                        if isinstance(value, list):
+                            value = " ".join(str(item) for item in value if item)
+                        cleaned = cls._public_identity(value)
+                        if cleaned:
+                            return cleaned
+        return None
+
+    @classmethod
+    def _rdap_entity_phone(cls, data: dict[str, Any] | None, role: str) -> str | None:
+        if not data:
+            return None
+        for entity in data.get("entities", []):
+            if role not in entity.get("roles", []):
+                continue
+            rows = entity.get("vcardArray", [None, []])
+            if not isinstance(rows, list) or len(rows) < 2:
+                continue
+            for row in rows[1]:
+                if row and row[0] == "tel" and len(row) > 3:
+                    value = row[3]
+                    if isinstance(value, list):
+                        value = next((item for item in value if item), None)
+                    cleaned = cls._public_identity(value)
+                    if cleaned:
+                        return cleaned.removeprefix("tel:")
+        return None
+
+    @classmethod
+    def _contact_name(cls, record: object) -> str | None:
+        if isinstance(record, dict):
+            for key in ("organization", "name", "organizationName"):
+                value = cls._public_identity(record.get(key))
+                if value:
+                    return value
+        return cls._public_identity(record) if isinstance(record, str) else None
+
+    @classmethod
+    def _contact_phone(cls, record: object) -> str | None:
+        if not isinstance(record, dict):
+            return None
+        for key in ("telephone", "phone", "phoneNumber", "voice"):
+            value = cls._public_identity(record.get(key))
+            if value:
+                return value.removeprefix("tel:")
+        return None
+
+    @staticmethod
+    def _public_identity(value: object) -> str | None:
+        if not value:
+            return None
+        text = str(value).strip()
+        hidden_markers = (
+            "redacted",
+            "data protected",
+            "not disclosed",
+            "privacy service",
+            "privacy protection",
+            "gdpr masked",
+        )
+        return None if any(marker in text.lower() for marker in hidden_markers) else text
+
+    @classmethod
+    def _registration_nameservers(
+        cls,
+        whoisxml: dict[str, Any] | None,
+        whois: dict[str, Any] | None,
+        rdap: dict[str, Any] | None,
+    ) -> tuple[str, ...]:
+        registry = (whoisxml or {}).get("registryData") or {}
+        candidates = [
+            registry.get("nameServers"),
+            (whoisxml or {}).get("nameServers"),
+            (whois or {}).get("name_servers"),
+            (whois or {}).get("nameservers"),
+        ]
+        values: list[str] = []
+        for candidate in candidates:
+            values.extend(cls._nameserver_values(candidate))
+        for record in (rdap or {}).get("nameservers", []):
+            if isinstance(record, dict):
+                values.extend(
+                    cls._nameserver_values(record.get("ldhName") or record.get("unicodeName"))
+                )
+        return tuple(dict.fromkeys(value.lower().rstrip(".") for value in values if value))
+
+    @classmethod
+    def _nameserver_values(cls, value: object) -> list[str]:
+        if isinstance(value, dict):
+            for key in ("hostNames", "nameservers", "name_servers"):
+                if key in value:
+                    return cls._nameserver_values(value[key])
+            for key in ("name", "host", "hostname", "ldhName"):
+                if value.get(key):
+                    return cls._nameserver_values(value[key])
+            return []
+        if isinstance(value, (list, tuple, set)):
+            result: list[str] = []
+            for item in value:
+                result.extend(cls._nameserver_values(item))
+            return result
+        if isinstance(value, str):
+            return [part.strip() for part in value.replace(",", " ").split() if part.strip()]
+        return []
 
 
 domain_intelligence_service = DomainIntelligenceService()

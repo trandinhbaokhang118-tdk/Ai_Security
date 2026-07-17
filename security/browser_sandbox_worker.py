@@ -8,6 +8,8 @@ ever be supplied to this worker.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import secrets
@@ -30,8 +32,10 @@ if os.name == "nt" and not os.environ.get("SYSTEMROOT"):
 
 try:  # pragma: no cover - import shape differs when run as a script.
     from .sandbox_worker import _issue, _normalize_url, _public_addresses
+    from .visual_hash import analyze_visual_hash
 except ImportError:  # pragma: no cover
     from sandbox_worker import _issue, _normalize_url, _public_addresses
+    from visual_hash import analyze_visual_hash
 
 
 MAX_NETWORK_EVENTS = 160
@@ -46,6 +50,7 @@ BROWSER_SCAN_STEPS = (
     ("fill_canary", "Fill only synthetic canary values"),
     ("probe_forms", "Probe sensitive forms and block submit"),
     ("inspect_events", "Inspect network, console and canary events"),
+    ("capture_visual_hash", "Hash screenshot and compare curated brand references"),
     ("close_context", "Close temporary browser context"),
 )
 
@@ -372,6 +377,8 @@ def _failure(raw_url: str, code: str, detail: str, started: float) -> dict:
         "network_events": [],
         "browser_events": [],
         "console_errors": [],
+        "page_identity": {},
+        "screenshot_data_url": None,
         "issues": [
             _issue(code, "high", "execution", messages.get(code, messages["browser_sandbox_error"]), detail[:800])
         ],
@@ -395,6 +402,7 @@ def _issues_from_signals(
     browser_events: list[dict],
     network_events: list[dict],
     canary: dict[str, str],
+    download_events: list[dict] | None = None,
 ) -> list[dict]:
     issues: list[dict] = []
     field_types = Counter(field.get("kind", "unknown") for field in fill_report.get("fields", []))
@@ -489,6 +497,65 @@ def _issues_from_signals(
                 f"Blocked attempts: {len(blocked_websockets)}",
             )
         )
+    permission_events = [
+        event for event in browser_events if event.get("type") == "permission_request_blocked"
+    ]
+    if permission_events:
+        issues.append(
+            _issue(
+                "permission_request_blocked",
+                "high",
+                "browser",
+                "The page requested a browser capability that the sandbox denied.",
+                ", ".join(str(event.get("permission", "unknown")) for event in permission_events[:8]),
+            )
+        )
+    popup_events = [event for event in browser_events if event.get("type") == "popup_open_blocked"]
+    if popup_events:
+        issues.append(
+            _issue(
+                "deceptive_popup",
+                "high",
+                "browser",
+                "The page attempted to open a popup window without leaving the sandbox.",
+                ", ".join(str(event.get("url", "")) for event in popup_events[:5]),
+            )
+        )
+    downloads = list(download_events or [])
+    if downloads:
+        issues.append(
+            _issue(
+                "download_attempt_blocked",
+                "high",
+                "download",
+                "The page attempted to start a download; the sandbox cancelled it.",
+                ", ".join(str(event.get("filename", "")) for event in downloads[:5]),
+            )
+        )
+    ad_markers = (
+        "doubleclick.net",
+        "googlesyndication.com",
+        "adservice.google.",
+        "taboola.com",
+        "outbrain.com",
+        "propellerads.com",
+        "popads.net",
+    )
+    ad_requests = [
+        event
+        for event in network_events
+        if any(marker in str(event.get("url", "")).lower() for marker in ad_markers)
+    ]
+    if ad_requests and (popup_events or downloads):
+        issues.append(
+            _issue(
+                "malvertising_behavior",
+                "critical",
+                "browser",
+                "Advertising traffic was coupled with a popup or download attempt.",
+                f"Ad requests: {len(ad_requests)}; popups: {len(popup_events)}; downloads: {len(downloads)}",
+            )
+        )
     return issues
 
 
@@ -519,6 +586,34 @@ INIT_SCRIPT_TEMPLATE = r"""
   const record = (type, detail) => {
     events.push({ type, at_ms: now(), ...detail });
   };
+
+  window.open = function(url) {
+    record("popup_open_blocked", { url: String(url || "") });
+    return null;
+  };
+  if (typeof Notification !== "undefined") {
+    Notification.requestPermission = function() {
+      record("permission_request_blocked", { permission: "notifications" });
+      return Promise.resolve("denied");
+    };
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia = function() {
+      record("permission_request_blocked", { permission: "camera_or_microphone" });
+      return Promise.reject(new DOMException("Denied by sandbox", "NotAllowedError"));
+    };
+  }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition = function(_success, error) {
+      record("permission_request_blocked", { permission: "geolocation" });
+      if (error) error({ code: 1, message: "Denied by sandbox" });
+    };
+    navigator.geolocation.watchPosition = function(_success, error) {
+      record("permission_request_blocked", { permission: "geolocation" });
+      if (error) error({ code: 1, message: "Denied by sandbox" });
+      return 0;
+    };
+  }
 
   const originalFetch = window.fetch;
   window.fetch = function(input, init) {
@@ -744,6 +839,7 @@ def run(payload: dict) -> dict:
 
     network_events: list[dict] = []
     console_errors: list[str] = []
+    download_events: list[dict] = []
     issues: list[dict] = []
 
     def add_network_event(event: dict) -> None:
@@ -805,6 +901,18 @@ def run(payload: dict) -> dict:
         )
         web_socket.close(code=1008, reason="Blocked by browser sandbox")
 
+    def download_handler(download) -> None:
+        try:
+            download_events.append(
+                {
+                    "filename": str(download.suggested_filename or "")[:240],
+                    "url": str(download.url or "")[:1000],
+                }
+            )
+            download.cancel()
+        except Exception:
+            return
+
     try:
         with _PinnedEgressProxy() as egress_proxy:
             with tempfile.TemporaryDirectory(prefix="aisec-browser-sandbox-") as profile_dir:
@@ -824,6 +932,7 @@ def run(payload: dict) -> dict:
                         else None,
                     )
                     page.on("pageerror", lambda exc: console_errors.append(str(exc)[:500]))
+                    page.on("download", download_handler)
                     page.on(
                         "requestfailed",
                         lambda request: add_network_event(
@@ -854,6 +963,98 @@ def run(payload: dict) -> dict:
                     browser_events = page.evaluate("window.__aisecSandboxEvents || []")
                     title = page.title()[:200]
                     final_url = page.url
+                    page_identity = page.evaluate(
+                        """() => {
+                            const meta = (selector) => document.querySelector(selector)?.content?.trim() || "";
+                            const text = (document.body?.innerText || "").slice(0, 200000);
+                            const folded = text.toLowerCase();
+                            const phones = Array.from(new Set((text.match(/(?:\\+?84|0)(?:[ .-]?\\d){8,10}/g) || [])
+                                .map((value) => value.replace(/\\s+/g, " ").trim()))).slice(0, 8);
+                            const emails = Array.from(new Set((text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])
+                                .map((value) => value.toLowerCase()))).slice(0, 8);
+                            const hrefs = Array.from(document.querySelectorAll('a[href]')).map((node) => ({
+                                href: node.href || "",
+                                label: (node.innerText || node.getAttribute('aria-label') || "").trim().slice(0, 120),
+                            }));
+                            const socialHosts = ['facebook.com', 'instagram.com', 'linkedin.com', 'tiktok.com', 'youtube.com', 'x.com', 'twitter.com', 'zalo.me'];
+                            const social_links = hrefs.filter((item) => socialHosts.some((host) => item.href.toLowerCase().includes(host))).slice(0, 12);
+                            const support_links = hrefs.filter((item) => /^(mailto:|tel:)/i.test(item.href) || /contact|support|help|lien he|ho tro|hotline/i.test(item.label + ' ' + item.href)).slice(0, 12);
+                            const paymentTerms = ['bank transfer', 'wire transfer', 'crypto', 'bitcoin', 'usdt', 'gift card', 'credit card', 'debit card', 'cash on delivery', 'cod', 'chuyen khoan', 'thanh toan'];
+                            const payment_methods = paymentTerms.filter((term) => folded.includes(term));
+                            const prices = (text.match(/(?:[$€£¥]|vnd|usd|eur|đ|dong)\\s?\\d[\\d.,]*|\\d[\\d.,]*\\s?(?:vnd|usd|eur|đ|dong)/gi) || []).slice(0, 20);
+                            const recipient_hints = (text.match(/(?:account|stk|so tai khoan|wallet|vi)\\s*(?:number|no|:|-)?\\s*[A-Z0-9]{8,34}/gi) || []).slice(0, 8);
+                            const address_terms = (text.match(/(?:address|dia chi|registered office|head office)\\s*[:-]?\\s*[^\\n]{8,160}/gi) || []).slice(0, 8);
+                            const complaint_terms = ['scam', 'fraud', 'lua dao', 'khieu nai', 'complaint', 'not received', 'mat tien'].filter((term) => folded.includes(term));
+                            const reviewNodes = Array.from(document.querySelectorAll('[itemprop="review"], [itemprop="ratingValue"], .review, .reviews, .testimonial, [class*="rating" i]'));
+                            const rating_mentions = (text.match(/(?:[1-5](?:\\.\\d)?\\s*[/]\\s*5|[1-5](?:\\.\\d)?\\s*(?:stars?|sao))/gi) || []).slice(0, 30);
+                            const legal_names = [];
+                            const addresses = [...address_terms];
+                            const ratings = [];
+                            const visit = (value) => {
+                                if (!value || typeof value !== 'object') return;
+                                if (Array.isArray(value)) { value.forEach(visit); return; }
+                                const type = String(value['@type'] || '').toLowerCase();
+                                if (/organization|corporation|localbusiness|store|financialservice/.test(type)) {
+                                    const name = String(value.legalName || value.name || '').trim();
+                                    if (name) legal_names.push(name.slice(0, 200));
+                                    const address = value.address;
+                                    if (typeof address === 'string') addresses.push(address.slice(0, 240));
+                                    else if (address && typeof address === 'object') addresses.push(Object.values(address).filter((part) => typeof part === 'string').join(', ').slice(0, 240));
+                                }
+                                const rating = value.aggregateRating || value.reviewRating;
+                                if (rating && typeof rating === 'object') ratings.push({ value: rating.ratingValue || '', count: rating.reviewCount || rating.ratingCount || '' });
+                                if (Array.isArray(value['@graph'])) value['@graph'].forEach(visit);
+                            };
+                            for (const node of document.querySelectorAll('script[type="application/ld+json"]')) {
+                                try { visit(JSON.parse(node.textContent || 'null')); } catch (_) {}
+                            }
+                            const commercial = prices.length > 0 || payment_methods.length > 0 || /add to cart|buy now|checkout|mua ngay|gio hang/.test(folded);
+                            const image_hosts = Array.from(new Set(Array.from(document.images).map((image) => { try { return new URL(image.currentSrc || image.src, location.href).hostname; } catch (_) { return ''; } }).filter(Boolean))).slice(0, 20);
+                            const script_hosts = Array.from(new Set(Array.from(document.scripts).map((script) => { try { return script.src ? new URL(script.src, location.href).hostname : ''; } catch (_) { return ''; } }).filter(Boolean))).slice(0, 20);
+                            return {
+                                description: meta('meta[name="description"]'),
+                                site_name: meta('meta[property="og:site_name"]'),
+                                image_url: meta('meta[property="og:image"]'),
+                                canonical_url: document.querySelector('link[rel="canonical"]')?.href || "",
+                                language: document.documentElement.lang || "",
+                                phones,
+                                emails,
+                                forms: document.forms.length,
+                                password_fields: document.querySelectorAll('input[type="password"]').length,
+                                legal_names: Array.from(new Set(legal_names)).slice(0, 8),
+                                addresses: Array.from(new Set(addresses.filter(Boolean))).slice(0, 8),
+                                social_links,
+                                support_links,
+                                is_commercial: commercial,
+                                prices,
+                                payment_methods,
+                                payment_recipient_hints: recipient_hints,
+                                review_elements: reviewNodes.length,
+                                rating_mentions,
+                                structured_ratings: ratings.slice(0, 8),
+                                complaint_terms,
+                                image_count: document.images.length,
+                                image_hosts,
+                                script_count: document.scripts.length,
+                                script_hosts,
+                                content_sample: text.replace(/\\s+/g, ' ').trim().slice(0, 80000),
+                            };
+                        }"""
+                    )
+                    content_sample = str(page_identity.pop("content_sample", ""))
+                    page_identity["content_fingerprint"] = (
+                        hashlib.sha256(content_sample.encode("utf-8")).hexdigest()
+                        if content_sample
+                        else ""
+                    )
+                    screenshot = page.screenshot(type="jpeg", quality=55, full_page=False)
+                    screenshot_data_url = "data:image/jpeg;base64," + base64.b64encode(screenshot).decode("ascii")
+                    visual_analysis = analyze_visual_hash(
+                        screenshot,
+                        host=urlsplit(final_url).hostname or "",
+                        title=title,
+                        registry_path=os.environ.get("BRAND_VISUAL_HASH_REGISTRY"),
+                    )
                     context.close()
                 for event in egress_proxy.events:
                     if event.get("blocked"):
@@ -868,7 +1069,37 @@ def run(payload: dict) -> dict:
     browser_events = browser_events if isinstance(browser_events, list) else []
     probe_report = probe_report if isinstance(probe_report, dict) else {}
     issues.extend(_status_issue(status_code))
-    issues.extend(_issues_from_signals(fill_report, browser_events, network_events, canary))
+    issues.extend(
+        _issues_from_signals(
+            fill_report,
+            browser_events,
+            network_events,
+            canary,
+            download_events,
+        )
+    )
+    if visual_analysis.get("brand_mismatch") is True:
+        issues.append(
+            _issue(
+                "visual_brand_impersonation",
+                "critical",
+                "credential",
+                "The page visually matches a curated brand reference on an unofficial domain.",
+                (
+                    f"Brand={visual_analysis.get('matched_brand')}; "
+                    f"similarity={visual_analysis.get('similarity')}"
+                ),
+            )
+        )
+        issues.append(
+            _issue(
+                "forged_brand_image",
+                "high",
+                "visual",
+                "A rendered page image matches a curated brand reference on an unofficial domain.",
+                f"Brand={visual_analysis.get('matched_brand')}; similarity={visual_analysis.get('similarity')}",
+            )
+        )
     canary_blocked = any(event.get("reason") == "canary_payload_blocked" for event in network_events)
     scripted_canary = _event_contains_canary(browser_events, canary)
     blocked_forms = [
@@ -912,6 +1143,9 @@ def run(payload: dict) -> dict:
         "network_events": network_events,
         "browser_events": browser_events[:80],
         "console_errors": console_errors[:20],
+        "visual_analysis": visual_analysis,
+        "page_identity": page_identity,
+        "screenshot_data_url": screenshot_data_url,
         "issues": issues,
         "scan_steps": _scan_steps(issues=issues),
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),

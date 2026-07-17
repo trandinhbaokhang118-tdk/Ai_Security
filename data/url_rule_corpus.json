@@ -1,0 +1,97 @@
+{
+  "schema_version": "1",
+  "purpose": "Synthetic, non-live regression corpus for the deterministic URL threat core",
+  "notes": [
+    "These examples encode threat patterns from the supplied Hudson Rock and CyRadar documents; they are not vendor-labelled ground truth.",
+    "Reserved .test/.example domains are used so the suite never visits a malicious website.",
+    "Provider no-hit results are not represented as benign labels."
+  ],
+  "cases": [
+    {
+      "id": "benign_known_domain",
+      "url": "https://github.com/openai",
+      "expected": "benign",
+      "max_score": 0.29
+    },
+    {
+      "id": "benign_shared_hosting",
+      "url": "https://legitimate-project.pages.dev/docs",
+      "expected": "benign",
+      "max_score": 0.29,
+      "forbidden_features": ["shared_hosting_abuse_context"]
+    },
+    {
+      "id": "credential_lure_cluster",
+      "url": "https://example.test/login/verify/account",
+      "expected": "review",
+      "min_score": 0.30,
+      "required_features": ["credential_lure_cluster"]
+    },
+    {
+      "id": "fake_invoice_archive",
+      "url": "https://files.example.test/invoice.pdf.zip",
+      "expected": "review",
+      "min_score": 0.20,
+      "required_features": ["archive_download_lure"]
+    },
+    {
+      "id": "fake_cv_double_extension",
+      "url": "https://files.example.test/CV-Nguyen.pdf.exe",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": ["dangerous_download", "disguised_executable_download"]
+    },
+    {
+      "id": "brand_lure_on_shared_hosting",
+      "url": "https://microsoft-login.pages.dev/account/verify",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": ["brand_domain_mismatch", "credential_lure_cluster", "shared_hosting_abuse_context"]
+    },
+    {
+      "id": "brand_homoglyph_short_lure",
+      "url": "http://paypa1-verify.tk/login",
+      "expected": "high_risk",
+      "min_score": 0.78,
+      "required_features": ["homoglyph", "risky_tld", "suspicious_keywords"]
+    },
+    {
+      "id": "deceptive_brand_subdomain",
+      "url": "https://facebook.com.security-login-check.xyz/verify?otp=1",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": ["brand_domain_mismatch", "deceptive_subdomain", "credential_theft_intent"]
+    },
+    {
+      "id": "vietnamese_bank_alias_login_lure",
+      "url": "https://vcb-dangnhap.test",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": [
+        "brand_domain_mismatch",
+        "suspicious_keywords",
+        "brand_credential_lure_combination"
+      ]
+    },
+    {
+      "id": "brand_typo_with_appended_lure",
+      "url": "https://viettcombank-login.test/verify",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": [
+        "brand_typosquatting",
+        "brand_credential_lure_combination"
+      ]
+    },
+    {
+      "id": "defanged_delivery_brand_lure",
+      "url": "hxxps://vnpost[.]redelivery-login.test/thanhtoan",
+      "expected": "malicious",
+      "min_score": 0.85,
+      "required_features": [
+        "brand_domain_mismatch",
+        "brand_credential_lure_combination"
+      ]
+    }
+  ]
+}

@@ -31,7 +31,7 @@ def main() -> None:  # pragma: no cover - offline training job
     from sklearn.metrics import classification_report, f1_score
     from sklearn.model_selection import train_test_split
 
-    from ai.adapters.url_adapter import FEATURE_NAMES, extract_url_features
+    from ai.adapters.url_adapter import FEATURE_NAMES, extract_enriched_url_features
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True, help="CSV with columns url,label")
@@ -44,7 +44,12 @@ def main() -> None:  # pragma: no cover - offline training job
     with open(args.data, encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             try:
-                X.append(extract_url_features(row["url"]))
+                context = {
+                    name: row[name]
+                    for name in FEATURE_NAMES
+                    if name in row and row[name] not in {None, ""}
+                }
+                X.append(extract_enriched_url_features(row["url"], context=context))
                 y.append(int(row["label"]))
             except (ValueError, KeyError):
                 skipped_rows += 1

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from .confidence import compute_confidence
-from .config import RiskConfig, default_config
+from .config import DANGEROUS_CRITERION_IDS, RiskConfig, default_config
 from .evidence import resolve_evidence
 from .overrides import OverrideRule, evaluate_overrides
 from .scoring import score_external, score_internal
-from .types import EvidenceV2, RiskResultV2
+from .types import CriterionStatus, EvidenceV2, OverrideResult, RiskResultV2
 
 
 def _level(score: float) -> str:
@@ -35,6 +35,36 @@ def assess(
     external, awards = score_external(resolved, cfg, {e.evidence_id for e in internal_items})
     base = min(100.0, internal + external)
     overrides, effective = evaluate_overrides(resolved, override_rules)
+    dangerous = sorted(
+        (
+            item
+            for item in criteria
+            if item.criterion_id in DANGEROUS_CRITERION_IDS
+            and item.status == CriterionStatus.MALICIOUS
+            and item.evidence_quality >= 0.75
+            and item.adjusted_score > 0
+        ),
+        key=lambda item: item.criterion_id,
+    )
+    if dangerous:
+        immediate = OverrideResult(
+            rule_id="high-confidence-dangerous-criterion-v1",
+            floor=60.0,
+            minimum_decision="soft_block",
+            matched_evidence_ids=tuple(
+                sorted({evidence_id for item in dangerous for evidence_id in item.evidence_ids})
+            ),
+            reason=(
+                "At least one high-confidence access-hazard criterion was malicious: "
+                + ", ".join(str(item.criterion_id) for item in dangerous)
+                + "."
+            ),
+        )
+        overrides.append(immediate)
+        overrides.sort(
+            key=lambda item: (-item.floor, -len(item.matched_evidence_ids), item.rule_id)
+        )
+        effective = overrides[0]
     score = max(base, effective.floor if effective else 0.0)
     confidence = compute_confidence(criteria, resolved)
     band = "high" if confidence.score >= 70 else "medium" if confidence.score >= 40 else "low"

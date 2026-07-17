@@ -16,6 +16,7 @@ htmlcov/
 .codex-run/
 .aisec-data/
 .omni/
+.tools/
 
 # Trained model artifacts (produced by ai/training/*, not source)
 *.onnx

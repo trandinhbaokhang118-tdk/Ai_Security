@@ -215,6 +215,94 @@ class ScanEvidence(Base):
     scan_event: Mapped[ScanEvent] = relationship(back_populates="evidence")
 
 
+class URLTelemetryObservation(Base):
+    """Minimal IOC observation; raw machine identifiers and system logs are excluded."""
+
+    __tablename__ = "url_telemetry_observations"
+    __table_args__ = (
+        UniqueConstraint("sensor_hash", "event_id", name="uq_url_telemetry_sensor_event"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    event_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    sensor_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    api_key_id: Mapped[str | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"))
+    exact_url_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    campaign_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    registrable_domain: Mapped[str] = mapped_column(String(253), index=True, nullable=False)
+    verdict: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    malware_family: Mapped[str | None] = mapped_column(String(120))
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    observed_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class ThreatFeedIndicator(Base):
+    """Normalized public threat-feed IOC used for local, privacy-preserving lookups."""
+
+    __tablename__ = "threat_feed_indicators"
+    __table_args__ = (
+        UniqueConstraint("source", "exact_url_key", name="uq_threat_feed_source_url"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    source: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(String(160), index=True)
+    indicator_type: Mapped[str] = mapped_column(String(24), default="url", nullable=False)
+    normalized_value: Mapped[str] = mapped_column(Text, nullable=False)
+    exact_url_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    campaign_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    registrable_domain: Mapped[str] = mapped_column(String(253), index=True, nullable=False)
+    verdict: Mapped[str] = mapped_column(String(24), default="malicious", nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.9, nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    extra_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    first_seen_at: Mapped[object] = mapped_column(DateTime, nullable=False)
+    last_seen_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ThreatFeedSyncState(Base):
+    """ETag, scheduling, and audit state for one configured feed."""
+
+    __tablename__ = "threat_feed_sync_state"
+
+    source: Mapped[str] = mapped_column(String(32), primary_key=True)
+    endpoint: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="never", nullable=False)
+    etag: Mapped[str | None] = mapped_column(String(255))
+    last_modified: Mapped[str | None] = mapped_column(String(255))
+    last_attempt_at: Mapped[object | None] = mapped_column(DateTime)
+    last_success_at: Mapped[object | None] = mapped_column(DateTime, index=True)
+    next_allowed_at: Mapped[object | None] = mapped_column(DateTime, index=True)
+    records_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    records_upserted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class TelegramUpdateReceipt(Base):
+    """Webhook replay protection without storing Telegram message contents."""
+
+    __tablename__ = "telegram_update_receipts"
+
+    update_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    chat_id_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="processing", nullable=False)
+    received_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    completed_at: Mapped[object | None] = mapped_column(DateTime)
+
+
 class PaymentOrder(Base):
     __tablename__ = "payment_orders"
 

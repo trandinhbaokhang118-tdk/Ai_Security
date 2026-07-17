@@ -44,6 +44,8 @@ from backend.demo.models import (
     TrainingStageResult,
     URLAnalysisRequest,
     URLAnalysisResponse,
+    URLAccessAnalysis,
+    URLDangerousCriterion,
     URLScoreLayer,
 )
 from backend.demo.sandbox import sandbox_runner
@@ -51,6 +53,7 @@ from backend.demo.simulator import attack_simulator
 from backend.demo.websocket import connection_manager
 from backend.dependencies import get_deepfake_service, get_inference_service
 from security.domain_intelligence import domain_intelligence_service
+from security.risk_core.config import DANGEROUS_CRITERION_IDS
 from security.url_risk_core import assess_url as assess_url_risk
 
 # Router setup with prefix and tags
@@ -65,6 +68,92 @@ inference_service = get_inference_service()
 # ============================================================================
 
 
+def _dangerous_criteria(trace) -> list[URLDangerousCriterion]:
+    if trace is None:
+        return []
+    output: list[URLDangerousCriterion] = []
+    for item in trace.criteria:
+        criterion_id = int(item.get("criterion_id", 0) or 0)
+        if (
+            criterion_id not in DANGEROUS_CRITERION_IDS
+            or item.get("status") != "malicious"
+            or float(item.get("evidence_quality", 0) or 0) < 0.75
+            or float(item.get("adjusted_score", 0) or 0) <= 0
+        ):
+            continue
+        output.append(
+            URLDangerousCriterion(
+                criterion_id=criterion_id,
+                name=str(item.get("name") or f"Tiêu chí {criterion_id}"),
+                contribution=round(float(item.get("adjusted_score", 0) or 0), 2),
+                max_weight=round(float(item.get("max_weight", 0) or 0), 2),
+                reason=str(item.get("reason") or "Phát hiện nguy hiểm có độ tin cậy cao."),
+            )
+        )
+    return sorted(output, key=lambda item: (-item.contribution, item.criterion_id))
+
+
+def _build_access_analysis(
+    original_url: str,
+    sandbox_report,
+    dangerous: list[URLDangerousCriterion],
+    final_score: float,
+) -> URLAccessAnalysis:
+    performed = sandbox_report is not None
+    effects: list[str] = []
+    final_url = original_url
+    if sandbox_report is not None:
+        if sandbox_report.redirects:
+            final_redirect = sandbox_report.redirects[-1]
+            final_url = str(final_redirect.get("to_url") or final_url)
+            effects.append(
+                f"Quan sát {len(sandbox_report.redirects)} lần chuyển hướng; đích cuối: {final_url}."
+            )
+        for behavior in sandbox_report.behaviors[:8]:
+            if behavior.get("category") != "execution":
+                effects.append(str(behavior.get("message") or behavior.get("code") or ""))
+        if sandbox_report.scripts_executed:
+            effects.append(f"Trang nạp {len(sandbox_report.scripts_executed)} script được quan sát.")
+        if sandbox_report.network_calls:
+            effects.append(f"Trang tạo {len(sandbox_report.network_calls)} yêu cầu mạng.")
+        if sandbox_report.dom_modifications:
+            effects.append(f"Trang tạo {len(sandbox_report.dom_modifications)} thay đổi DOM.")
+        if sandbox_report.error:
+            effects.append(f"Giới hạn sandbox: {sandbox_report.error}")
+        if not effects:
+            effects.append("Không quan sát thấy hành vi bất thường trong lần truy cập cô lập này.")
+
+    causes = [f"{item.name}: {item.reason}" for item in dangerous[:6]]
+    if dangerous or final_score >= 60:
+        verdict = "dangerous"
+        warning = (
+            "NGUY HIỂM — nên cân nhắc và không truy cập trực tiếp. "
+            "Không nhập mật khẩu, OTP, thông tin thẻ hoặc tải tệp từ URL này."
+        )
+    elif not performed:
+        verdict = "caution" if final_score >= 20 else "safe"
+        warning = "Chưa mở URL trong sandbox; kết quả hiện dựa trên cấu trúc và nguồn đối chứng."
+    elif sandbox_report.error and not sandbox_report.behaviors:
+        verdict = "unavailable"
+        warning = "Không thể hoàn tất mô phỏng truy cập; hãy giữ trạng thái thận trọng."
+    elif final_score >= 20 or sandbox_report.behaviors:
+        verdict = "caution"
+        warning = "Có tín hiệu cần cân nhắc trước khi truy cập URL."
+    else:
+        verdict = "safe"
+        warning = "Chưa quan sát thấy hành vi nguy hiểm trong lần truy cập cô lập này."
+
+    return URLAccessAnalysis(
+        performed=performed,
+        analysis_mode=sandbox_report.analysis_mode if sandbox_report else "not_run",
+        verdict=verdict,
+        warning=warning,
+        causes=causes,
+        observed_effects=effects,
+        final_url=final_url,
+    )
+
+
 @router.post("/url/analyze")
 async def analyze_url(request: URLAnalysisRequest) -> URLAnalysisResponse:
     """Analyze a URL for malicious behavior.
@@ -77,60 +166,125 @@ async def analyze_url(request: URLAnalysisRequest) -> URLAnalysisResponse:
     # Validate URL
     _validate_url(request.url)
 
-    # The engine combines offline ML with deterministic identity, intent and evasion rules.
-    engine = inference_service.engine
-    result = engine.predict_url(request.url)
-    core = assess_url_risk(request.url, model_score=result.risk_score)
-    final_score = core.score
-    run_sandbox = request.deep_analysis or request.advanced_analysis
+    core = assess_url_risk(request.url)
+    requested_sandbox = request.deep_analysis or request.advanced_analysis
+    offline_danger = core.score >= 0.40 and any(
+        item.severity.value == "critical" and float(item.contribution or 0) >= 0.20
+        for item in core.evidence
+    )
+    auto_deep_analysis = not requested_sandbox and offline_danger
+    run_sandbox = requested_sandbox or auto_deep_analysis
+    sandbox_report = None
+    sandbox_sources: tuple[tuple[object, bool], ...] = ()
+    if run_sandbox:
+        sandbox_report, sandbox_sources = await sandbox_runner.analyze_url_detailed(
+            request.url,
+            prefer_browser=request.advanced_analysis or auto_deep_analysis,
+        )
+
+    # Run one authoritative weighted assessment after all requested observations
+    # have been collected. This prevents L3 evidence from becoming a separate,
+    # incomparable score layered on top of Risk Core.
+    production = await asyncio.to_thread(
+        inference_service.assess_url,
+        request.url,
+        sandbox_reports=sandbox_sources,
+    )
+    dangerous_criteria = _dangerous_criteria(production.risk_core)
+    initial_final_score = (
+        float(production.risk_core.final_score)
+        if production.risk_core is not None
+        else float(production.risk_score) * 100
+    )
+    # A provider-only dangerous finding may appear after the first assessment.
+    # In quick mode, automatically investigate it and rescore with sandbox evidence.
+    if (dangerous_criteria or initial_final_score >= 60) and not run_sandbox:
+        auto_deep_analysis = True
+        run_sandbox = True
+        sandbox_report, sandbox_sources = await sandbox_runner.analyze_url_detailed(
+            request.url,
+            prefer_browser=True,
+        )
+        production = await asyncio.to_thread(
+            inference_service.assess_url,
+            request.url,
+            sandbox_reports=sandbox_sources,
+        )
+        dangerous_criteria = _dangerous_criteria(production.risk_core)
+    final_score = round(
+        float(production.risk_core.final_score)
+        if production.risk_core is not None
+        else float(production.risk_score) * 100,
+        2,
+    )
     signals = analyze_url_signals(request.url)
     intelligence = await asyncio.to_thread(
         domain_intelligence_service.inspect,
         signals.parts.registrable_domain,
         request.url,
     )
-    final_score = min(1.0, final_score + intelligence.score)
     evidence_by_feature = {item.feature: item for item in core.evidence if item.feature}
     l1_details = _build_l1_details(signals, evidence_by_feature, intelligence)
     l2_details = _build_l2_details(signals, evidence_by_feature)
     layers = [
-        URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=min(1.0, core.layer_scores["lexical_identity"] + intelligence.score), status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, tuổi domain và danh tiếng URLhaus.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "brand_typosquatting", "punycode_domain", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence) + int(intelligence.score > 0), details=l1_details),
-        URLScoreLayer(layer="L2 · Ý đồ đánh cắp & né tránh", score=max(core.layer_scores["credential_intent"], core.layer_scores["evasion"]), status="completed", summary="Phát hiện lure OTP/mật khẩu/thanh toán, URL mã hóa và tham số bất thường.", signals=sum(item.feature in {"credential_theft_intent", "credential_lure_cluster", "nested_url_redirect", "redirect_parameter", "at_symbol", "url_obfuscation", "excessive_query_parameters", "high_entropy_domain", "embedded_credentials", "nonstandard_port"} for item in core.evidence), details=l2_details),
-        URLScoreLayer(layer="L3 · Sandbox trình duyệt cô lập", score=0.0, status="skipped" if not run_sandbox else "unavailable", summary="Chạy theo yêu cầu: canary tổng hợp, chặn submit/exfiltration, giám sát redirect và network."),
+        URLScoreLayer(layer="L1 · Nhận diện URL & giả mạo thương hiệu", score=round(min(100.0, (core.layer_scores["lexical_identity"] + intelligence.score) * 100), 2), status="completed", summary="Phân tích tên miền thật, thương hiệu, HTTPS, tuổi domain và danh tiếng URLhaus.", signals=sum(item.feature in {"brand_domain_mismatch", "deceptive_subdomain", "homoglyph", "brand_typosquatting", "punycode_domain", "ip_host", "risky_tld", "no_https", "is_shortlink"} for item in core.evidence) + int(intelligence.score > 0), details=l1_details),
+        URLScoreLayer(layer="L2 · Ý đồ đánh cắp & né tránh", score=round(max(core.layer_scores["credential_intent"], core.layer_scores["evasion"]) * 100, 2), status="completed", summary="Phát hiện lure OTP/mật khẩu/thanh toán, URL mã hóa và tham số bất thường.", signals=sum(item.feature in {"credential_theft_intent", "credential_lure_cluster", "nested_url_redirect", "redirect_parameter", "at_symbol", "url_obfuscation", "excessive_query_parameters", "high_entropy_domain", "embedded_credentials", "nonstandard_port"} for item in core.evidence), details=l2_details),
+        URLScoreLayer(layer="L3 · Sandbox nội dung cô lập", score=0.0, status="skipped" if not run_sandbox else "unavailable", summary="Cân bằng quét HTTP/HTML; Chuyên sâu chạy thêm browser để quan sát redirect, script, network và DOM."),
     ]
+    warning_required = bool(dangerous_criteria) or final_score >= 60
+    access_analysis = _build_access_analysis(
+        request.url,
+        sandbox_report,
+        dangerous_criteria,
+        final_score,
+    )
     response = URLAnalysisResponse(
         url=request.url, risk_score=final_score, threat_level=_map_risk_to_threat_level(final_score),
         analysis_time_ms=int((time.time() - start_time) * 1000),
         traditional_detection=TraditionalDetection(detected=False, methods=[]),
-        ai_detection=AIDetection(detected=final_score >= 0.5, confidence=final_score, model_version=result.model_version),
-        evidence=[item.model_dump() for item in core.evidence], score_layers=layers,
-        deep_analysis_recommended=core.requires_deep_analysis, sandbox_report=None,
+        ai_detection=AIDetection(detected=warning_required, confidence=production.confidence, model_version=production.model_version),
+        evidence=[
+            {
+                **item.model_dump(),
+                "contribution": round(float(item.contribution or 0) * 100, 2),
+            }
+            for item in core.evidence
+        ],
+        score_layers=layers,
+        deep_analysis_recommended=core.requires_deep_analysis or warning_required,
+        warning_required=warning_required,
+        auto_deep_analysis=auto_deep_analysis,
+        dangerous_criteria=dangerous_criteria,
+        access_analysis=access_analysis,
+        sandbox_report=sandbox_report,
+        risk_core=production.risk_core,
+        url_intelligence=production.url_intelligence,
     )
     if run_sandbox:
-        sandbox_report = await sandbox_runner.analyze_url(request.url)
-        response.sandbox_report = sandbox_report
-        sandbox_score = min(1.0, sum({"critical": 0.30, "high": 0.18, "medium": 0.10, "low": 0.04}.get(item.get("severity"), 0.0) for item in sandbox_report.behaviors))
-        layers[-1] = URLScoreLayer(
-            layer="L3 · Sandbox trình duyệt cô lập",
+        assert sandbox_report is not None
+        risk_behaviors = [
+            item for item in sandbox_report.behaviors if item.get("category") != "execution"
+        ]
+        sandbox_score = min(100.0, sum({"critical": 30.0, "high": 18.0, "medium": 10.0, "low": 4.0}.get(item.get("severity"), 0.0) for item in risk_behaviors))
+        l3_layer = URLScoreLayer(
+            layer="L3 · Sandbox nội dung cô lập",
             score=sandbox_score,
             status="completed" if not sandbox_report.error else "unavailable",
             summary="Quan sát live trong sandbox cô lập; khi browser engine chưa sẵn sàng, dùng HTTP sandbox an toàn để kiểm tra redirect, HTML, form và security headers.",
-            signals=len(sandbox_report.behaviors),
+            signals=len(risk_behaviors),
             details=[
                 {
                     "criterion": behavior.get("code", "sandbox_signal"),
                     "value": behavior.get("category", "sandbox"),
                     "triggered": True,
-                    "contribution": {"critical": 0.30, "high": 0.18, "medium": 0.10, "low": 0.04}.get(behavior.get("severity"), 0.0),
+                    "contribution": {"critical": 30.0, "high": 18.0, "medium": 10.0, "low": 4.0}.get(behavior.get("severity"), 0.0),
                     "reason": behavior.get("message", "Sandbox phát hiện tín hiệu cần xem xét."),
                 }
-                for behavior in sandbox_report.behaviors
+                for behavior in risk_behaviors
             ],
         )
-        response.risk_score = max(response.risk_score, sandbox_score)
-        response.threat_level = _map_risk_to_threat_level(response.risk_score)
-        response.ai_detection.detected = response.risk_score >= 0.5
-        response.ai_detection.confidence = response.risk_score
+        layers[-1] = l3_layer
+        response.score_layers[-1] = l3_layer
         response.analysis_time_ms = int((time.time() - start_time) * 1000)
     return response
 
@@ -138,7 +292,7 @@ async def analyze_url(request: URLAnalysisRequest) -> URLAnalysisResponse:
 def _detail(
     criterion: str, value: str, evidence: object | None, fallback: str
 ) -> dict:
-    contribution = float(getattr(evidence, "contribution", 0.0) or 0.0)
+    contribution = round(float(getattr(evidence, "contribution", 0.0) or 0.0) * 100, 2)
     return {
         "criterion": criterion,
         "value": value,
@@ -165,7 +319,7 @@ def _build_l1_details(signals, evidence_by_feature: dict[str, object], intellige
                 else "Không thể truy vấn RDAP/URLhaus"
             ),
             "triggered": intelligence.score > 0,
-            "contribution": intelligence.score,
+            "contribution": round(intelligence.score * 100, 2),
             "reason": " ".join(intelligence.reasons),
         },
     ]
@@ -201,14 +355,14 @@ def _validate_url(url: str) -> None:
 
 
 def _map_risk_to_threat_level(risk_score: float) -> str:
-    """Map risk score [0-1] to threat level category."""
-    if risk_score < 0.2:
+    """Map the shared risk score [0..100] to a threat level category."""
+    if risk_score < 20:
         return "safe"
-    elif risk_score < 0.4:
+    elif risk_score < 40:
         return "low"
-    elif risk_score < 0.6:
+    elif risk_score < 60:
         return "medium"
-    elif risk_score < 0.8:
+    elif risk_score < 80:
         return "high"
     else:
         return "critical"

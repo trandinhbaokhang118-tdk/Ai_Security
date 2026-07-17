@@ -97,6 +97,10 @@ class CriterionResult:
     adjusted_score: float = 0.0
     evidence_ids: list[str] = field(default_factory=list)
     incident_key: str = ""
+    name: str = ""
+    reason: str = ""
+    applicable: bool = True
+    checked: bool = False
 
 
 @dataclass(frozen=True)
@@ -145,7 +149,7 @@ class RiskResultV2:
     conflicts: list[dict[str, Any]]
     rules_version: str
     weights_version: str
-    scan_version: str = "risk-core-64-v2.0.0"
+    scan_version: str = "risk-core-url-v2.2.0"
     calibrated_probability: float | None = None
     mitigations: list[dict[str, Any]] = field(default_factory=list)
     unavailable_checks: list[int] = field(default_factory=list)
