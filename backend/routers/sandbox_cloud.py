@@ -96,7 +96,7 @@ def verify_sepay_webhook_hmac(
         return False
     expected = "sha256=" + hmac.new(
         secret.encode("utf-8"),
-        f"{signed_timestamp}.".encode("utf-8") + raw_body,
+        f"{signed_timestamp}.".encode() + raw_body,
         hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(signature.strip(), expected)
@@ -449,7 +449,14 @@ def free_browser_navigate(payload: FreeNavigateInput, session_id: str, auth: Cur
 @router.post("/sessions/{session_id}/browser/click")
 def free_browser_click(payload: FreeClickInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
     require_free_session(db, session_id, auth.user.id)
-    return free_web_sandbox.click(session_id, payload.x, payload.y)
+    try:
+        return free_web_sandbox.click(session_id, payload.x, payload.y)
+    except TimeoutError as exc:
+        raise HTTPException(410, "Phiên Free Sandbox đã hết hạn") from exc
+    except KeyError as exc:
+        raise HTTPException(409, "Trình duyệt Sandbox vừa được khởi động lại; hãy tải lại phiên") from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Không thực hiện được thao tác click: {exc}") from exc
 
 
 @router.post("/sessions/{session_id}/browser/key")
@@ -459,12 +466,27 @@ def free_browser_key(payload: FreeKeyInput, session_id: str, auth: CurrentSessio
         return free_web_sandbox.key(session_id, payload.key)
     except ValueError as exc:
         raise HTTPException(400, "Phím không được phép") from exc
+    except TimeoutError as exc:
+        raise HTTPException(410, "Phiên Free Sandbox đã hết hạn") from exc
+    except KeyError as exc:
+        raise HTTPException(409, "Trình duyệt Sandbox vừa được khởi động lại; hãy tải lại phiên") from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Không gửi được phím vào Sandbox: {exc}") from exc
 
 
 @router.post("/sessions/{session_id}/browser/type")
 def free_browser_type(payload: FreeTypeInput, session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
     require_free_session(db, session_id, auth.user.id)
-    return free_web_sandbox.type_text(session_id, payload.text)
+    try:
+        return free_web_sandbox.type_text(session_id, payload.text)
+    except ValueError as exc:
+        raise HTTPException(400, "Dữ liệu nhập không hợp lệ") from exc
+    except TimeoutError as exc:
+        raise HTTPException(410, "Phiên Free Sandbox đã hết hạn") from exc
+    except KeyError as exc:
+        raise HTTPException(409, "Trình duyệt Sandbox vừa được khởi động lại; hãy tải lại phiên") from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Không điền được canary vào website: {exc}") from exc
 
 
 @router.get("/sessions/{session_id}")
