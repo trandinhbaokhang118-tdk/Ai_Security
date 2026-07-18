@@ -6,6 +6,8 @@ from security.risk_core import (
     default_config,
     mark_context_applicability,
 )
+from security.risk_core.detectors import add_offline_url_findings
+from security.url_risk_core import assess_url
 
 
 def test_structured_registry_can_activate_every_adapter_driven_criterion():
@@ -76,3 +78,17 @@ def test_applicability_requires_explicit_context_evidence():
     for cid in (20, 21, 22, 23, 24, 25, 45, 47):
         assert by_id[cid].status == CriterionStatus.NOT_APPLICABLE
         assert by_id[cid].applicability_evidence_ids
+
+
+def test_new_offline_download_and_hosting_signals_reach_v2_criteria():
+    url = "https://microsoft-login.pages.dev/account/verify/CV.pdf.exe"
+    obs = ScanObservations(url)
+    add_offline_url_findings(obs, assess_url(url).evidence)
+    evidence = build_criteria_evidence(obs, default_config())
+    active = {
+        item.criterion_id
+        for item in evidence
+        if item.status in {CriterionStatus.SUSPICIOUS, CriterionStatus.MALICIOUS}
+    }
+
+    assert {5, 15, 29, 34}.issubset(active)

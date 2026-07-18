@@ -125,19 +125,29 @@ def add_offline_url_findings(obs: ScanObservations, legacy_evidence: list[Any]) 
         "brand_domain_mismatch": 5,
         "brand_typosquatting": 5,
         "deceptive_subdomain": 7,
+        "excessive_subdomains": 7,
         "no_https": 8,
+        "risky_tld": 12,
+        "shared_hosting_abuse_context": 15,
         "is_shortlink": 17,
         "redirect_parameter": 18,
         "nested_url_redirect": 16,
+        "ip_host": 18,
+        "long_url": 18,
         "credential_theft_intent": 29,
         "credential_lure_cluster": 29,
+        "brand_credential_lure_combination": 29,
+        "suspicious_keywords": 29,
+        "dangerous_download": 34,
+        "disguised_executable_download": 34,
+        "archive_download_lure": 34,
         "url_obfuscation": 18,
         "at_symbol": 18,
         "embedded_credentials": 18,
         "nonstandard_port": 18,
         "excessive_query_parameters": 18,
     }
-    checked = {5, 6, 7, 8, 16, 17, 18, 29}
+    checked = {5, 6, 7, 8, 12, 15, 16, 17, 18, 29, 34}
     obs.clean(*checked)
     severity = {"critical": 1.0, "high": 0.85, "medium": 0.6, "low": 0.35, "info": 0.0}
     for item in legacy_evidence:

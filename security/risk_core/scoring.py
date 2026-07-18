@@ -34,6 +34,15 @@ _MATCH = {
 _VERDICT = {ProviderVerdict.MALICIOUS: 1.0, ProviderVerdict.SUSPICIOUS: 0.5}
 
 
+def _reason(items: list[EvidenceV2], fallback: str) -> str:
+    summaries: list[str] = []
+    for item in items:
+        value = str(item.metadata.get("summary", "")).strip()
+        if value and value not in summaries:
+            summaries.append(value)
+    return "; ".join(summaries[:3]) or fallback
+
+
 def score_internal(
     evidence: list[EvidenceV2], config: RiskConfig
 ) -> tuple[float, list[CriterionResult], list[EvidenceV2]]:
@@ -51,6 +60,9 @@ def score_internal(
                     CriterionStatus.NOT_CHECKED,
                     cfg.max_weight,
                     cfg.coverage_weight,
+                    name=cfg.name,
+                    reason="Required observation was not collected in this scan mode.",
+                    checked=False,
                 )
             )
             continue
@@ -78,6 +90,15 @@ def score_internal(
                     cfg.max_weight,
                     cfg.coverage_weight,
                     evidence_ids=[e.evidence_id for e in group],
+                    name=cfg.name,
+                    reason=_reason(group, "Check completed without a risk finding."),
+                    applicable=status != CriterionStatus.NOT_APPLICABLE,
+                    checked=status
+                    in {
+                        CriterionStatus.CLEAN,
+                        CriterionStatus.SUSPICIOUS,
+                        CriterionStatus.MALICIOUS,
+                    },
                 )
             )
             continue
@@ -100,6 +121,10 @@ def score_internal(
                 score,
                 [e.evidence_id for e in group],
                 best.incident_key,
+                cfg.name,
+                _reason([best], best.finding_type),
+                True,
+                True,
             )
         )
     # Apply caps only to findings sharing the same incident and correlation family.

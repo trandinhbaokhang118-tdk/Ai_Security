@@ -7,10 +7,10 @@ unified contract response.
 
 from __future__ import annotations
 
-import time
-import uuid
 import hashlib
 import threading
+import time
+import uuid
 from dataclasses import asdict
 from urllib.parse import urlsplit
 
@@ -31,6 +31,7 @@ from security.risk_core.detectors import (
     build_criteria_evidence,
 )
 from security.risk_core.external_adapters import collect_external
+from security.risk_core.url_overrides import URL_OVERRIDE_RULES
 from shared.schemas import (
     AgentContext,
     AgentRiskResponse,
@@ -133,7 +134,11 @@ class InferenceService:
         config = default_config()
         v2_evidence = build_criteria_evidence(observations, config)
         v2_evidence.extend(collect_external(url, config))
-        risk = assess_risk_v2(v2_evidence, config=config)
+        risk = assess_risk_v2(
+            v2_evidence,
+            config=config,
+            override_rules=URL_OVERRIDE_RULES,
+        )
         policy = PolicyEngineV2().decide(risk)
         trace = asdict(risk)
         trace.update(
@@ -153,6 +158,28 @@ class InferenceService:
         response.scoring_version = risk.scan_version
         response.raw_score = round(risk.base_risk_score / 100, 4)
         response.final_score = round(risk.risk_score / 100, 4)
+        # Risk Core V2 is authoritative. Keep legacy response fields synchronized
+        # so API and frontend consumers cannot display a weaker, conflicting verdict.
+        response.risk_score = response.final_score
+        response.risk_level = score_to_level(response.risk_score)
+        response.confidence = round(risk.confidence_score / 100, 4)
+        response.decision = {
+            "allow": Decision.ALLOW,
+            "warn": Decision.WARN,
+            "require_review": Decision.ASK_USER_CONFIRMATION,
+            "soft_block": Decision.BLOCK,
+            "hard_block": Decision.BLOCK,
+        }[policy.decision.value]
+        scored_reasons = [
+            item.reason
+            for item in sorted(
+                risk.criteria,
+                key=lambda item: item.adjusted_score,
+                reverse=True,
+            )
+            if item.adjusted_score > 0 and item.reason
+        ]
+        response.reasons = scored_reasons[:3] or risk.reasoning[:3]
         self._store_result(cache_key, response)
         return response
 

@@ -21,6 +21,7 @@ from backend.services.quota_service import reserve_scan_quota
 from backend.services.scan_log_service import log_assessment
 from security.browser_sandbox import BrowserSandboxRunner
 from security.exe_sandbox import ExeSandboxRunner
+from security.risk_core import default_config
 from security.url_sandbox import URLSandboxRunner
 from shared.schemas import (
     AgentRiskResponse,
@@ -39,12 +40,18 @@ router = APIRouter(prefix="/v1/assess", tags=["assess"])
 sandbox_runner = URLSandboxRunner()
 browser_sandbox_runner = BrowserSandboxRunner()
 exe_sandbox_runner = ExeSandboxRunner()
+_URL_CACHE_VERSION = default_config().rules_version
+
+
+def _url_cache_key(url: str) -> str:
+    return f"url:{input_sha256(_URL_CACHE_VERSION + chr(10) + url)}"
+
 
 
 def _cached_url_result(db: DbSession, url: str) -> AssessResponse | None:
     if not settings.shared_assessment_cache_enabled:
         return None
-    key = f"url:{input_sha256(url)}"
+    key = _url_cache_key(url)
     cached = db.get(AssessmentCache, key)
     if cached is None or cached.expires_at <= utcnow():
         return None
@@ -56,7 +63,7 @@ def _cached_url_result(db: DbSession, url: str) -> AssessResponse | None:
 def _store_url_result(db: DbSession, url: str, result: AssessResponse) -> None:
     if not settings.shared_assessment_cache_enabled:
         return
-    key = f"url:{input_sha256(url)}"
+    key = _url_cache_key(url)
     cached = db.get(AssessmentCache, key)
     if cached is None:
         cached = AssessmentCache(cache_key=key, modality="url", response={"risk_score": 0}, expires_at=utcnow())

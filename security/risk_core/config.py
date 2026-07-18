@@ -121,6 +121,14 @@ _STRONG = {5, 6, 7, 16, 18, 19, 28, 32, 46}
 _REPUTATION = {1, 2, 4, 8, 9, 10, 11, 12, 13, 15, 17, 36, 42, 43, 44, 45, 48, 49}
 _BUSINESS = {3, 20, 21, 22, 23, 24, 25, 27, 31, 33, 41, 47}
 
+# A high-confidence malicious finding in one of these criteria represents an
+# immediate access hazard (credential theft, impersonation, malicious redirect,
+# payload delivery or active browser abuse). It receives a deterministic danger
+# floor even when only one scanner has completed so users are warned promptly.
+DANGEROUS_CRITERION_IDS = frozenset(
+    {5, 6, 7, 10, 11, 13, 16, 19, 29, 30, 31, 32, 34, 35, 36, 37, 38, 40, 48}
+)
+
 
 @dataclass(frozen=True)
 class CriterionConfig:
@@ -146,7 +154,7 @@ class RiskConfig:
     family_caps: dict[str, float]
     internal_cap: float = 80.0
     external_cap: float = 20.0
-    rules_version: str = "risk-rules-v2"
+    rules_version: str = "risk-rules-v2.2"
     weights_version: str = "risk-weights-v2"
     normalization_version: str = "url-normalization-v2"
 
@@ -198,7 +206,7 @@ _SOURCE_ROWS = (
     (58, "NCSC", 2.5, "phishing_malware"),
     (59, "ScamVN", 1.5, "phishing_malware"),
     (60, "IP Quality Score", 2, "infrastructure_ip"),
-    (61, "Google Web Risk", 4, "phishing_malware"),
+    (61, "Google Safe Browsing", 4, "phishing_malware"),
     (62, "Bfore", 1, "infrastructure_ip"),
     (63, "APIVoid", 2, "infrastructure_ip"),
     (64, "PhishDestroy", 1, "phishing_malware"),

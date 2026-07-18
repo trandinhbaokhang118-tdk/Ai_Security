@@ -7,11 +7,8 @@ high-impact targets.
 """
 from __future__ import annotations
 
-import html
-import re
-import unicodedata
 from dataclasses import dataclass
-from urllib.parse import parse_qsl, unquote, unquote_plus, urlparse
+from urllib.parse import parse_qsl, unquote, urlparse
 
 from ai.adapters.url_adapter import (
     URLSignals,
@@ -41,68 +38,6 @@ def _e(message: str, severity: Severity, feature: str, contribution: float) -> E
     )
 
 
-def _canonical_component(value: str, rounds: int = 3) -> str:
-    """Build a bounded, non-executing view for detecting encoded URL payloads."""
-    current = unicodedata.normalize("NFKC", value)
-    for _ in range(rounds):
-        decoded = html.unescape(unquote_plus(current))
-        decoded = unicodedata.normalize("NFKC", decoded)
-        if decoded == current:
-            break
-        current = decoded
-    return current.lower()
-
-
-_XSS_PATTERNS = (
-    re.compile(r"<\s*/?\s*script\b", re.I),
-    re.compile(r"<[^>]+\bon(?:error|load|click|focus|mouseover)\s*=", re.I),
-    re.compile(r"(?:javascript|vbscript)\s*:", re.I),
-    re.compile(r"\b(?:document\.cookie|window\.location)\b", re.I),
-)
-_SQLI_PATTERNS = (
-    re.compile(r"\bunion\s+(?:all\s+)?select\b", re.I),
-    re.compile(r"(?:'|%27)?\s*or\s+[\w'\"]+\s*=\s*[\w'\"]+", re.I),
-    re.compile(r"\b(?:sleep|benchmark)\s*\(", re.I),
-    re.compile(r"\binformation_schema\b", re.I),
-)
-_COMMAND_PATTERNS = (
-    re.compile(r"(?:;|&&|\|\|)\s*(?:cmd|powershell|pwsh|bash|sh|curl|wget|nc)\b", re.I),
-    re.compile(r"\$\([^)]*(?:curl|wget|cat|whoami|id)\b", re.I),
-)
-
-
-def _injection_findings(parsed) -> list[tuple[str, str]]:
-    """Return (category, location) for strong executable payload signatures."""
-    components: list[tuple[str, str]] = [
-        ("path", parsed.path or ""),
-        ("fragment", parsed.fragment or ""),
-    ]
-    query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
-    for name, value in query_pairs:
-        label = f"query parameter {name[:80]}" if name else "query parameter"
-        components.append((label, value))
-    # Also scan the whole raw query to catch malformed separators that parse_qsl
-    # intentionally leaves opaque.
-    if parsed.query and not query_pairs:
-        components.append(("query string", parsed.query))
-
-    findings: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for location, raw in components:
-        value = _canonical_component(raw)
-        category = None
-        if any(pattern.search(value) for pattern in _XSS_PATTERNS):
-            category = "xss_probe"
-        elif any(pattern.search(value) for pattern in _SQLI_PATTERNS):
-            category = "sqli_probe"
-        elif any(pattern.search(value) for pattern in _COMMAND_PATTERNS):
-            category = "command_injection_probe"
-        if category and (category, location) not in seen:
-            seen.add((category, location))
-            findings.append((category, location))
-    return findings
-
-
 def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
     """Score URL evidence in layers 0--2 without fetching an untrusted site.
 
@@ -120,7 +55,6 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
     lexical = 0.0
     intent = 0.0
     evasion = 0.0
-    injection = 0.0
 
     # Layer 0: parsing and protocol abuse. These indicators are especially valuable
     # because they do not depend on reputation feeds or a live fetch.
@@ -179,6 +113,22 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         lexical += 0.10
         evidence.append(_e("Shortlink che giấu đích đến; cần mở rộng redirect trong sandbox.",
                            Severity.MEDIUM, "is_shortlink", 0.10))
+    if signals.long_url:
+        evasion += 0.05
+        evidence.append(_e(
+            "URL dài bất thường; cần kiểm tra phần đích và tham số đã được che khuất.",
+            Severity.LOW,
+            "long_url",
+            0.05,
+        ))
+    if signals.excessive_dots:
+        evasion += 0.06
+        evidence.append(_e(
+            "Hostname có nhiều lớp subdomain, có thể làm người dùng đọc nhầm tên miền đăng ký.",
+            Severity.LOW,
+            "excessive_subdomains",
+            0.06,
+        ))
 
     # Layer 2: credential theft intent and URL obfuscation/evasion.
     # Decode repeatedly (bounded) so percent-encoding cannot hide another URL or
@@ -204,10 +154,67 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         intent += min(0.26, 0.09 * len(matched_sensitive))
         evidence.append(_e("URL nhắm tới dữ liệu nhạy cảm: " + ", ".join(sorted(matched_sensitive)) + ".",
                            Severity.HIGH, "credential_theft_intent", intent))
-    if len(signals.suspicious_keywords) >= 3:
-        intent += 0.10
-        evidence.append(_e("Nhiều từ khóa xác minh/đăng nhập xuất hiện đồng thời.",
-                           Severity.HIGH, "credential_lure_cluster", 0.10))
+    if signals.suspicious_keywords:
+        # Keep this monotonic: three coordinated lure terms must never contribute
+        # less risk than one or two. Cap at three to avoid unlimited accumulation.
+        keyword_contribution = 0.12 * min(len(signals.suspicious_keywords), 3)
+        intent += keyword_contribution
+        evidence.append(_e(
+            "URL chứa cụm từ dụ xác thực/đăng nhập: "
+            + ", ".join(sorted(signals.suspicious_keywords)),
+            Severity.HIGH if len(signals.suspicious_keywords) >= 3 else Severity.MEDIUM,
+            "credential_lure_cluster" if len(signals.suspicious_keywords) >= 3 else "suspicious_keywords",
+            keyword_contribution,
+        ))
+    if signals.suspicious_keywords and (
+        signals.brand_mismatch or (0.0 < brand_distance <= 0.25)
+    ):
+        intent += 0.38
+        evidence.append(_e(
+            "Tên miền giả/gần giống thương hiệu được kết hợp với lời dụ đăng nhập, "
+            "xác minh hoặc thanh toán.",
+            Severity.CRITICAL,
+            "brand_credential_lure_combination",
+            0.38,
+        ))
+    if signals.dangerous_download:
+        intent += 0.14
+        evidence.append(_e(
+            "URL trỏ trực tiếp tới loại tệp có thể thực thi; không tải hoặc chạy ngoài sandbox.",
+            Severity.HIGH,
+            "dangerous_download",
+            0.14,
+        ))
+    if signals.disguised_download:
+        evasion += 0.72
+        evidence.append(_e(
+            "Tên tệp dùng đuôi tài liệu giả trước đuôi thực thi (ví dụ PDF.EXE), phù hợp mẫu phát tán mã độc ngụy trang.",
+            Severity.CRITICAL,
+            "disguised_executable_download",
+            0.72,
+        ))
+    if signals.archive_lure:
+        intent += 0.22
+        evidence.append(_e(
+            "Tệp nén gắn với ngữ cảnh CV/hóa đơn/tài liệu hoặc dùng đuôi kép; cần phân tích trong sandbox.",
+            Severity.HIGH,
+            "archive_download_lure",
+            0.22,
+        ))
+    shared_hosting_abuse = signals.shared_hosting and (
+        signals.brand_mismatch
+        or len(signals.suspicious_keywords) >= 2
+        or signals.dangerous_download
+        or signals.archive_lure
+    )
+    if shared_hosting_abuse:
+        evasion += 0.16
+        evidence.append(_e(
+            "Hosting dùng chung đi kèm dấu hiệu mạo danh/dụ tải; nền tảng không bị coi là độc nếu đứng riêng.",
+            Severity.HIGH,
+            "shared_hosting_abuse_context",
+            0.16,
+        ))
     if signals.at_symbol:
         evasion += 0.22
         evidence.append(_e("Ký tự @ có thể làm người dùng hiểu sai đích thực của URL.",
@@ -216,24 +223,6 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         evasion += 0.12
         evidence.append(_e("URL bị mã hóa hoặc phân mảnh bất thường để né kiểm tra trực quan.",
                            Severity.MEDIUM, "url_obfuscation", 0.12))
-
-    # URL parameters are untrusted input. Detect strong payload signatures after
-    # bounded percent/HTML/Unicode canonicalization without claiming the remote
-    # website is vulnerable or executing any content.
-    injection_findings = _injection_findings(parsed)
-    for category, location in injection_findings:
-        if category == "xss_probe":
-            message = (
-                f"{location} giải mã thành payload thăm dò XSS/JavaScript. "
-                "Điều này không tự chứng minh website có lỗ hổng, nhưng URL không an toàn để mở trong phiên đăng nhập."
-            )
-        elif category == "sqli_probe":
-            message = f"{location} chứa mẫu thăm dò SQL injection sau khi chuẩn hóa."
-        else:
-            message = f"{location} chứa mẫu thăm dò command injection sau khi chuẩn hóa."
-        contribution = 0.78 if category == "xss_probe" else 0.72
-        injection = max(injection, contribution)
-        evidence.append(_e(message, Severity.CRITICAL, category, contribution))
     if signals.query_param_count >= 5 or len(query_pairs) >= 7:
         evasion += 0.08
         evidence.append(_e("URL chứa số lượng tham số truy vấn bất thường.",
@@ -244,7 +233,7 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         evidence.append(_e("Nhãn tên miền dài, entropy cao; có thể là tên miền sinh tự động.",
                            Severity.MEDIUM, "high_entropy_domain", 0.10))
 
-    rule_score = _clip(lexical + intent + evasion + injection)
+    rule_score = _clip(lexical + intent + evasion)
     model_value = _clip(float(model_score or 0.0))
     # Không để một dự đoán ML không có bằng chứng hiển thị được tự đẩy URL lên
     # mức cao: điều đó tạo mâu thuẫn giữa tổng điểm và checklist L1/L2. Khi model
@@ -256,8 +245,15 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         # ML augments the deterministic score but cannot reduce a strong rule verdict.
         score = _clip(max(rule_score, model_value, (rule_score * 0.75) + (model_value * 0.25)))
     uncertain = 0.30 <= score < 0.70
-    high_impact = bool(matched_sensitive or signals.shortlink or signals.brand_mismatch or injection_findings)
-    requires_deep = bool(injection_findings) or uncertain or signals.shortlink or (high_impact and score >= 0.45)
+    high_impact = bool(
+        matched_sensitive
+        or signals.shortlink
+        or signals.brand_mismatch
+        or signals.dangerous_download
+        or signals.archive_lure
+        or shared_hosting_abuse
+    )
+    requires_deep = uncertain or signals.shortlink or (high_impact and score >= 0.45)
     if uncorroborated_model:
         evidence.append(_e(
             "Model nhận thấy mẫu cần xem xét nhưng chưa có tín hiệu URL xác thực; không nâng lên mức rủi ro cao nếu chưa chạy sandbox hoặc đối chiếu danh tiếng.",
@@ -272,6 +268,5 @@ def assess_url(url: str, model_score: float | None = None) -> URLRiskAssessment:
         evidence.append(_e("Không phát hiện tín hiệu rủi ro rõ rệt ở lớp phân tích ngoại tuyến.",
                            Severity.INFO, "no_offline_signal", 0.0))
     return URLRiskAssessment(score, evidence, requires_deep, {
-        "lexical_identity": _clip(lexical), "credential_intent": _clip(intent),
-        "evasion": _clip(evasion), "injection": _clip(injection),
+        "lexical_identity": _clip(lexical), "credential_intent": _clip(intent), "evasion": _clip(evasion),
     })

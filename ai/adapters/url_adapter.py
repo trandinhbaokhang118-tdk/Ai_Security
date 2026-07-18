@@ -10,11 +10,44 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, parse_qsl, unquote, urlparse
 
 from shared.constants import HIGH_RISK_TLDS, KNOWN_BRANDS
 
 SHORTLINK_DOMAINS = {"bit.ly", "tinyurl.com", "goo.gl", "t.co", "ow.ly", "is.gd", "buff.ly"}
+
+# Shared hosting is not malicious by itself.  Attackers do, however, abuse these
+# services to make a brand-looking subdomain appear trustworthy.  The risk core
+# only scores this signal when a credential lure, impersonation, or disguised
+# download is present as well.
+SHARED_HOSTING_SUFFIXES = {
+    "workers.dev",
+    "pages.dev",
+    "web.app",
+    "firebaseapp.com",
+    "vercel.app",
+    "netlify.app",
+    "github.io",
+    "gitlab.io",
+    "azurewebsites.net",
+    "onrender.com",
+    "ngrok-free.app",
+    "trycloudflare.com",
+}
+
+DANGEROUS_DOWNLOAD_EXTENSIONS = {
+    "apk", "bat", "cmd", "com", "dll", "dmg", "exe", "hta", "img", "iso",
+    "jar", "js", "jse", "lnk", "msi", "pkg", "ps1", "scr", "vbe", "vbs", "wsf",
+}
+ARCHIVE_EXTENSIONS = {"7z", "gz", "rar", "tar", "zip"}
+DOCUMENT_EXTENSIONS = {
+    "csv", "doc", "docx", "jpeg", "jpg", "pdf", "png", "ppt", "pptx", "rtf",
+    "txt", "xls", "xlsx",
+}
+DOWNLOAD_LURE_TERMS = {
+    "cv", "delivery", "document", "hoadon", "hoso", "invoice", "order", "quotation",
+    "receipt", "report", "resume", "shipment", "ungvien",
+}
 SUSPICIOUS_KEYWORDS = (
     "login",
     "verify",
@@ -39,6 +72,20 @@ SUSPICIOUS_KEYWORDS = (
     "billing",
     "card",
     "cccd",
+    "dangnhap",
+    "dang-nhap",
+    "xacminh",
+    "xac-minh",
+    "taikhoan",
+    "tai-khoan",
+    "thanhtoan",
+    "thanh-toan",
+    "mokhoa",
+    "mo-khoa",
+    "giaohang",
+    "giao-hang",
+    "redelivery",
+    "toll",
 )
 
 MULTI_PART_PUBLIC_SUFFIXES = {
@@ -74,22 +121,127 @@ BRAND_CANONICAL_DOMAINS: dict[str, tuple[str, ...]] = {
     "tpbank": ("tpbank.com.vn", "tpb.vn"),
     "bidv": ("bidv.com.vn",),
     "agribank": ("agribank.com.vn",),
+    "vietinbank": ("vietinbank.vn",),
+    "vpbank": ("vpbank.com.vn",),
+    "sacombank": ("sacombank.com.vn",),
+    "hdbank": ("hdbank.com.vn",),
+    "seabank": ("seabank.com.vn",),
     "netflix": ("netflix.com",),
     "instagram": ("instagram.com",),
     "shopee": ("shopee.vn", "shopee.com"),
     "tiki": ("tiki.vn",),
     "zalo": ("zalo.me", "zalo.vn"),
+    "momo": ("momo.vn",),
+    "zalopay": ("zalopay.vn",),
+    "vnpost": ("vnpost.vn",),
+    "viettelpost": ("viettelpost.com.vn",),
+    "binance": ("binance.com",),
+    "coinbase": ("coinbase.com",),
+    "vneid": ("vneid.gov.vn",),
+    "dichvucong": ("dichvucong.gov.vn",),
+    "vcb": ("vietcombank.com.vn",),
+    "acb": ("acb.com.vn",),
+    "vib": ("vib.com.vn",),
+    "msb": ("msb.com.vn",),
+    "ocb": ("ocb.com.vn",),
+    "ghn": ("ghn.vn",),
+    "ghtk": ("ghtk.vn",),
+    "dhl": ("dhl.com",),
+    "fedex": ("fedex.com",),
 }
 
 # Digits commonly substituted for letters in homoglyph attacks.
 _HOMOGLYPH_DIGITS = "013457"
 
-FEATURE_NAMES = (
+LEGACY_FEATURE_NAMES = (
     "url_length", "domain_entropy", "subdomain_depth", "tld_risk_score",
     "has_ip_address", "special_char_ratio", "path_depth", "query_param_count",
     "has_https", "homoglyph_score", "is_shortlink", "digit_ratio",
     "vowel_consonant_ratio", "url_path_entropy", "has_suspicious_keywords",
 )
+
+STATIC_FEATURE_NAMES = LEGACY_FEATURE_NAMES + (
+    "host_length",
+    "registrable_domain_length",
+    "path_length",
+    "query_length",
+    "fragment_length",
+    "url_entropy",
+    "host_entropy",
+    "query_entropy",
+    "hyphen_count",
+    "dot_count",
+    "slash_count",
+    "at_count",
+    "percent_count",
+    "equals_count",
+    "ampersand_count",
+    "underscore_count",
+    "digit_count",
+    "letter_count",
+    "non_ascii_count",
+    "punycode_label_count",
+    "subdomain_label_count",
+    "max_label_length",
+    "average_label_length",
+    "suspicious_keyword_count",
+    "brand_mention_count",
+    "brand_mismatch",
+    "brand_in_subdomain",
+    "deceptive_subdomain",
+    "excessive_dots",
+    "many_delimiters",
+    "percent_encoded",
+    "has_at_symbol",
+    "has_nonstandard_port",
+    "embedded_credentials",
+    "nested_url_count",
+    "redirect_param_count",
+    "dangerous_file_extension",
+    "disguised_download",
+    "archive_lure",
+    "shared_hosting",
+    "max_repeated_character_run",
+    "max_consecutive_digit_run",
+    "hex_token_count",
+    "base64_like_token_count",
+    "path_token_count",
+    "query_key_count",
+    "duplicate_query_key_count",
+    "parameter_value_entropy",
+    "scheme_is_http",
+    "scheme_was_missing",
+)
+
+CONTEXT_FEATURE_NAMES = (
+    "dns_available",
+    "dns_resolves",
+    "dns_record_count",
+    "rdap_available",
+    "domain_age_days_normalized",
+    "tls_available",
+    "tls_present",
+    "tls_hostname_match",
+    "tls_days_remaining_normalized",
+    "redirect_available",
+    "redirect_count_normalized",
+    "cross_domain_redirect_count",
+    "final_domain_changed",
+    "dom_available",
+    "login_form_present",
+    "password_form_present",
+    "external_form_present",
+    "hidden_iframe_present",
+    "script_count_normalized",
+    "visual_hash_available",
+    "visual_brand_similarity",
+    "local_feed_checked",
+    "local_feed_hit",
+)
+
+# Context values have explicit availability flags, so an unavailable collector is
+# never confused with a verified clean result.
+FEATURE_NAMES = STATIC_FEATURE_NAMES + CONTEXT_FEATURE_NAMES
 
 
 @dataclass(frozen=True)
@@ -123,6 +275,10 @@ class URLSignals:
     path_depth: int
     query_param_count: int
     delimiter_count: int
+    shared_hosting: bool
+    dangerous_download: bool
+    disguised_download: bool
+    archive_lure: bool
 
 
 def shannon_entropy(s: str) -> float:
@@ -154,7 +310,21 @@ def min_brand_distance(domain: str) -> float:
     if not domain:
         return 1.0
     brands = tuple(dict.fromkeys((*KNOWN_BRANDS, *BRAND_CANONICAL_DOMAINS.keys())))
-    dists = [levenshtein(domain, b) / max(len(domain), len(b)) for b in brands]
+    # Compare both the full label and hyphen/underscore-delimited tokens.  Without
+    # this, a typo such as ``viettcombank-login`` looks far away from
+    # ``vietcombank`` merely because the attacker appended a lure word.
+    candidates = tuple(
+        dict.fromkeys(
+            candidate
+            for candidate in (domain, *re.split(r"[-_]+", domain))
+            if candidate
+        )
+    )
+    dists = [
+        levenshtein(candidate, brand) / max(len(candidate), len(brand))
+        for candidate in candidates
+        for brand in brands
+    ]
     return min(dists)
 
 
@@ -166,6 +336,11 @@ def _registered_domain(host: str) -> str:
 def _normalize_for_urlparse(url: str) -> str:
     """Normalize URL for urlparse, handling edge cases."""
     url = url.strip()
+    # Analysts and users often paste defanged indicators.  Refang only the URL
+    # syntax for offline parsing; this function never performs a network request.
+    url = re.sub(r"^hxxps://", "https://", url, flags=re.I)
+    url = re.sub(r"^hxxp://", "http://", url, flags=re.I)
+    url = re.sub(r"\[(?:\.|dot)\]|\((?:\.|dot)\)|\{(?:\.|dot)\}", ".", url, flags=re.I)
     # Handle IPv6 URLs by ensuring they're properly formatted
     if '[' in url and ']' in url:
         # Already has IPv6 brackets
@@ -280,7 +455,15 @@ def _brand_names() -> tuple[str, ...]:
 
 
 def _brand_mentions(text: str) -> tuple[str, ...]:
-    return tuple(brand for brand in _brand_names() if brand in text)
+    mentions = []
+    for brand in _brand_names():
+        if len(brand) <= 4:
+            matched = re.search(rf"(?:^|[.\-_]){re.escape(brand)}(?:$|[.\-_])", text)
+        else:
+            matched = brand in text
+        if matched:
+            mentions.append(brand)
+    return tuple(mentions)
 
 
 def _brand_domain_allowed(brand: str, host: str, registrable_domain: str) -> bool:
@@ -317,6 +500,21 @@ def analyze_url_signals(url: str) -> URLSignals:
                for label in subdomain_labels)
     ) and brand_mismatch
     keywords = tuple(k for k in SUSPICIOUS_KEYWORDS if k in decoded_url)
+    decoded_path = unquote(path).lower()
+    filename = decoded_path.rsplit("/", 1)[-1]
+    filename_parts = [part for part in filename.split(".") if part]
+    final_extension = filename_parts[-1] if len(filename_parts) >= 2 else ""
+    previous_extension = filename_parts[-2] if len(filename_parts) >= 3 else ""
+    dangerous_download = final_extension in DANGEROUS_DOWNLOAD_EXTENSIONS
+    disguised_download = dangerous_download and previous_extension in DOCUMENT_EXTENSIONS
+    lure_context = any(term in decoded_url for term in DOWNLOAD_LURE_TERMS)
+    archive_lure = final_extension in ARCHIVE_EXTENSIONS and (
+        lure_context or previous_extension in DOCUMENT_EXTENSIONS
+    )
+    shared_hosting = any(
+        parts.host == suffix or parts.host.endswith("." + suffix)
+        for suffix in SHARED_HOSTING_SUFFIXES
+    )
 
     return URLSignals(
         parts=parts,
@@ -338,38 +536,185 @@ def analyze_url_signals(url: str) -> URLSignals:
         path_depth=path_depth,
         query_param_count=query_param_count,
         delimiter_count=delimiter_count,
+        shared_hosting=shared_hosting,
+        dangerous_download=dangerous_download,
+        disguised_download=disguised_download,
+        archive_lure=archive_lure,
     )
 
 
-def extract_url_features(url: str) -> list[float]:
-    """Return the 15-dim feature vector (order == FEATURE_NAMES).
+def _max_repeated_run(text: str) -> int:
+    longest = current = 0
+    previous = ""
+    for char in text:
+        current = current + 1 if char == previous else 1
+        longest = max(longest, current)
+        previous = char
+    return longest
 
-    Raises ValueError on empty/None input.
-    """
+
+def _context_number(context: dict[str, object], name: str, default: float = 0.0) -> float:
+    try:
+        return float(context.get(name, default) or 0.0)
+    except (TypeError, ValueError):
+        return default
+
+
+def extract_url_feature_map(
+    url: str,
+    context: dict[str, object] | None = None,
+) -> dict[str, float]:
+    """Return the complete named URL and enrichment feature map."""
     if not url or not isinstance(url, str):
         raise ValueError("URL must be a non-empty string")
-    url = url.strip()[:2048]
-    parsed = urlparse(_normalize_for_urlparse(url))
-    host, domain, sub_tld = _split_host(url)
+    raw_url = url.strip()[:2048]
+    normalized_url = _normalize_for_urlparse(raw_url)
+    parsed = urlparse(normalized_url)
+    host, domain, sub_tld = _split_host(raw_url)
     subdomain, tld = (sub_tld.split("|", 1) + [""])[:2]
     path = parsed.path or ""
-
-    f = [0.0] * 15
-    f[0] = min(len(url), 2048)
-    f[1] = shannon_entropy(domain)
-    f[2] = float(len(subdomain.split(".")) if subdomain else 0)
-    f[3] = 1.0 if tld in HIGH_RISK_TLDS else 0.0
-    f[4] = 1.0 if is_ip_host(url) else 0.0
-    f[5] = sum(1 for c in domain if c in "@-_") / max(len(domain), 1)
-    f[6] = float(len([p for p in path.split("/") if p]))
-    f[7] = float(len(parse_qs(parsed.query)))
-    f[8] = 1.0 if parsed.scheme == "https" else 0.0
-    f[9] = min_brand_distance(domain)
-    f[10] = 1.0 if host in SHORTLINK_DOMAINS else 0.0
-    f[11] = sum(1 for c in domain if c.isdigit()) / max(len(domain), 1)
+    query = parsed.query or ""
+    signals = analyze_url_signals(raw_url)
+    labels = [label for label in host.split(".") if label]
+    pairs = parse_qsl(query, keep_blank_values=True)
+    query_keys = [key.lower() for key, _ in pairs]
+    redirect_keys = {
+        "url", "uri", "redirect", "redirect_uri", "return", "return_url",
+        "next", "continue", "target", "destination", "dest",
+    }
+    decoded = unquote(normalized_url).lower()
+    nested_urls = max(
+        0,
+        len(re.findall(r"(?:https?://|https?%3a%2f%2f)", normalized_url, flags=re.I)) - 1,
+    )
+    path_tokens = [token for token in re.split(r"[/._~-]+", path) if token]
+    all_tokens = [token for token in re.split(r"[^a-zA-Z0-9+/=_-]+", decoded) if token]
+    parameter_values = "".join(value for _, value in pairs)
+    context = context or {}
+    domain_age_days = max(0.0, _context_number(context, "domain_age_days"))
+    tls_days_remaining = max(0.0, _context_number(context, "tls_days_remaining"))
     vowels = sum(1 for c in domain if c in "aeiou")
     cons = sum(1 for c in domain if c.isalpha() and c not in "aeiou")
-    f[12] = vowels / max(cons, 1)
-    f[13] = shannon_entropy(path)
-    f[14] = 1.0 if any(k in path.lower() for k in SUSPICIOUS_KEYWORDS) else 0.0
-    return f
+
+    return {
+        "url_length": float(min(len(raw_url), 2048)),
+        "domain_entropy": shannon_entropy(domain),
+        "subdomain_depth": float(len(subdomain.split(".")) if subdomain else 0),
+        "tld_risk_score": 1.0 if tld in HIGH_RISK_TLDS else 0.0,
+        "has_ip_address": 1.0 if is_ip_host(raw_url) else 0.0,
+        "special_char_ratio": sum(1 for char in domain if char in "@-_") / max(len(domain), 1),
+        "path_depth": float(len([part for part in path.split("/") if part])),
+        "query_param_count": float(len(parse_qs(query))),
+        "has_https": 1.0 if parsed.scheme == "https" else 0.0,
+        "homoglyph_score": min_brand_distance(domain),
+        "is_shortlink": 1.0 if host in SHORTLINK_DOMAINS else 0.0,
+        "digit_ratio": sum(1 for char in domain if char.isdigit()) / max(len(domain), 1),
+        "vowel_consonant_ratio": vowels / max(cons, 1),
+        "url_path_entropy": shannon_entropy(path),
+        "has_suspicious_keywords": 1.0
+        if any(keyword in path.lower() for keyword in SUSPICIOUS_KEYWORDS)
+        else 0.0,
+        "host_length": float(len(host)),
+        "registrable_domain_length": float(len(signals.parts.registrable_domain)),
+        "path_length": float(len(path)),
+        "query_length": float(len(query)),
+        "fragment_length": float(len(parsed.fragment or "")),
+        "url_entropy": shannon_entropy(decoded),
+        "host_entropy": shannon_entropy(host),
+        "query_entropy": shannon_entropy(query),
+        "hyphen_count": float(raw_url.count("-")),
+        "dot_count": float(raw_url.count(".")),
+        "slash_count": float(raw_url.count("/")),
+        "at_count": float(raw_url.count("@")),
+        "percent_count": float(raw_url.count("%")),
+        "equals_count": float(raw_url.count("=")),
+        "ampersand_count": float(raw_url.count("&")),
+        "underscore_count": float(raw_url.count("_")),
+        "digit_count": float(sum(char.isdigit() for char in raw_url)),
+        "letter_count": float(sum(char.isalpha() for char in raw_url)),
+        "non_ascii_count": float(sum(ord(char) > 127 for char in raw_url)),
+        "punycode_label_count": float(sum(label.startswith("xn--") for label in labels)),
+        "subdomain_label_count": float(len([label for label in subdomain.split(".") if label])),
+        "max_label_length": float(max((len(label) for label in labels), default=0)),
+        "average_label_length": sum(map(len, labels)) / max(len(labels), 1),
+        "suspicious_keyword_count": float(len(signals.suspicious_keywords)),
+        "brand_mention_count": float(len(signals.brand_mentions)),
+        "brand_mismatch": float(signals.brand_mismatch),
+        "brand_in_subdomain": float(signals.brand_in_subdomain),
+        "deceptive_subdomain": float(signals.deceptive_subdomain),
+        "excessive_dots": float(signals.excessive_dots),
+        "many_delimiters": float(signals.many_delimiters),
+        "percent_encoded": float(signals.percent_encoded),
+        "has_at_symbol": float(signals.at_symbol),
+        "has_nonstandard_port": float(parsed.port not in {None, 80, 443}),
+        "embedded_credentials": float(bool(parsed.username or parsed.password)),
+        "nested_url_count": float(nested_urls),
+        "redirect_param_count": float(sum(key in redirect_keys for key in query_keys)),
+        "dangerous_file_extension": float(signals.dangerous_download),
+        "disguised_download": float(signals.disguised_download),
+        "archive_lure": float(signals.archive_lure),
+        "shared_hosting": float(signals.shared_hosting),
+        "max_repeated_character_run": float(_max_repeated_run(domain)),
+        "max_consecutive_digit_run": float(
+            max((len(match.group(0)) for match in re.finditer(r"\d+", domain)), default=0)
+        ),
+        "hex_token_count": float(
+            sum(bool(re.fullmatch(r"[0-9a-fA-F]{8,}", token)) for token in all_tokens)
+        ),
+        "base64_like_token_count": float(
+            sum(bool(re.fullmatch(r"[A-Za-z0-9_-]{20,}={0,2}", token)) for token in all_tokens)
+        ),
+        "path_token_count": float(len(path_tokens)),
+        "query_key_count": float(len(query_keys)),
+        "duplicate_query_key_count": float(len(query_keys) - len(set(query_keys))),
+        "parameter_value_entropy": shannon_entropy(parameter_values),
+        "scheme_is_http": float(parsed.scheme == "http"),
+        "scheme_was_missing": float("://" not in raw_url),
+        "dns_available": _context_number(context, "dns_available"),
+        "dns_resolves": _context_number(context, "dns_resolves"),
+        "dns_record_count": min(_context_number(context, "dns_record_count"), 50.0) / 50.0,
+        "rdap_available": _context_number(context, "rdap_available"),
+        "domain_age_days_normalized": min(domain_age_days, 3650.0) / 3650.0,
+        "tls_available": _context_number(context, "tls_available"),
+        "tls_present": _context_number(context, "tls_present"),
+        "tls_hostname_match": _context_number(context, "tls_hostname_match"),
+        "tls_days_remaining_normalized": min(tls_days_remaining, 825.0) / 825.0,
+        "redirect_available": _context_number(context, "redirect_available"),
+        "redirect_count_normalized": min(_context_number(context, "redirect_count"), 10.0) / 10.0,
+        "cross_domain_redirect_count": min(
+            _context_number(context, "cross_domain_redirect_count"), 10.0
+        ) / 10.0,
+        "final_domain_changed": _context_number(context, "final_domain_changed"),
+        "dom_available": _context_number(context, "dom_available"),
+        "login_form_present": _context_number(context, "login_form_present"),
+        "password_form_present": _context_number(context, "password_form_present"),
+        "external_form_present": _context_number(context, "external_form_present"),
+        "hidden_iframe_present": _context_number(context, "hidden_iframe_present"),
+        "script_count_normalized": min(_context_number(context, "script_count"), 200.0) / 200.0,
+        "visual_hash_available": _context_number(context, "visual_hash_available"),
+        "visual_brand_similarity": _context_number(context, "visual_brand_similarity"),
+        "local_feed_checked": _context_number(context, "local_feed_checked"),
+        "local_feed_hit": _context_number(context, "local_feed_hit"),
+    }
+
+
+def extract_url_features(
+    url: str,
+    feature_names: tuple[str, ...] | list[str] | None = None,
+    context: dict[str, object] | None = None,
+) -> list[float]:
+    """Return a stable vector; defaults to the deployed legacy 15-feature schema."""
+    selected = tuple(feature_names or LEGACY_FEATURE_NAMES)
+    feature_map = extract_url_feature_map(url, context=context)
+    unknown = [name for name in selected if name not in feature_map]
+    if unknown:
+        raise ValueError(f"Unknown URL feature names: {', '.join(unknown[:5])}")
+    return [float(feature_map[name]) for name in selected]
+
+
+def extract_enriched_url_features(
+    url: str,
+    context: dict[str, object] | None = None,
+) -> list[float]:
+    """Return the complete 54+ feature vector used by new training jobs."""
+    return extract_url_features(url, FEATURE_NAMES, context=context)
