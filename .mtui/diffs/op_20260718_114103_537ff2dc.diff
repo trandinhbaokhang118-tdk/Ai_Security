@@ -1,0 +1,14 @@
+@@ -150,6 +150,13 @@
+     anonymous_daily_ai_credit_limit: int = 5
+     anonymous_daily_deep_scan_limit: int = 1
+     max_upload_bytes: int = 10 * 1024 * 1024
++
++    # Quick EXE Lab analysis. Local PE inspection is always available. Hash
++    # lookup and sample upload are enabled only when a server-side key exists.
++    metadefender_api_key: str = ""
++    metadefender_base_url: str = "https://api.metadefender.com/v4"
++    metadefender_timeout_seconds: float = 20.0
++
+     shared_assessment_cache_enabled: bool = True
+     shared_assessment_cache_ttl_seconds: int = 900
+ 

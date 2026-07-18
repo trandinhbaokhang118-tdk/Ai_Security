@@ -1,0 +1,10 @@
+@@ -360,8 +360,8 @@
+         );
+     }
+ 
+-    }
+ 
++
+     async assessText(
+         text: string,
+         metadata?: AssessMetadata,

@@ -1,0 +1,19 @@
+@@ -883,17 +883,7 @@
+             <div className="exe-provider-row">
+                 <span>
+                     <small>PROVIDER</small>
+-                    <b>
+-                        {!provider?.configured
+-                            ? "Chưa cấu hình · chỉ phân tích cục bộ"
+-                            : provider.status === "not_found"
+-                              ? "Hash chưa có kết quả"
+-                              : provider.status === "queued"
+-                                ? `Đang quét ${provider.progress}%`
+-                                : provider.status === "failed"
+-                                  ? "Không lấy được kết quả"
+-                                  : `${provider.detected_engines}/${provider.total_engines || "?"} engine phát hiện`}
+-                    </b>
++                    <b>{providerStatusLabel(provider)}</b>
+                 </span>
+                 {polling && <i>Đang chờ báo cáo…</i>}
+             </div>

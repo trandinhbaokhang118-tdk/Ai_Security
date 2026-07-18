@@ -1,0 +1,9 @@
+@@ -573,7 +573,7 @@
+                 title="Dữ liệu thật đã được thay bằng canary",
+                 message=(
+                     f"Nội dung bạn nhập không được gửi vào website. Sandbox dùng dữ liệu thử "
+-                    f“{canary.value}” để quan sát hành vi."
++                    f"“{canary.value}” để quan sát hành vi."
+                 ),
+                 signature=f"input:{field_id}:{canary.value}",
+                 fieldType=canary.kind,

@@ -18,14 +18,15 @@ from typing import Any
 from ai.adapters.prompt_adapter import detect_injection
 from ai.adapters.text_adapter import chunk_text, normalize_for_detection, preprocess_email
 from ai.adapters.url_adapter import (
+    CONTEXT_FEATURE_NAMES,
     analyze_url_signals,
     extract_url_features,
     has_homoglyph,
     is_ip_host,
 )
 from security.prompt_firewall import assess_prompt_firewall
-from security.url_risk_core import assess_url as assess_url_risk
 from security.text_risk_core import assess_text_risk
+from security.url_risk_core import assess_url as assess_url_risk
 from shared.constants import HIGH_RISK_TLDS, URGENCY_KEYWORDS_VI
 from shared.schemas import Evidence, Severity
 
@@ -292,10 +293,13 @@ class InferenceEngine:
         return f"hybrid-{modality}[{'+'.join(components)}]"
 
     # ------------------------------------------------------------------ URL
-    def predict_url(self, url: str) -> PredictionResult:
+    def predict_url(
+        self,
+        url: str,
+        context: dict[str, object] | None = None,
+    ) -> PredictionResult:
         try:
-            features = extract_url_features(url)
-            rule_score = self._heuristic_url(url, features)
+            legacy_features = extract_url_features(url)
         except Exception as e:
             # Handle invalid URLs gracefully
             return PredictionResult(
@@ -311,15 +315,38 @@ class InferenceEngine:
             )
 
         model_score: float | None = None
+        dynamic_context_used = False
         if self.url_session is not None:  # pragma: no cover - needs model
             try:
-                model_score = self._run_lgbm(self.url_session, features)
+                metadata = self.model_metadata.get("url_lgbm.onnx", {})
+                configured_names = metadata.get("feature_names")
+                feature_names = (
+                    configured_names
+                    if isinstance(configured_names, list) and configured_names
+                    else None
+                )
+                model_features = (
+                    extract_url_features(
+                        url,
+                        feature_names=feature_names,
+                        context=context,
+                    )
+                    if feature_names
+                    else legacy_features
+                )
+                dynamic_context_used = bool(
+                    context
+                    and feature_names
+                    and set(feature_names).intersection(CONTEXT_FEATURE_NAMES)
+                )
+                model_score = self._run_lgbm(self.url_session, model_features)
             except Exception:
                 model_score = None
 
         core = assess_url_risk(url, model_score=model_score)
         if model_score is not None:
-            version = "url_lgbm.onnx+multilayer-url-core-4"
+            context_suffix = "+enriched-context" if dynamic_context_used else ""
+            version = f"url_lgbm.onnx{context_suffix}+multilayer-url-core-4"
         else:
             version = "multilayer-url-core-4"
         return PredictionResult(_clip01(core.score), core.evidence, version)
@@ -490,6 +517,7 @@ class InferenceEngine:
             modality=str((metadata or {}).get("modality", "email")),
             metadata=metadata,
             model_score=score,
+            technical_signal=detect_injection(clean)[0] >= 0.5,
         )
         version = self._hybrid_version("text", transformer_score, lightweight_score)
         model_evidence = self._text_evidence(
@@ -556,15 +584,15 @@ class InferenceEngine:
                                severity=Severity.CRITICAL, feature="injection", contribution=inj))
         if transformer_score is not None and transformer_score >= 0.5:
             ev.append(Evidence(source="text_transformer",
-                               message="mDeBERTa Transformer flagged phishing risk",
-                               severity=Severity.HIGH if transformer_score >= 0.75 else Severity.MEDIUM,
+                               message="Mô hình ngữ nghĩa nhận thấy kịch bản đáng ngờ; đây là tín hiệu hỗ trợ, không phải xác nhận độc hại.",
+                               severity=Severity.MEDIUM,
                                feature="text_transformer_probability",
-                               contribution=transformer_score))
+                               contribution=min(0.10, transformer_score)))
         if lightweight_score is not None and lightweight_score >= 0.5:
             ev.append(Evidence(source="text_model",
-                               message="Lightweight text model flagged phishing risk",
-                               severity=Severity.HIGH if lightweight_score >= 0.75 else Severity.MEDIUM,
-                               feature="text_model_probability", contribution=lightweight_score))
+                               message="Mô hình văn bản nhận thấy mẫu đáng ngờ; cần đối chiếu với bằng chứng kỹ thuật/nội dung.",
+                               severity=Severity.MEDIUM,
+                               feature="text_model_probability", contribution=min(0.10, lightweight_score)))
         if not ev:
             ev.append(Evidence(source="text_adapter",
                                message="Không phát hiện dấu hiệu lừa đảo rõ rệt",

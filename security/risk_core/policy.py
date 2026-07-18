@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from .types import NextAction, PolicyDecision, PolicyProfile, PolicyResult, RiskResultV2
+from .types import (
+    CriterionStatus,
+    NextAction,
+    PolicyDecision,
+    PolicyProfile,
+    PolicyResult,
+    RiskResultV2,
+)
 
 _DECISION_RANK = {
     PolicyDecision.ALLOW: 0,
@@ -33,10 +40,29 @@ class PolicyEngineV2:
                 decision, action = PolicyDecision.REQUIRE_REVIEW, NextAction.SANDBOX
         elif score >= 20:
             decision, action = PolicyDecision.WARN, NextAction.DEEP_SCAN
-        elif confidence < 40:
-            decision, action = PolicyDecision.WARN, NextAction.DEEP_SCAN
         else:
-            decision, action = PolicyDecision.ALLOW, NextAction.NONE
+            has_malicious_finding = any(
+                item.adjusted_score > 0
+                and item.status == CriterionStatus.MALICIOUS
+                for item in risk_result.criteria
+            )
+            has_suspicious_finding = any(
+                item.adjusted_score > 0
+                and item.status == CriterionStatus.SUSPICIOUS
+                for item in risk_result.criteria
+            )
+            if has_malicious_finding:
+                decision, action = PolicyDecision.WARN, NextAction.DEEP_SCAN
+            else:
+                # Incomplete coverage is a reason to recommend a deeper scan,
+                # not evidence that an otherwise clean or weakly suspicious URL
+                # is dangerous.
+                decision = PolicyDecision.ALLOW
+                action = (
+                    NextAction.DEEP_SCAN
+                    if confidence < 40 or has_suspicious_finding
+                    else NextAction.NONE
+                )
 
         override = risk_result.effective_override
         if override:

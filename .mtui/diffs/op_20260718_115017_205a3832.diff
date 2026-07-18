@@ -1,0 +1,68 @@
+@@ -17,16 +17,16 @@
+     AssessResult,
+     BrowserSandboxResult,
+     ExeSandboxResult,
+-
++
+     ExeProviderResult,
+     ChatChunk,
+     ChatFinal,
+     ChatRequest,
+     Credentials,
+-    PlanInfo,
+-    PhoneAssessResult,
+-    GmailMessageSummary,
+-    GmailStatus,
++    PlanInfo,
++    PhoneAssessResult,
++    GmailMessageSummary,
++    GmailStatus,
+     PasswordChangeInput,
+     PasswordResetRequestResult,
+     RegisterInput,
+@@ -48,24 +48,24 @@
+     sandboxUrl(url: string): Promise<SandboxResult>;
+ 
+     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
+-
++    /** Phân tích nhanh PE cục bộ và tùy chọn tra cứu/chia sẻ với provider. */
+     /** Chạy tệp EXE trong Windows Sandbox thật, không chạy trực tiếp trên máy chủ. */
+     sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+ 
+-    /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
+-    assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;
+-
+-    /** Parse đầy đủ MIME/header/tệp/link từ một Email RFC822 `.eml`. */
+-    assessEmailFile(file: File, metadata?: AssessMetadata): Promise<AssessResult>;
+-
+-    /** Đánh giá SMS cùng thông tin uy tín của số gửi (nếu nhà cung cấp khả dụng). */
+-    assessPhone(phoneNumber: string, sms: string, countryHint?: string, metadata?: AssessMetadata): Promise<PhoneAssessResult>;
+-
+-    getGmailStatus(): Promise<GmailStatus>;
+-    connectGmail(): Promise<{authUrl: string}>;
+-    listGmailMessages(query?: string, label?: string): Promise<GmailMessageSummary[]>;
+-    assessGmailMessage(messageId: string, metadata?: AssessMetadata): Promise<AssessResult>;
+-    disconnectGmail(): Promise<void>;
++    /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
++    assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;
++
++    /** Parse đầy đủ MIME/header/tệp/link từ một Email RFC822 `.eml`. */
++    assessEmailFile(file: File, metadata?: AssessMetadata): Promise<AssessResult>;
++
++    /** Đánh giá SMS cùng thông tin uy tín của số gửi (nếu nhà cung cấp khả dụng). */
++    assessPhone(phoneNumber: string, sms: string, countryHint?: string, metadata?: AssessMetadata): Promise<PhoneAssessResult>;
++
++    getGmailStatus(): Promise<GmailStatus>;
++    connectGmail(): Promise<{authUrl: string}>;
++    listGmailMessages(query?: string, label?: string): Promise<GmailMessageSummary[]>;
++    assessGmailMessage(messageId: string, metadata?: AssessMetadata): Promise<AssessResult>;
++    disconnectGmail(): Promise<void>;
+ 
+     /**
+      * Mở luồng chat streaming. Trả về async generator phát các đoạn
+@@ -110,4 +110,4 @@
+ }
+ 
+ /** Chế độ API được cấu hình qua `NEXT_PUBLIC_API_MODE`. */
+-export type ApiMode = "mock" | "real";
++export type ApiMode = "mock" | "real";

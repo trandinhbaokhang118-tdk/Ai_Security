@@ -1,0 +1,15 @@
+@@ -354,11 +354,12 @@
+         if not self.configured:
+             return self.disabled_result()
+         clean_id = data_id.strip()
+-        if not clean_id or len(clean_id) > 256:
++        if not _DATA_ID_PATTERN.fullmatch(clean_id):
+             raise ValueError("data_id không hợp lệ")
++        encoded_id = quote(clean_id, safe="")
+         with httpx.Client(timeout=self.timeout, follow_redirects=False) as client:
+             response = client.get(
+-                f"{self.base_url}/file/{clean_id}",
++                f"{self.base_url}/file/{encoded_id}",
+                 headers=self._headers(),
+             )
+         response.raise_for_status()

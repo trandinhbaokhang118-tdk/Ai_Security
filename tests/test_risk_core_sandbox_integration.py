@@ -1,6 +1,24 @@
 from backend.services.inference_service import InferenceService
-from security.risk_core import CriterionStatus
-from shared.schemas import SandboxIssue, SandboxURLResponse, Severity
+from security.dns_intelligence import DNSIntelligence
+from security.domain_intelligence import DomainIntelligence
+from security.ip_intelligence import IPIntelligence
+from security.risk_core import CriterionStatus, assess, default_config
+from security.risk_core.detectors import (
+    ScanObservations,
+    add_browser_sandbox,
+    add_cross_source_intelligence,
+    add_dns_intelligence,
+    add_domain_intelligence,
+    add_http_sandbox,
+    build_criteria_evidence,
+)
+from security.scan_history import LocalScanHistory
+from shared.schemas import (
+    BrowserSandboxURLResponse,
+    SandboxIssue,
+    SandboxURLResponse,
+    Severity,
+)
 
 
 def test_http_sandbox_report_is_scored_by_risk_core():
@@ -26,3 +44,174 @@ def test_failed_sandbox_is_unavailable_not_clean():
     by_id = {item["criterion_id"]: item for item in trace.criteria}
     assert by_id[30]["status"] == CriterionStatus.UNAVAILABLE
     assert by_id[30]["adjusted_score"] == 0
+
+
+def test_password_form_alone_does_not_trigger_the_danger_floor():
+    report = SandboxURLResponse(
+        ok=True,
+        execution_status="completed",
+        url="https://accounts.example.test/login",
+        issues=[
+            SandboxIssue(
+                code="password_form",
+                severity=Severity.HIGH,
+                category="content",
+                message="Page contains a password field",
+            )
+        ],
+    )
+    observations = ScanObservations(report.url)
+    add_http_sandbox(observations, report)
+    config = default_config()
+    evidence = build_criteria_evidence(observations, config)
+    by_id = {item.criterion_id: item for item in evidence}
+
+    assert by_id[29].status == CriterionStatus.CLEAN
+    assert assess(evidence, config=config).risk_score < 60
+
+
+def test_browser_password_field_alone_does_not_trigger_the_danger_floor():
+    report = BrowserSandboxURLResponse(
+        ok=True,
+        execution_status="completed",
+        url="https://accounts.example.test/login",
+        issues=[
+            SandboxIssue(
+                code="password_input_detected",
+                severity=Severity.HIGH,
+                category="content",
+                message="Page contains a password field",
+            )
+        ],
+    )
+    observations = ScanObservations(report.url)
+    add_browser_sandbox(observations, report)
+    config = default_config()
+    evidence = build_criteria_evidence(observations, config)
+    by_id = {item.criterion_id: item for item in evidence}
+
+    assert by_id[29].status == CriterionStatus.CLEAN
+    assert assess(evidence, config=config).risk_score < 60
+
+
+def test_password_form_with_cross_origin_submission_still_blocks():
+    report = SandboxURLResponse(
+        ok=True,
+        execution_status="completed",
+        url="https://accounts.example.test/login",
+        issues=[
+            SandboxIssue(
+                code="password_form",
+                severity=Severity.HIGH,
+                category="content",
+                message="Page contains a password field",
+            ),
+            SandboxIssue(
+                code="external_form_action",
+                severity=Severity.CRITICAL,
+                category="content",
+                message="Credentials are submitted cross-origin",
+            ),
+        ],
+    )
+    observations = ScanObservations(report.url)
+    add_http_sandbox(observations, report)
+    config = default_config()
+    evidence = build_criteria_evidence(observations, config)
+    by_id = {item.criterion_id: item for item in evidence}
+    result = assess(evidence, config=config)
+
+    assert by_id[29].status == CriterionStatus.MALICIOUS
+    assert result.risk_score >= 60
+
+
+def test_advanced_scan_completes_requested_criteria_without_fabricating_clean(tmp_path):
+    url = "https://shop.example.test"
+    domain = DomainIntelligence(
+        domain="example.test",
+        age_days=800,
+        created_at="2024-01-01T00:00:00Z",
+        registrar="Example Registrar",
+        reputation_status="not_listed",
+        reputation_source="urlscan.io",
+        listed=False,
+        score=0.0,
+        reasons=(),
+        available=True,
+        expiry_days=400,
+        certificate_age_days=700,
+        registrant=None,
+        registration_available=True,
+        reputation_ips=("203.0.113.10",),
+    )
+    dns = DNSIntelligence(
+        "shop.example.test",
+        ("203.0.113.10",),
+        ("ns1.example.test",),
+        (),
+        False,
+        False,
+        False,
+        True,
+        (),
+    )
+    ip = IPIntelligence(
+        ip="203.0.113.10",
+        country="Viet Nam",
+        country_code="VN",
+        available=True,
+        status="completed",
+    )
+    http = SandboxURLResponse(
+        ok=True,
+        execution_status="completed",
+        url=url,
+        page_title="Example information page",
+        page_signals={
+            "is_commercial": False,
+            "social_links": [],
+            "review_context": False,
+            "metadata": {"description": "Example"},
+            "content_fingerprint": "content-a",
+        },
+    )
+    browser = BrowserSandboxURLResponse(
+        ok=True,
+        execution_status="completed",
+        url=url,
+        page_title="Example information page",
+        page_identity={
+            "site_name": "Example",
+            "is_commercial": False,
+            "social_links": [],
+            "addresses": [],
+            "content_fingerprint": "content-a",
+        },
+        visual_analysis={"status": "no_reference", "dhash64": "0123456789abcdef"},
+    )
+    observations = ScanObservations(url)
+    add_domain_intelligence(observations, domain)
+    add_dns_intelligence(observations, dns)
+    add_http_sandbox(observations, http)
+    add_browser_sandbox(observations, browser)
+    add_cross_source_intelligence(
+        observations,
+        domain_intelligence=domain,
+        dns_intelligence=dns,
+        ip_intelligence=ip,
+        sandbox_reports=((http, False), (browser, True)),
+        history_store=LocalScanHistory(tmp_path / "history.json"),
+    )
+    by_id = {
+        item.criterion_id: item
+        for item in build_criteria_evidence(observations, default_config())
+    }
+    requested = {
+        2, 3, 4, 13, 14, 19, 21, 22, 23, 27, 31, 32, 33, 35, 37,
+        38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49,
+    }
+    incomplete = {CriterionStatus.NOT_CHECKED, CriterionStatus.UNAVAILABLE}
+    assert not {criterion for criterion in requested if by_id[criterion].status in incomplete}
+    assert by_id[3].status == CriterionStatus.NOT_APPLICABLE
+    assert by_id[14].status == CriterionStatus.NOT_APPLICABLE
+    assert by_id[44].status == CriterionStatus.NOT_APPLICABLE

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .types import EvidenceV2, OverrideResult
+from .types import CriterionStatus, EvidenceV2, OverrideResult, ProviderVerdict
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,15 @@ class OverrideRule:
 def evaluate_overrides(
     evidence: list[EvidenceV2], rules: tuple[OverrideRule, ...]
 ) -> tuple[list[OverrideResult], OverrideResult | None]:
-    findings = {e.finding_type: e.evidence_id for e in evidence if e.evidence_quality > 0}
+    positive_statuses = {CriterionStatus.SUSPICIOUS, CriterionStatus.MALICIOUS}
+    positive_verdicts = {ProviderVerdict.SUSPICIOUS, ProviderVerdict.MALICIOUS}
+    findings = {
+        e.finding_type: e.evidence_id
+        for e in evidence
+        if e.evidence_quality > 0
+        and e.status in positive_statuses
+        and e.provider_verdict in positive_verdicts
+    }
     matches = []
     for rule in rules:
         if rule.required_finding_types and rule.required_finding_types <= findings.keys():

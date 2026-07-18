@@ -1,0 +1,37 @@
+@@ -328,6 +328,36 @@
+     reward = _matches(text, _REWARD)
+     brand_claim = any(term in text for term in _BRANDS)
+ 
++    sender_valid = metadata.get("sender_valid")
++    sender_country_mismatch = bool(metadata.get("sender_country_mismatch"))
++    sender_abuse_confirmed = bool(metadata.get("sender_abuse_confirmed"))
++    sender_line_type = str(metadata.get("sender_line_type") or "").strip().lower()
++    if sender_valid is False or sender_country_mismatch:
++        contribution = 0.08 if sender_country_mismatch else 0.05
++        score += contribution
++        evidence.append(_e(
++            "Số gửi không hợp lệ hoặc quốc gia không phù hợp với ngữ cảnh tin nhắn.",
++            Severity.MEDIUM,
++            "S-ID-01",
++            contribution,
++        ))
++    if sender_abuse_confirmed:
++        score += 0.18
++        evidence.append(_e(
++            "Nguồn uy tín ghi nhận số gửi có báo cáo lạm dụng gần đây.",
++            Severity.HIGH,
++            "S-ID-02",
++            0.18,
++        ))
++    if sender_line_type in {"voip", "prepaid", "virtual"}:
++        score += 0.04
++        evidence.append(_e(
++            "Số gửi là số ảo/VoIP hoặc thuê bao trả trước; đây chỉ là dấu hiệu phụ.",
++            Severity.LOW,
++            "S-ID-03",
++            0.04,
++        ))
++
+     if urls:
+         score += 0.07
+         evidence.append(_e(f"SMS chứa {len(urls)} liên kết; từng trang đích được chuyển sang bộ kiểm tra website.", Severity.MEDIUM, "S-WEB-link-present", 0.07))

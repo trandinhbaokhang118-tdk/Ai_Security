@@ -1,0 +1,10 @@
+@@ -52,8 +52,8 @@
+     sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;
+ 
+     getExecutableProviderReport(dataId: string): Promise<ExeProviderResult>;
+-    sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+ 
++
+     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
+     assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;
+ 

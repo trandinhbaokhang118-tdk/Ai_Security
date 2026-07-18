@@ -1,0 +1,23 @@
+$ python -c import subprocess;old='\r\n'.join(['from backend.security_utils import input_sha256, utcnow','','from backend.services.exe_quick_scan_service import exe_quick_scan_service','from backend.services.ai_context_weight_service import get_ai_context_weight_percent'])+'\r\n';new='\r\n'.join(['from backend.security_utils import input_sha256, utcnow','from backend.services.ai_context_weight_service import get_ai_context_weight_percent','from backend.services.exe_quick_scan_service import exe_quick_scan_service'])+'\r\n';subprocess.run(['mtui','--json','edit','backend/routers/assess.py','replace',old,new],check=True)
+mode: fallback
+exit_code: 1
+duration_ms: 411
+---- stdout ----
+
+---- stderr ----
+{
+  "ok": false,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "mtui",
+  "operation": null,
+  "error_type": "NO_MATCH",
+  "message": "Text not found in backend/routers/assess.py",
+  "suggestion": "Use mtui search \"backend/routers/assess.py\" \"keyword\" --json"
+}
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Users\MyPC\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['mtui', '--json', 'edit', 'backend/routers/assess.py', 'replace', 'from backend.security_utils import input_sha256, utcnow\r\n\r\nfrom backend.services.exe_quick_scan_service import exe_quick_scan_service\r\nfrom backend.services.ai_context_weight_service import get_ai_context_weight_percent\r\n', 'from backend.security_utils import input_sha256, utcnow\r\nfrom backend.services.ai_context_weight_service import get_ai_context_weight_percent\r\nfrom backend.services.exe_quick_scan_service import exe_quick_scan_service\r\n']' returned non-zero exit status 1.

@@ -1,0 +1,59 @@
+@@ -268,3 +268,58 @@
+     assert actions == ["abort"]
+     assert session.events[-1]["type"] == "download_blocked"
+     assert session.events[-1]["filename"] == "setup.msi"
++
++
++def test_binary_post_data_cannot_break_route_handler() -> None:
++    manager = FreeWebSandboxManager()
++    page = SimpleNamespace(url="https://example.com/form")
++    session = make_session(page)
++    actions: list[str] = []
++    route = SimpleNamespace(
++        abort=lambda: actions.append("abort"),
++        continue_=lambda: actions.append("continue"),
++    )
++
++    class BinaryRequest:
++        url = "https://example.com/telemetry"
++        method = "POST"
++        resource_type = "fetch"
++        is_navigation_request = False
++
++        @property
++        def post_data(self) -> str:
++            raise UnicodeDecodeError("utf-8", b"\x9c", 0, 1, "invalid start byte")
++
++    manager.assert_public_url = lambda value: value  # type: ignore[method-assign]
++
++    manager._guard_request(session, route, BinaryRequest())
++
++    assert actions == ["continue"]
++
++
++def test_observation_failure_does_not_fail_page_request(monkeypatch: pytest.MonkeyPatch) -> None:
++    manager = FreeWebSandboxManager()
++    page = SimpleNamespace(url="https://example.com/form")
++    session = make_session(page)
++    actions: list[str] = []
++    route = SimpleNamespace(
++        abort=lambda: actions.append("abort"),
++        continue_=lambda: actions.append("continue"),
++    )
++    request = SimpleNamespace(
++        url="https://example.com/api",
++        method="POST",
++        post_data="payload",
++        resource_type="fetch",
++        is_navigation_request=False,
++    )
++    manager.assert_public_url = lambda value: value  # type: ignore[method-assign]
++    monkeypatch.setattr(
++        manager,
++        "_observe_canary_request",
++        lambda *_args: (_ for _ in ()).throw(RuntimeError("observer failed")),
++    )
++
++    manager._guard_request(session, route, request)
++
++    assert actions == ["continue"]

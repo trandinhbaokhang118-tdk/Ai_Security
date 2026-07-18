@@ -1,0 +1,9 @@
+@@ -50,6 +50,8 @@
+     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
+     /** Phân tích nhanh PE cục bộ và tùy chọn tra cứu/chia sẻ với provider. */
+     sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;
++
++    getExecutableProviderReport(dataId: string): Promise<ExeProviderResult>;
+     sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+ 
+     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */

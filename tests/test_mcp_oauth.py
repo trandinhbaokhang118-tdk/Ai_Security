@@ -12,7 +12,12 @@ from starlette.testclient import TestClient
 
 from backend.db import Base
 from backend.models import ApiKey, User
-from backend.security_utils import create_api_key_value, create_password_salt, hash_api_key, hash_password
+from backend.security_utils import (
+    create_api_key_value,
+    create_password_salt,
+    hash_api_key,
+    hash_password,
+)
 from mcp_server import auth as mcp_auth
 from mcp_server import oauth as mcp_oauth
 from mcp_server.auth import MCPApiKeyMiddleware

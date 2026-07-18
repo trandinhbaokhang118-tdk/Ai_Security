@@ -1,0 +1,25 @@
+$ python -c import subprocess;lines=['export interface ExeQuickScanSection {','    name: string;','    virtual_size: number;','    raw_size: number;','    entropy: number;','    readable: boolean;','    writable: boolean;','    executable: boolean;','}','','export interface ExeLocalAnalysis {','    valid: boolean;','    format: string;','    architecture: string;','    subsystem: string;','    entry_point_rva: number;','    section_count: number;','    sections: ExeQuickScanSection[];','    signature_present: boolean;','    overlay_bytes: number;','    compile_time: string | null;','    characteristics: number;','    anomalies: string[];','    risk_score: number;','}','','export interface ExeProviderDetection {','    engine: string;','    threat: string;','}','','export interface ExeProviderResult {','    name: string;','    configured: boolean;','    status: \x22disabled\x22 | \x22not_found\x22 | \x22known\x22 | \x22queued\x22 | \x22completed\x22 | \x22failed\x22;','    data_id: string | null;','    progress: number;','    detected_engines: number;','    total_engines: number;','    detections: ExeProviderDetection[];','    risk_score: number;','    sample_shared: boolean;','    error: string | null;','}'];c='\n'.join(lines)+'\n';subprocess.run(['mtui','--json','edit','frontend/web/lib/types.ts','insert-before','export interface ExeSandboxResult {',c],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 1244
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_before",
+  "operation_id": "op_20260718_114901_e78f5175",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\types.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_114901_e78f5175\\types.ts",
+  "diff_summary": "+45 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "9392e0ad3ec3cfc901dbb7d003c7bb992d83497fb05fc17b8d110148015ee338",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

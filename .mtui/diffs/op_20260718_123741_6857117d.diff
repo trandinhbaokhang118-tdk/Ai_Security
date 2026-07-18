@@ -1,0 +1,16 @@
+@@ -172,8 +172,14 @@
+             max_raw_end = 0
+             entry_in_executable_section = False
+             score = 0
++            parsed_section_count = min(section_count, _MAX_PE_SECTIONS)
++            if section_count > _MAX_PE_SECTIONS:
++                score += 20
++                anomalies.append(
++                    f"Số section khai báo vượt giới hạn phân tích an toàn: {section_count}."
++                )
+             headers_end = min(len(data), section_table_offset + (section_count * 40))
+-            for index in range(section_count):
++            for index in range(parsed_section_count):
+                 offset = section_table_offset + (index * 40)
+                 if offset + 40 > len(data):
+                     anomalies.append("Bảng section bị cắt hoặc không đầy đủ.")

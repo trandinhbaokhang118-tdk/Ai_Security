@@ -1,0 +1,12 @@
+@@ -233,7 +233,10 @@
+ 
+ 
+ def redact_message(value: str, limit: int = 12_000) -> tuple[str, dict[str, int]]:
+-    value = value or ""
++    # Normalize whitespace before redaction. Otherwise line breaks inside a long
++    # digit sequence can be collapsed later and accidentally form an unredacted
++    # phone/account-like number in the final payload.
++    value = collapse_space(value or "")
+     counts = {
+         "url_count": len(URL_RE.findall(value)),
+         "email_address_count": len(EMAIL_RE.findall(value)),

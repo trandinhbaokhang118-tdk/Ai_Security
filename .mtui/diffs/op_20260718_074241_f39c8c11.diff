@@ -1,0 +1,59 @@
+@@ -341,6 +341,58 @@
+         if len(session.events) > MAX_SECURITY_EVENTS:
+             session.events[:] = session.events[-MAX_SECURITY_EVENTS:]
+ 
++    def _record_form_attempt(
++        self,
++        session: FreeBrowserSession,
++        target: dict[str, object],
++    ) -> None:
++        raw_field_ids = target.get("fieldIds")
++        field_ids = raw_field_ids if isinstance(raw_field_ids, list) else []
++        field_types = sorted(
++            {
++                session.canary_fields[field_id].kind
++                for field_id in field_ids
++                if isinstance(field_id, str) and field_id in session.canary_fields
++            }
++        )
++        if not field_types:
++            field_types = sorted({canary.kind for canary in session.canary_fields.values()})
++        if not field_types:
++            return
++        action = str(target.get("formAction") or getattr(session.page, "url", "") or "")
++        action = urljoin(str(getattr(session.page, "url", "") or ""), action)
++        method = str(target.get("formMethod") or "GET").upper()
++        destination = self._host(action)
++        current_host = self._host(str(getattr(session.page, "url", "") or ""))
++        cross_domain = bool(destination and current_host and destination != current_host)
++        severe_fields = bool(SENSITIVE_FIELD_TYPES.intersection(field_types))
++        severity = "high" if cross_domain and severe_fields else "medium"
++        title = (
++            "Sắp gửi canary sang domain khác"
++            if cross_domain
++            else "Sắp gửi biểu mẫu bằng dữ liệu canary"
++        )
++        message = (
++            f"Sandbox sẽ gửi dữ liệu thử nghiệm ({', '.join(field_types)})"
++            + (f" tới {destination}" if destination else "")
++            + "; dữ liệu thật của bạn vẫn được giữ lại."
++        )
++        safe_url = self._safe_event_url(action)
++        self._append_event(
++            session,
++            event_type="form_submission_attempt",
++            severity=severity,
++            title=title,
++            message=message,
++            signature=f"form:{method}:{safe_url}:{','.join(field_types)}",
++            destination=destination or None,
++            url=safe_url or None,
++            method=method,
++            fieldTypes=field_types,
++            crossDomain=cross_domain,
++            blocked=False,
++        )
++
+     def _record_download(
+         self,
+         session: FreeBrowserSession,

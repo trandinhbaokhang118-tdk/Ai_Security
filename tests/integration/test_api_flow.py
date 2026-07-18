@@ -1,8 +1,11 @@
 """Integration tests (test-plan.md §3 + §4 demo cases) via FastAPI TestClient."""
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
+from backend.db import SessionLocal
 from backend.main import app
+from backend.models import ScanEvent
 
 client = TestClient(app)
 
@@ -11,6 +14,22 @@ def test_health():
     r = client.get("/v1/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_readiness_reports_each_required_runtime_check():
+    response = client.get("/v1/ready")
+    assert response.status_code in {200, 503}
+    body = response.json()
+    assert body["status"] in {"ready", "not_ready"}
+    assert set(body["checks"]) == {
+        "database",
+        "url_model",
+        "text_model",
+        "prompt_model",
+        "ocr",
+        "clamav",
+    }
+    assert (response.status_code == 200) is all(body["checks"].values())
 
 
 def test_url_assess_e2e_phishing():
@@ -90,6 +109,95 @@ def test_text_assess_vietnamese_phishing():
     )
     assert r.status_code == 200
     assert r.json()["risk_score"] > 0.4
+
+
+def test_email_file_assess_parses_rfc822_headers():
+    payload = (
+        b"From: Bank Security <alert@unknown.example>\r\n"
+        b"Reply-To: collect@other.example\r\n"
+        b"To: user@example.com\r\n"
+        b"Subject: Verify account\r\n"
+        b"Authentication-Results: mx.example; spf=fail; dkim=fail; dmarc=fail\r\n"
+        b"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"Please login and enter password to verify account."
+    )
+    r = client.post(
+        "/v1/assess/email-file",
+        files={"file": ("message.eml", payload, "message/rfc822")},
+        data={"analysis_depth": "quick"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["analysis_coverage"]["mime_parse"] == "completed"
+    assert body["analysis_coverage"]["authentication_results"] == "completed"
+    assert body["message_metadata"]["sender"].startswith("Bank Security")
+    assert body["message_metadata"]["analysis_depth"] == "quick"
+
+    with SessionLocal() as db:
+        event = db.execute(
+            select(ScanEvent).where(ScanEvent.request_id == body["request_id"])
+        ).scalar_one()
+        assert event.input_preview == ""
+        assert event.input_sha256
+
+
+def test_assessment_responses_disable_browser_storage_and_embedding():
+    response = client.post(
+        "/v1/assess/text",
+        json={"text": "Tin nhan thu nghiem", "modality": "sms"},
+    )
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+
+
+def test_pro_message_analysis_requires_paid_plan():
+    r = client.post(
+        "/v1/assess/text",
+        json={
+            "text": "Please verify account",
+            "modality": "email",
+            "metadata": {"analysis_depth": "pro"},
+        },
+    )
+    assert r.status_code == 403
+
+
+def test_demo_pro_account_can_request_pro_message_analysis():
+    login = client.post(
+        "/v1/auth/login",
+        json={"email": "demo@aisec.local", "password": "Demo@123456"},
+    )
+    assert login.status_code == 200
+    token = login.json()["token"]
+    r = client.post(
+        "/v1/assess/text",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "text": "Please verify account",
+            "modality": "email",
+            "metadata": {"analysis_depth": "pro"},
+        },
+    )
+    assert r.status_code == 200
+
+
+def test_gmail_status_is_safe_when_oauth_is_not_configured():
+    login = client.post(
+        "/v1/auth/login",
+        json={"email": "demo@aisec.local", "password": "Demo@123456"},
+    )
+    token = login.json()["token"]
+    r = client.get(
+        "/v1/integrations/gmail/status",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["configured"] is False
+    assert "token" not in r.text.lower()
 
 
 def test_action_block_credential_exfil():
@@ -179,3 +287,13 @@ def test_judge_demo_deepfake_image_runs_local_model():
     assert body["verdict"] == "likely_fake"
     assert body["decision"] == "WARN"
     assert body["evidence"]
+
+
+def test_deepfake_capabilities_do_not_claim_audio_support():
+    response = client.get("/v1/demo/deepfake/capabilities")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["image"] == "available"
+    assert body["video"] == "frame_sampling"
+    assert body["audio"] == "unavailable"
+    assert "model" in body["audio_reason"].lower()

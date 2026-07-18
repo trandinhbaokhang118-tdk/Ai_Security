@@ -1,0 +1,30 @@
+@@ -223,9 +223,9 @@
+             compile_time = None
+             if timestamp:
+                 try:
+-                    compiled = datetime.fromtimestamp(timestamp, tz=timezone.utc)
++                    compiled = datetime.fromtimestamp(timestamp, tz=UTC)
+                     compile_time = compiled.isoformat()
+-                    if compiled > datetime.now(timezone.utc):
++                    if compiled > datetime.now(UTC):
+                         score += 8
+                         anomalies.append("Compile timestamp nằm trong tương lai.")
+                 except (OSError, OverflowError, ValueError):
+@@ -447,7 +447,7 @@
+         *,
+         share_with_provider: bool = False,
+     ) -> dict[str, Any]:
+-        started = datetime.now(timezone.utc)
++        started = datetime.now(UTC)
+         sha256 = hashlib.sha256(data).hexdigest()
+         local = self.analyzer.inspect(data, filename)
+         issues = list(local["anomalies"])
+@@ -472,7 +472,7 @@
+ 
+         status = "queued" if provider_result.get("status") == "queued" else "completed"
+         elapsed_ms = round(
+-            (datetime.now(timezone.utc) - started).total_seconds() * 1000,
++            (datetime.now(UTC) - started).total_seconds() * 1000,
+             2,
+         )
+         provider_available = bool(self.provider and self.provider.configured)

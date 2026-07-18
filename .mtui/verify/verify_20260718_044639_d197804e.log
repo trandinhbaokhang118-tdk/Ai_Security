@@ -1,0 +1,20 @@
+$ python -c import subprocess,base64; c=base64.b64decode('YWxwaGEKYmV0YQ==').decode(); subprocess.run(['mtui','--json','new','tmp-test-content.txt','--content',c,'--overwrite'],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 526
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "new",
+  "operation": "create_file",
+  "operation_id": "op_20260718_114639_b5f45fcb",
+  "file": "C:\\NDT\\PJ\\Ai_Security-main\\tmp-test-content.txt",
+  "changed": true,
+  "backup": null,
+  "diff_summary": "+2 -0"
+}
+
+---- stderr ----

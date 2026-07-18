@@ -4,18 +4,39 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session as DbSession
 
+from backend.config import settings
 from backend.db import SessionLocal, get_db
-from backend.models import AdminJob, AdminJobEvent, ModelVersion, ScanEvent, User
+from backend.models import AdminJob, AdminJobEvent, AssessmentCache, ModelVersion, ScanEvent, User
 from backend.routers.auth import require_admin
 from backend.security_utils import utcnow
+from backend.services.ai_context_weight_service import (
+    AI_CONTEXT_WEIGHT_MAX_PERCENT,
+    get_ai_context_weight_percent,
+    get_operational_switches,
+    get_url_assessment_cache_enabled,
+    set_ai_context_weight_percent,
+    set_operational_switches,
+    set_url_assessment_cache_enabled,
+)
+from backend.services.operational_maintenance_service import (
+    cleanup_expired_operational_data,
+    normalized_scan_history_retention_days,
+)
+from backend.services.threat_feed_service import (
+    REMOTE_FEED_SOURCES,
+    configured_feed_specs,
+    feed_status,
+    sync_configured_feeds,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -36,6 +57,38 @@ class ModelTrainingRequest(BaseModel):
 
 class UserStatusRequest(BaseModel):
     status: Literal["active", "suspended"]
+
+
+class AIContextWeightRequest(BaseModel):
+    percent: int = Field(ge=0, le=AI_CONTEXT_WEIGHT_MAX_PERCENT)
+
+
+class URLAssessmentCacheRequest(BaseModel):
+    enabled: bool
+
+
+class OperationalSwitchesRequest(BaseModel):
+    threatFeedSchedulerEnabled: bool
+    openphishEnabled: bool
+    operationalMaintenanceSchedulerEnabled: bool
+
+
+class ThreatFeedSyncRequest(BaseModel):
+    """A bounded, allowlisted subset of configured remote threat feeds."""
+
+    sources: list[str] | None = Field(default=None, max_length=3)
+
+    @field_validator("sources")
+    @classmethod
+    def validate_sources(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized = [source.strip().lower() for source in value]
+        if not normalized or any(source not in REMOTE_FEED_SOURCES for source in normalized):
+            raise ValueError("Only configured PhishTank, OpenPhish, or URLhaus feeds may be synced")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Threat-feed sources must be unique")
+        return normalized
 
 
 def _contained_file(base: Path, candidate: Path, *, suffixes: set[str]) -> Path:
@@ -183,6 +236,200 @@ def get_overview(db: DbSession = Depends(get_db)) -> dict:
              "f1": model.f1, "accuracy": model.accuracy, "createdAt": model.created_at.isoformat()}
             for model in db.execute(select(ModelVersion).order_by(ModelVersion.created_at.desc()).limit(8)).scalars()
         ],
+    }
+
+
+@router.get("/operational-metrics")
+def get_operational_metrics(db: DbSession = Depends(get_db)) -> dict:
+    """Low-cardinality scan/core metrics for the admin console and on-call checks."""
+
+    window_start = utcnow() - timedelta(hours=24)
+    total_scans = db.scalar(select(func.count()).select_from(ScanEvent)) or 0
+    scans_24h = db.scalar(
+        select(func.count()).select_from(ScanEvent).where(ScanEvent.created_at >= window_start)
+    ) or 0
+    blocked_24h = db.scalar(
+        select(func.count())
+        .select_from(ScanEvent)
+        .where(ScanEvent.created_at >= window_start, ScanEvent.decision == "BLOCK")
+    ) or 0
+    avg_latency_24h = db.scalar(
+        select(func.avg(ScanEvent.latency_ms)).where(ScanEvent.created_at >= window_start)
+    ) or 0
+    last_scan_at = db.scalar(select(func.max(ScanEvent.created_at)))
+
+    def grouped(column) -> dict[str, int]:
+        return {
+            str(key): int(count)
+            for key, count in db.execute(
+                select(column, func.count())
+                .where(ScanEvent.created_at >= window_start)
+                .group_by(column)
+            )
+        }
+
+    return {
+        "windowHours": 24,
+        "windowStart": window_start.isoformat(),
+        "totalScans": int(total_scans),
+        "scansLast24h": int(scans_24h),
+        "blockedLast24h": int(blocked_24h),
+        "blockRateLast24h": round((float(blocked_24h) / scans_24h) * 100, 2)
+        if scans_24h
+        else 0.0,
+        "averageLatencyMsLast24h": round(float(avg_latency_24h), 2),
+        "lastScanAt": last_scan_at.isoformat() if last_scan_at else None,
+        "byDecisionLast24h": grouped(ScanEvent.decision),
+        "byRiskLevelLast24h": grouped(ScanEvent.risk_level),
+        "byModalityLast24h": grouped(ScanEvent.modality),
+        "retention": {
+            "scanHistoryDays": normalized_scan_history_retention_days(),
+            "schedulerEnabled": settings.operational_maintenance_scheduler_enabled,
+            "schedulerIntervalMinutes": max(5, settings.operational_maintenance_interval_minutes),
+        },
+    }
+
+
+@router.post("/maintenance/cleanup")
+def run_operational_cleanup(db: DbSession = Depends(get_db)) -> dict:
+    """Run retention cleanup on demand; scheduled cleanup is configured separately."""
+
+    result = cleanup_expired_operational_data(db)
+    return {
+        "ok": True,
+        "retentionDays": normalized_scan_history_retention_days(),
+        "deleted": result.as_dict(),
+    }
+
+
+@router.get("/settings/ai-context-weight")
+def get_ai_context_weight(db: DbSession = Depends(get_db)) -> dict:
+    percent = get_ai_context_weight_percent(db)
+    return {
+        "percent": percent,
+        "maxPercent": AI_CONTEXT_WEIGHT_MAX_PERCENT,
+        "mode": "shadow" if percent == 0 else "weighted",
+    }
+
+
+@router.put("/settings/ai-context-weight")
+def update_ai_context_weight(
+    payload: AIContextWeightRequest,
+    auth=Depends(require_admin),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    percent = set_ai_context_weight_percent(
+        db,
+        payload.percent,
+        updated_by_user_id=auth.user.id,
+    )
+    return {
+        "percent": percent,
+        "maxPercent": AI_CONTEXT_WEIGHT_MAX_PERCENT,
+        "mode": "shadow" if percent == 0 else "weighted",
+    }
+
+
+@router.get("/settings/url-assessment-cache")
+def get_url_assessment_cache(db: DbSession = Depends(get_db)) -> dict:
+    return {
+        "enabled": get_url_assessment_cache_enabled(
+            db,
+            default=settings.shared_assessment_cache_enabled,
+        ),
+        "ttlSeconds": settings.shared_assessment_cache_ttl_seconds,
+    }
+
+
+@router.put("/settings/url-assessment-cache")
+def update_url_assessment_cache(
+    payload: URLAssessmentCacheRequest,
+    auth=Depends(require_admin),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    enabled = set_url_assessment_cache_enabled(
+        db,
+        payload.enabled,
+        updated_by_user_id=auth.user.id,
+    )
+    return {
+        "enabled": enabled,
+        "ttlSeconds": settings.shared_assessment_cache_ttl_seconds,
+    }
+
+
+@router.delete("/settings/url-assessment-cache")
+def purge_url_assessment_cache(db: DbSession = Depends(get_db)) -> dict:
+    """Remove every saved URL result without touching unrelated cache entries."""
+
+    result = db.execute(delete(AssessmentCache).where(AssessmentCache.modality == "url"))
+    db.commit()
+    return {"purged": int(result.rowcount or 0)}
+
+
+def _operational_switches(db: DbSession) -> dict[str, bool]:
+    return get_operational_switches(
+        db,
+        threat_feed_scheduler_default=settings.threat_feed_scheduler_enabled,
+        openphish_default=settings.threat_feed_openphish_enabled,
+        maintenance_scheduler_default=settings.operational_maintenance_scheduler_enabled,
+    )
+
+
+@router.get("/settings/operations")
+def get_operational_switch_settings(db: DbSession = Depends(get_db)) -> dict:
+    return _operational_switches(db)
+
+
+@router.put("/settings/operations")
+def update_operational_switch_settings(
+    payload: OperationalSwitchesRequest,
+    auth=Depends(require_admin),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    return set_operational_switches(
+        db,
+        threat_feed_scheduler_enabled=payload.threatFeedSchedulerEnabled,
+        openphish_enabled=payload.openphishEnabled,
+        operational_maintenance_scheduler_enabled=payload.operationalMaintenanceSchedulerEnabled,
+        updated_by_user_id=auth.user.id,
+    )
+
+
+@router.get("/threat-feeds")
+def get_threat_feed_status(db: DbSession = Depends(get_db)) -> dict:
+    """Return provider-safe state; endpoint URLs and credentials stay private."""
+    switches = _operational_switches(db)
+    return {
+        "schedulerEnabled": switches["threatFeedSchedulerEnabled"],
+        "feeds": feed_status(db, openphish_enabled=switches["openphishEnabled"]),
+    }
+
+
+@router.post("/threat-feeds/sync", status_code=202)
+def trigger_threat_feed_sync(
+    background_tasks: BackgroundTasks,
+    payload: ThreatFeedSyncRequest = ThreatFeedSyncRequest(),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    switches = _operational_switches(db)
+    configured = {
+        spec.source: spec
+        for spec in configured_feed_specs(openphish_enabled=switches["openphishEnabled"])
+    }
+    requested = tuple(payload.sources) if payload.sources is not None else tuple(configured)
+    enabled = tuple(source for source in requested if configured[source].enabled)
+    if not enabled:
+        raise HTTPException(status_code=409, detail="No requested threat-feed source is enabled")
+    background_tasks.add_task(
+        sync_configured_feeds,
+        enabled,
+        openphish_enabled=switches["openphishEnabled"],
+    )
+    return {
+        "status": "queued",
+        "sources": list(enabled),
+        "rateLimitHonored": True,
     }
 
 

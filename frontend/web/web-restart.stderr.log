@@ -1,0 +1,56 @@
+Image with src "/brand-logo?v=3" is using a query string which is not configured in images.localPatterns. This config will be required starting in Next.js 16.
+Read more: https://nextjs.org/docs/messages/next-image-unconfigured-localpatterns
+Image with src "/brand-logo?v=3" is using a query string which is not configured in images.localPatterns. This config will be required starting in Next.js 16.
+Read more: https://nextjs.org/docs/messages/next-image-unconfigured-localpatterns
+Image with src "/brand-logo?v=3" is using a query string which is not configured in images.localPatterns. This config will be required starting in Next.js 16.
+Read more: https://nextjs.org/docs/messages/next-image-unconfigured-localpatterns
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+Error fetching specs: Error: Failed to fetch specs
+    at GET (app\api\admin\specs\route.ts:17:19)
+  15 |
+  16 |         if (!response.ok) {
+> 17 |             throw new Error('Failed to fetch specs');
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const data = await response.json();
+Error fetching specs: Error: Failed to fetch specs
+    at GET (app\api\admin\specs\route.ts:17:19)
+  15 |
+  16 |         if (!response.ok) {
+> 17 |             throw new Error('Failed to fetch specs');
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const data = await response.json();
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+Error fetching specs: Error: Failed to fetch specs
+    at GET (app\api\admin\specs\route.ts:17:19)
+  15 |
+  16 |         if (!response.ok) {
+> 17 |             throw new Error('Failed to fetch specs');
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const data = await response.json();
+Error fetching specs: Error: Failed to fetch specs
+    at GET (app\api\admin\specs\route.ts:17:19)
+  15 |
+  16 |         if (!response.ok) {
+> 17 |             throw new Error('Failed to fetch specs');
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const data = await response.json();
+Image with src "/brand-logo?v=3" is using a query string which is not configured in images.localPatterns. This config will be required starting in Next.js 16.
+Read more: https://nextjs.org/docs/messages/next-image-unconfigured-localpatterns
+Error fetching specs: Error: Failed to fetch specs
+    at GET (app\api\admin\specs\route.ts:17:19)
+  15 |
+  16 |         if (!response.ok) {
+> 17 |             throw new Error('Failed to fetch specs');
+     |                   ^
+  18 |         }
+  19 |
+  20 |         const data = await response.json();

@@ -28,6 +28,8 @@ import type {
     AssessResult,
     BrowserSandboxResult,
     ExeSandboxResult,
+
+    ExeProviderResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
@@ -460,6 +462,11 @@ function buildPlanInfo(tier: PlanTier): PlanInfo {
         label: labels[tier],
         renewsAt: tier === "free" ? undefined : "02/08/2026",
         dailyScanLimit: tier === "free" ? 50 : Number.POSITIVE_INFINITY,
+        aiCreditDailyLimit: tier === "free" ? 5 : tier === "pro" ? 50 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
+        deepScanDailyLimit: tier === "free" ? 1 : tier === "pro" ? 10 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
+        chatFollowupLimit: tier === "free" ? 3 : tier === "pro" ? 20 : tier === "team" ? 50 : Number.POSITIVE_INFINITY,
+        autoMessageContext: tier !== "free",
+        autoWebContext: tier !== "free",
     };
 }
 
@@ -605,8 +612,12 @@ export class MockApiClient implements ApiClient {
         };
     }
 
-    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
-        return { ok: false, execution_status: "failed", filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để chạy Windows Sandbox thật."], processes: [], files_created: [], network_attempts: [], elapsed_ms: 0 };
+    async sandboxExecutable(file: File, _shareWithProvider = false): Promise<ExeSandboxResult> {
+        return { ok: false, execution_status: "failed", analysis_mode: "quick_scan", dynamic_execution: false, filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để phân tích EXE thật."], processes: [], files_created: [], network_attempts: [], provider_available: false, upload_consent_required: false, elapsed_ms: 0 };
+    }
+
+    async getExecutableProviderReport(_dataId: string): Promise<ExeProviderResult> {
+        return { name: "mock", configured: false, status: "disabled", data_id: null, progress: 0, detected_engines: 0, total_engines: 0, detections: [], risk_score: 0, sample_shared: false, error: null };
     }
 
     async assessText(
@@ -616,6 +627,63 @@ export class MockApiClient implements ApiClient {
         const result = mockAssessText(text);
         this.recordScan("Email", result);
         return result;
+    }
+
+    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
+        return this.assessText(await file.text(), { ...metadata, modality: "email", source: "eml_upload" });
+    }
+
+    async getGmailStatus() {
+        return { configured: true, connected: true, address: "demo@gmail.com", status: "active" };
+    }
+
+    async connectGmail() {
+        return { authUrl: "/analyze?gmail=connected" };
+    }
+
+    async listGmailMessages() {
+        return [
+            { id: "demo-gmail-1", threadId: "thread-1", from: "Security <alert@example.com>", subject: "Xác minh tài khoản", date: new Date().toISOString(), snippet: "Hãy xác minh tài khoản ngay…", labelIds: ["INBOX"] },
+            { id: "demo-gmail-2", threadId: "thread-2", from: "Đối tác <partner@example.com>", subject: "Biên bản cuộc họp", date: new Date().toISOString(), snippet: "Nội dung cuộc họp tuần…", labelIds: ["INBOX"] },
+        ];
+    }
+
+    async getGmailMessagePreview(messageId: string) {
+        const suspicious = messageId === "demo-gmail-1";
+        return {
+            id: messageId,
+            threadId: suspicious ? "thread-1" : "thread-2",
+            from: suspicious ? "Security <alert@example.com>" : "Đối tác <partner@example.com>",
+            replyTo: "",
+            subject: suspicious ? "Xác minh tài khoản" : "Biên bản cuộc họp",
+            date: new Date().toISOString(),
+            body: suspicious
+                ? "Hãy xác minh tài khoản ngay. Liên kết trong thư đã được vô hiệu hóa ở chế độ xem an toàn."
+                : "Nội dung cuộc họp tuần và các đầu việc tiếp theo.",
+            labelIds: ["INBOX"],
+            attachments: [],
+            linksRemoved: suspicious ? 1 : 0,
+        };
+    }
+
+    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}) {
+        const text = messageId === "demo-gmail-1"
+            ? "Tài khoản sẽ bị khóa. Xác minh ngay tại http://account-verify.example/login"
+            : "Biên bản cuộc họp tuần và các đầu việc đã thống nhất.";
+        return this.assessText(text, { ...metadata, modality: "email", source: "gmail" });
+    }
+
+    async disconnectGmail(): Promise<void> {}
+
+    async assessPhone(phoneNumber: string, sms: string, _countryHint = "VN", metadata: AssessMetadata = {}): Promise<import("@/lib/types").PhoneAssessResult> {
+        const assessment = await this.assessText(sms, { ...metadata, modality: "sms", phoneNumber });
+        return {
+            provider: "",
+            providerStatus: "unavailable",
+            reputation: null,
+            metadata: {},
+            assessment,
+        };
     }
 
     async *openChatStream(

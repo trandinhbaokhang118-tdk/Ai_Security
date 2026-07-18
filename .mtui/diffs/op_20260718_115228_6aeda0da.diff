@@ -1,0 +1,142 @@
+@@ -257,7 +257,7 @@
+     const score = clamp(Math.round(rawScore), 0, 100);
+     const sorted = sortEvidenceBySeverity(evidence);
+     const level = getRiskLevel(score);
+-    return {
++    return {
+         score,
+         riskLevel: level.key,
+         confidence: estimateConfidence(score, sorted),
+@@ -459,14 +459,14 @@
+         tier,
+         label: labels[tier],
+         renewsAt: tier === "free" ? undefined : "02/08/2026",
+-        dailyScanLimit: tier === "free" ? 50 : Number.POSITIVE_INFINITY,
+-        aiCreditDailyLimit: tier === "free" ? 5 : tier === "pro" ? 50 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
+-        deepScanDailyLimit: tier === "free" ? 1 : tier === "pro" ? 10 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
+-        chatFollowupLimit: tier === "free" ? 3 : tier === "pro" ? 20 : tier === "team" ? 50 : Number.POSITIVE_INFINITY,
+-        autoMessageContext: tier !== "free",
+-        autoWebContext: tier !== "free",
+-    };
+-}
++        dailyScanLimit: tier === "free" ? 50 : Number.POSITIVE_INFINITY,
++        aiCreditDailyLimit: tier === "free" ? 5 : tier === "pro" ? 50 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
++        deepScanDailyLimit: tier === "free" ? 1 : tier === "pro" ? 10 : tier === "team" ? 100 : Number.POSITIVE_INFINITY,
++        chatFollowupLimit: tier === "free" ? 3 : tier === "pro" ? 20 : tier === "team" ? 50 : Number.POSITIVE_INFINITY,
++        autoMessageContext: tier !== "free",
++        autoWebContext: tier !== "free",
++    };
++}
+ 
+ /** Suy ra tên hiển thị từ phần local của email. */
+ function displayNameFromEmail(email: string): string {
+@@ -610,58 +610,58 @@
+         };
+     }
+ 
+-    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
++    async sandboxExecutable(file: File, _shareWithProvider = false): Promise<ExeSandboxResult> {
+         return { ok: false, execution_status: "failed", filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để chạy Windows Sandbox thật."], processes: [], files_created: [], network_attempts: [], elapsed_ms: 0 };
+     }
+ 
+-    async assessText(
+-        text: string,
+-        _metadata?: AssessMetadata,
++    async assessText(
++        text: string,
++        _metadata?: AssessMetadata,
+     ): Promise<AssessResult> {
+         const result = mockAssessText(text);
+         this.recordScan("Email", result);
+-        return result;
+-    }
+-
+-    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
+-        return this.assessText(await file.text(), { ...metadata, modality: "email", source: "eml_upload" });
+-    }
+-
+-    async getGmailStatus() {
+-        return { configured: true, connected: true, address: "demo@gmail.com", status: "active" };
+-    }
+-
+-    async connectGmail() {
+-        return { authUrl: "/analyze?gmail=connected" };
+-    }
+-
+-    async listGmailMessages() {
+-        return [
+-            { id: "demo-gmail-1", threadId: "thread-1", from: "Security <alert@example.com>", subject: "Xác minh tài khoản", date: new Date().toISOString(), snippet: "Hãy xác minh tài khoản ngay…", labelIds: ["INBOX"] },
+-            { id: "demo-gmail-2", threadId: "thread-2", from: "Đối tác <partner@example.com>", subject: "Biên bản cuộc họp", date: new Date().toISOString(), snippet: "Nội dung cuộc họp tuần…", labelIds: ["INBOX"] },
+-        ];
+-    }
+-
+-    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}) {
+-        const text = messageId === "demo-gmail-1"
+-            ? "Tài khoản sẽ bị khóa. Xác minh ngay tại http://account-verify.example/login"
+-            : "Biên bản cuộc họp tuần và các đầu việc đã thống nhất.";
+-        return this.assessText(text, { ...metadata, modality: "email", source: "gmail" });
+-    }
+-
+-    async disconnectGmail(): Promise<void> {}
+-
+-    async assessPhone(phoneNumber: string, sms: string, _countryHint = "VN", metadata: AssessMetadata = {}): Promise<import("@/lib/types").PhoneAssessResult> {
+-        const assessment = await this.assessText(sms, { ...metadata, modality: "sms", phoneNumber });
+-        return {
+-            provider: "",
+-            providerStatus: "unavailable",
+-            reputation: null,
+-            metadata: {},
+-            assessment,
+-        };
+-    }
++        return result;
++    }
++
++    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
++        return this.assessText(await file.text(), { ...metadata, modality: "email", source: "eml_upload" });
++    }
++
++    async getGmailStatus() {
++        return { configured: true, connected: true, address: "demo@gmail.com", status: "active" };
++    }
++
++    async connectGmail() {
++        return { authUrl: "/analyze?gmail=connected" };
++    }
++
++    async listGmailMessages() {
++        return [
++            { id: "demo-gmail-1", threadId: "thread-1", from: "Security <alert@example.com>", subject: "Xác minh tài khoản", date: new Date().toISOString(), snippet: "Hãy xác minh tài khoản ngay…", labelIds: ["INBOX"] },
++            { id: "demo-gmail-2", threadId: "thread-2", from: "Đối tác <partner@example.com>", subject: "Biên bản cuộc họp", date: new Date().toISOString(), snippet: "Nội dung cuộc họp tuần…", labelIds: ["INBOX"] },
++        ];
++    }
++
++    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}) {
++        const text = messageId === "demo-gmail-1"
++            ? "Tài khoản sẽ bị khóa. Xác minh ngay tại http://account-verify.example/login"
++            : "Biên bản cuộc họp tuần và các đầu việc đã thống nhất.";
++        return this.assessText(text, { ...metadata, modality: "email", source: "gmail" });
++    }
++
++    async disconnectGmail(): Promise<void> {}
+ 
++    async assessPhone(phoneNumber: string, sms: string, _countryHint = "VN", metadata: AssessMetadata = {}): Promise<import("@/lib/types").PhoneAssessResult> {
++        const assessment = await this.assessText(sms, { ...metadata, modality: "sms", phoneNumber });
++        return {
++            provider: "",
++            providerStatus: "unavailable",
++            reputation: null,
++            metadata: {},
++            assessment,
++        };
++    }
++
+     async *openChatStream(
+         payload: ChatRequest,
+     ): AsyncGenerator<ChatChunk, ChatFinal, void> {
+@@ -828,4 +828,4 @@
+             `Hãy dán một URL hoặc nội dung email để mình phân tích rủi ro chi tiết nhé.`
+         );
+     }
+-}
++}

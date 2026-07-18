@@ -1,0 +1,13 @@
+@@ -828,10 +828,12 @@
+     result,
+     polling,
+     onShare,
++    onRefresh,
+ }: {
+     result: ExeSandboxResult;
+     polling: boolean;
+     onShare?: () => void;
++    onRefresh?: () => void;
+ }) {
+     const provider = result.provider;
+     const local = result.local_analysis;

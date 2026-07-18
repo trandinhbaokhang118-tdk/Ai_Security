@@ -1,0 +1,25 @@
+@@ -1138,6 +1138,24 @@
+     return result
+ 
+ 
++def write_json_schemas(output_root: Path) -> None:
++    schema_dir = output_root / "schemas"
++    schema_dir.mkdir(parents=True, exist_ok=True)
++    models = {
++        "message_input": MessageContextInput,
++        "message_output": MessageContextOutput,
++        "web_input": WebContextInput,
++        "web_output": WebContextOutput,
++        "explanation_input": ExplanationInput,
++        "explanation_output": ExplanationOutput,
++    }
++    for name, model in models.items():
++        (schema_dir / f"{name}.schema.json").write_text(
++            json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2),
++            encoding="utf-8",
++        )
++
++
+ def write_supporting_docs(output_root: Path, manifest: dict[str, Any]) -> None:
+     source_lines = [
+         "# Source datasets and licenses",

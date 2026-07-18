@@ -1,0 +1,69 @@
+
+> ai-security-armor-web@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3000
+
+   ▲ Next.js 15.5.18
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 7.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 2.3s (732 modules)
+ GET / 200 in 4024ms
+ GET / 200 in 4346ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 11s (768 modules)
+ GET /brand-logo?v=3 200 in 12534ms
+ ✓ Compiled in 2.1s (316 modules)
+ GET / 200 in 2440ms
+ GET / 200 in 330ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 1656ms (761 modules)
+ GET /analyze 200 in 2214ms
+ ○ Compiling /account/mcp-connect ...
+ ✓ Compiled /account/mcp-connect in 573ms (786 modules)
+ GET /account/mcp-connect 200 in 752ms
+ ○ Compiling /sandbox ...
+ ✓ Compiled /account/api-key in 4.2s (789 modules)
+ GET /sandbox 200 in 5487ms
+ GET /account/api-key 200 in 3778ms
+ GET /account/api-key 200 in 191ms
+ ○ Compiling /auth ...
+ ✓ Compiled /auth in 1003ms (804 modules)
+ GET /auth 200 in 1296ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 580ms (496 modules)
+ GET /brand-logo?v=3 200 in 1145ms
+ GET /auth 200 in 760ms
+ GET /brand-logo?v=3 200 in 94ms
+ GET /brand-logo?v=3 200 in 122ms
+ GET /analyze 200 in 78ms
+ GET /account/api-key 200 in 95ms
+ GET / 200 in 195ms
+ GET /brand-logo?v=3 200 in 47ms
+ GET /brand-logo?v=3 200 in 99ms
+ GET / 200 in 109ms
+ GET /brand-logo?v=3 200 in 66ms
+ GET /analyze 200 in 84ms
+ GET /account/api-key 200 in 53ms
+ ✓ Compiled in 1384ms (808 modules)
+ GET /account/api-key 200 in 461ms
+ GET /account/api-key 200 in 307ms
+ GET /account/api-key 200 in 241ms
+ ✓ Compiled in 2.6s (808 modules)
+ GET /account/api-key 200 in 534ms
+ GET /account/api-key 200 in 207ms
+ GET /account/mcp-connect 200 in 49ms
+ ○ Compiling /methodology ...
+ ✓ Compiled /methodology in 555ms (800 modules)
+ GET /methodology 200 in 707ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1343ms (1155 modules)
+ GET /methodology 500 in 7564ms
+ ○ Compiling / ...
+ ✓ Compiled / in 662ms (664 modules)
+ GET / 200 in 1394ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 896ms (685 modules)
+ GET /brand-logo?v=3 200 in 1223ms

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "algorithm": "dhash64",
+  "match_threshold": 0.88,
+  "brands": []
+}

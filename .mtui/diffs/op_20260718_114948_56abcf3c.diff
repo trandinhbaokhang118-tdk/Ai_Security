@@ -1,0 +1,15 @@
+@@ -224,6 +224,14 @@
+     signature_status?: string;
+     signer?: string | null;
+     defender_detections?: Record<string, unknown>[];
++    analysis_mode?: "quick_scan" | "windows_sandbox";
++    dynamic_execution?: boolean;
++    local_analysis?: ExeLocalAnalysis;
++    provider?: ExeProviderResult;
++    provider_available?: boolean;
++    upload_consent_required?: boolean;
++    privacy_notice?: string;
++
+     elapsed_ms: number;
+ }
+ 

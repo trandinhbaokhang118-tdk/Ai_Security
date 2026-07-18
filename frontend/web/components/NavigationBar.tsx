@@ -109,7 +109,7 @@ export default function NavigationBar({
                             {accountOpen && (
                                 <div role="menu" className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
                                     <Link href="/account" role="menuitem" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">Tổng quan</Link>
-                                    <Link href="/account/history" role="menuitem" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">Lịch sử quét</Link>
+                                    <Link href="/account/history" role="menuitem" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">Lịch sử tài khoản</Link>
                                     <button type="button" role="menuitem" onClick={onLogout} className="block w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50">Đăng xuất</button>
                                 </div>
                             )}

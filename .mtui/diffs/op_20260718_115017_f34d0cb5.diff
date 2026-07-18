@@ -1,0 +1,9 @@
+@@ -49,7 +49,7 @@
+ 
+     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
+     /** Phân tích nhanh PE cục bộ và tùy chọn tra cứu/chia sẻ với provider. */
+-    /** Chạy tệp EXE trong Windows Sandbox thật, không chạy trực tiếp trên máy chủ. */
++    sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;
+     sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+ 
+     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */

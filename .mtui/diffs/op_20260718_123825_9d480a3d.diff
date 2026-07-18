@@ -1,0 +1,9 @@
+@@ -400,7 +400,7 @@
+                 f"{self.base_url}/file/{encoded_id}",
+                 headers=self._headers(),
+             )
+-        response.raise_for_status()
++        self._ensure_success(response)
+         return self._normalize(response.json(), fallback_status="queued")
+ 
+     def disabled_result(self) -> dict[str, Any]:

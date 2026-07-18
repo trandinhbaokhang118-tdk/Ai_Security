@@ -1,0 +1,25 @@
+$ python -c import subprocess;lines=['@router.post(\x22/file/exe-quick-scan\x22, response_model=dict)','async def quick_scan_executable(','    file: UploadFile,','    request: Request,','    credentials: BearerCredentials,','    share_with_provider: bool = Form(False),','    db: DbSession = Depends(get_db),','):','    actor = resolve_actor(credentials, db, request)','    require_api_key_scope(actor, \x22assess:file\x22)','    reserve_scan_quota(db, actor, request)','    filename = file.filename or \x22sample.exe\x22','    if not filename.lower().endswith(\x22.exe\x22):','        raise HTTPException(status_code=400, detail=\x22Ch\u1ec9 ch\u1ea5p nh\u1eadn t\u1ec7p .exe\x22)','    data = await file.read(settings.max_upload_bytes + 1)','    if len(data) > settings.max_upload_bytes:','        raise HTTPException(status_code=413, detail=\x22File too large\x22)','    return await asyncio.to_thread(','        exe_quick_scan_service.inspect,','        data,','        filename,','        share_with_provider=share_with_provider,','    )','','','@router.get(\x22/file/exe-quick-scan/provider/{data_id}\x22, response_model=dict)','async def quick_scan_provider_report(','    data_id: str,','    request: Request,','    credentials: BearerCredentials,','    db: DbSession = Depends(get_db),','):','    actor = resolve_actor(credentials, db, request)','    require_api_key_scope(actor, \x22assess:file\x22)','    return await asyncio.to_thread(exe_quick_scan_service.provider_report, data_id)'];c='\n'.join(lines)+'\n';subprocess.run(['mtui','--json','edit','backend/routers/assess.py','insert-before','@router.post(\x22/file/exe-sandbox\x22, response_model=dict)',c],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 634
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_before",
+  "operation_id": "op_20260718_114750_c5164c7b",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\backend\\routers\\assess.py",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_114750_c5164c7b\\assess.py",
+  "diff_summary": "+36 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "511e1244d5ae3ea94d4cb9e3f9567b59cdd79c6f3b155c9d317f7f392806afe3",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

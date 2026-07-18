@@ -1,0 +1,13 @@
+@@ -41,6 +41,12 @@
+ MISP_API_KEY=
+ MISP_VERIFY_TLS=true
+ 
++# Quick EXE Lab analysis. Leave the key empty for local PE analysis only.
++# A sample is uploaded only after the user explicitly enables sharing.
++METADEFENDER_API_KEY=
++METADEFENDER_BASE_URL=https://api.metadefender.com/v4
++METADEFENDER_TIMEOUT_SECONDS=20
++
+ # Optional bounded local feeds and multi-machine IOC consensus.
+ THREAT_FEED_SCHEDULER_ENABLED=false
+ THREAT_FEED_SCHEDULER_INTERVAL_MINUTES=60

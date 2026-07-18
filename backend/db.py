@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from threading import Lock
 
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.config import settings
@@ -56,6 +56,57 @@ _init_lock = Lock()
 _database_initialized = False
 
 
+def _ensure_sqlite_development_columns() -> None:
+    """Keep persistent local/demo SQLite databases compatible without Alembic.
+
+    Production deployments still use the versioned migration. ``create_all``
+    cannot add columns to an existing SQLite table, so local upgrades need this
+    small idempotent bridge before ORM queries select the new quota fields.
+    """
+
+    if engine.dialect.name != "sqlite":
+        return
+    columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("daily_quota_usage")
+    }
+    additions = {
+        "ai_credit_count": "INTEGER NOT NULL DEFAULT 0",
+        "ai_evaluation_count": "INTEGER NOT NULL DEFAULT 0",
+        "ai_explanation_count": "INTEGER NOT NULL DEFAULT 0",
+        "deep_scan_count": "INTEGER NOT NULL DEFAULT 0",
+        "ai_limit_snapshot": "INTEGER",
+        "deep_limit_snapshot": "INTEGER",
+        "last_ai_at": "DATETIME",
+        "last_deep_at": "DATETIME",
+    }
+    with engine.begin() as connection:
+        for name, definition in additions.items():
+            if name not in columns:
+                connection.execute(
+                    text(f"ALTER TABLE daily_quota_usage ADD COLUMN {name} {definition}")
+                )
+        sandbox_columns = {
+            column["name"] for column in inspect(engine).get_columns("cloud_sandbox_sessions")
+        }
+        sandbox_additions = {
+            "agent_token_hash": "VARCHAR(64)",
+            "sample_filename": "VARCHAR(260)",
+            "sample_storage_path": "TEXT",
+            "sample_sha256": "VARCHAR(64)",
+            "sample_size": "INTEGER",
+            "sample_status": "VARCHAR(32) NOT NULL DEFAULT 'none'",
+            "sample_report": "JSON NOT NULL DEFAULT '{}'",
+            "sample_uploaded_at": "DATETIME",
+            "sample_completed_at": "DATETIME",
+        }
+        for name, definition in sandbox_additions.items():
+            if name not in sandbox_columns:
+                connection.execute(
+                    text(f"ALTER TABLE cloud_sandbox_sessions ADD COLUMN {name} {definition}")
+                )
+
+
 def get_db() -> Iterator[Session]:
     initialize_database()
     db = SessionLocal()
@@ -96,28 +147,30 @@ def initialize_database() -> None:
         )
 
         Base.metadata.create_all(bind=engine)
+        _ensure_sqlite_development_columns()
 
         with SessionLocal() as db:
             plans = {
-                "free": ("FREE", 50, 0, 0, {"api_key": False, "history_days": 7}),
-                "pro": ("PRO", None, 99000, 990000, {"api_key": True, "history_days": 90}),
+                "free": ("FREE", 50, 0, 0, {"api_key": False, "history_days": 7, "ai_credit_daily_limit": 5, "deep_scan_daily_limit": 1, "chat_followup_limit": 3, "auto_message_context": False, "auto_web_context": False}),
+                "pro": ("PRO", None, 99000, 990000, {"api_key": True, "history_days": 90, "ai_credit_daily_limit": 50, "deep_scan_daily_limit": 10, "chat_followup_limit": 20, "auto_message_context": True, "auto_web_context": True}),
                 "team": (
                     "TEAM",
                     None,
                     299000,
                     2990000,
-                    {"api_key": True, "history_days": 365, "mcp": True},
+                    {"api_key": True, "history_days": 365, "mcp": True, "ai_credit_daily_limit": 100, "deep_scan_daily_limit": 100, "chat_followup_limit": 50, "auto_message_context": True, "auto_web_context": True},
                 ),
                 "enterprise": (
                     "ENTERPRISE",
                     None,
                     None,
                     None,
-                    {"api_key": True, "history_days": 730, "mcp": True, "sso": True},
+                    {"api_key": True, "history_days": 730, "mcp": True, "sso": True, "ai_credit_daily_limit": 999999, "deep_scan_daily_limit": 999999, "chat_followup_limit": 999999, "auto_message_context": True, "auto_web_context": True},
                 ),
             }
             for tier, (label, limit, monthly, yearly, features) in plans.items():
-                if db.get(Plan, tier) is None:
+                current_plan = db.get(Plan, tier)
+                if current_plan is None:
                     db.add(
                         Plan(
                             tier=tier,
@@ -128,6 +181,10 @@ def initialize_database() -> None:
                             features=features,
                         )
                     )
+                else:
+                    merged_features = dict(features)
+                    merged_features.update(current_plan.features or {})
+                    current_plan.features = merged_features
 
             # Upgrade legacy development keys to the explicit Agent Shield scopes.
             default_scopes = [

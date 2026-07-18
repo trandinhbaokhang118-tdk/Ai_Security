@@ -39,7 +39,7 @@
 
 - Mở `/demo` để chạy so sánh A/B cho hai đề tài: **Deepfake & Phishing Detection** và **AI Security & Robustness**.
 - Luồng demo dùng detector thật cho phishing, prompt injection và training-data poisoning; canary/tool call chỉ chạy trong sandbox.
-- Deepfake dùng model ViT ONNX cục bộ để sàng lọc ảnh tĩnh/ảnh AI-generated. Chưa hỗ trợ video, audio và không xem xác suất model là bằng chứng pháp y tuyệt đối.
+- Deepfake dùng model ViT ONNX cục bộ để sàng lọc ảnh tĩnh/ảnh AI-generated. Video MP4/WebM/MOV/AVI được hỗ trợ ở mức beta bằng cách lấy mẫu tối đa 12 frame (50 MB, 120 giây, timeout 45 giây) rồi chạy model ảnh; hệ thống không phân tích chuyển động hoặc tính nhất quán theo thời gian. Audio báo `unavailable` vì chưa có detector audio được đóng gói và kiểm định. Mọi xác suất chỉ là tín hiệu sàng lọc, không phải bằng chứng pháp y tuyệt đối.
 - Kịch bản thuyết trình chi tiết: [`docs/judge-demo.md`](docs/judge-demo.md).
 
 ---
@@ -282,6 +282,9 @@ curl -X POST http://localhost:8000/v1/assess/url \
 ---
 
 ## 🔧 Cấu hình nâng cao
+
+Hướng dẫn cắm contextual LoRA/phone provider và phục vụ nhiều adapter trên một
+base model: [`docs/context-adapters.md`](docs/context-adapters.md).
 
 ### Environment Variables
 

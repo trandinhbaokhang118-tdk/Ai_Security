@@ -1,0 +1,79 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','line','345','replace','    async sandboxExecutable(file: File, shareWithProvider = false): Promise<ExeSandboxResult> {'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','line','348','replace','        form.append(\x22share_with_provider\x22, shareWithProvider ? \x22true\x22 : \x22false\x22);\n        const response = await fetch(`${getApiBase()}/v1/assess/file/exe-quick-scan`,'],check=True);lines=['','    async getExecutableProviderReport(dataId: string): Promise<ExeProviderResult> {','        return requestJson<ExeProviderResult>(', '            `/v1/assess/file/exe-quick-scan/provider/${encodeURIComponent(dataId)}`,','            withAuthentication({ method: \x22GET\x22 }),','        );','    }'];c='\n'.join(lines)+'\n';subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','insert-after','        return response.json() as Promise<ExeSandboxResult>;',c],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','insert-after','    ExeSandboxResult,','\n    ExeProviderResult,'],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 686
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115125_b228ce20",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115125_b228ce20\\real.ts",
+  "diff_summary": "+139 -139",
+  "matches": null,
+  "line": 345,
+  "current_hash": "dd349e9c2b67d20db2e8e2dbff0524446b0057a702b2d2cc0dc8db27f4de358b",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115125_914b7ad5",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115125_914b7ad5\\real.ts",
+  "diff_summary": "+2 -1",
+  "matches": null,
+  "line": 348,
+  "current_hash": "4e62495a0c35738d9bf6b1a66d428ffcafed91fc2e35a4b1e147d7235c77f596",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_115125_149196c8",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115125_149196c8\\real.ts",
+  "diff_summary": "+8 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "383d68551d2cab27c507940e6a5754c59ba40c3224d2ae45c0e34916f2654751",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_115125_b4e4565b",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115125_b4e4565b\\real.ts",
+  "diff_summary": "+2 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "0ed5b76bc1556fe0972dba2e9b5875f022355b73a8e10fe072d00f395b51278c",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

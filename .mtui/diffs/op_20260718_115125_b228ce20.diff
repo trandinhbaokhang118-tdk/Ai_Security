@@ -1,0 +1,358 @@
+@@ -33,14 +33,14 @@
+     ExeSandboxResult,
+     ChatChunk,
+     ChatFinal,
+-    ChatRequest,
+-    ContextualAnalysis,
++    ChatRequest,
++    ContextualAnalysis,
+     Credentials,
+     Evidence,
+-    PlanInfo,
+-    PhoneAssessResult,
+-    GmailMessageSummary,
+-    GmailStatus,
++    PlanInfo,
++    PhoneAssessResult,
++    GmailMessageSummary,
++    GmailStatus,
+     PasswordChangeInput,
+     PasswordResetRequestResult,
+     RegisterInput,
+@@ -96,7 +96,7 @@
+  * dung nạp cả `AssessResponse` (design.md §7) lẫn schema MCP (`risk_score`
+  * 0..1, `request_id`).
+  */
+-interface BackendAssessResponse {
++interface BackendAssessResponse {
+     /** Điểm rủi ro chuẩn hóa 0..1 (schema MCP). */
+     risk_score?: number;
+     /** Mức rủi ro 5 bậc (design.md §7). */
+@@ -107,11 +107,11 @@
+     explanation?: string;
+     model_version?: string;
+     latency_ms?: number;
+-    request_id?: string;
+-    analysis_coverage?: Record<string, string>;
+-    message_metadata?: Record<string, unknown>;
+-    embedded_url_assessments?: Array<Record<string, unknown>>;
+-    contextual_analysis?: ContextualAnalysis;
++    request_id?: string;
++    analysis_coverage?: Record<string, string>;
++    message_metadata?: Record<string, unknown>;
++    embedded_url_assessments?: Array<Record<string, unknown>>;
++    contextual_analysis?: ContextualAnalysis;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -184,9 +184,9 @@
+  *   `riskLevel === getRiskLevel(score).key`.
+  * - `confidence`: kẹp về [0,1].
+  */
+-function mapAssessResponse(
+-    raw: BackendAssessResponse,
+-    modality: "url" | "email" | "sms" | "text",
++function mapAssessResponse(
++    raw: BackendAssessResponse,
++    modality: "url" | "email" | "sms" | "text",
+ ): AssessResult {
+     const rawScore =
+         typeof raw.risk_score === "number" && Number.isFinite(raw.risk_score)
+@@ -217,13 +217,13 @@
+     if (typeof raw.model_version === "string") {
+         result.modelVersion = raw.model_version;
+     }
+-    if (typeof raw.latency_ms === "number") {
+-        result.latencyMs = raw.latency_ms;
+-    }
+-    if (raw.analysis_coverage) result.analysisCoverage = raw.analysis_coverage;
+-    if (raw.message_metadata) result.messageMetadata = raw.message_metadata;
+-    if (raw.embedded_url_assessments) result.embeddedUrlAssessments = raw.embedded_url_assessments;
+-    if (raw.contextual_analysis) result.contextualAnalysis = raw.contextual_analysis;
++    if (typeof raw.latency_ms === "number") {
++        result.latencyMs = raw.latency_ms;
++    }
++    if (raw.analysis_coverage) result.analysisCoverage = raw.analysis_coverage;
++    if (raw.message_metadata) result.messageMetadata = raw.message_metadata;
++    if (raw.embedded_url_assessments) result.embeddedUrlAssessments = raw.embedded_url_assessments;
++    if (raw.contextual_analysis) result.contextualAnalysis = raw.contextual_analysis;
+ 
+     return result;
+ }
+@@ -296,12 +296,12 @@
+  * Thông điệp phía server gửi qua WS chat. Mỗi message có `type` để phân biệt
+  * đoạn delta (token) với thông điệp kết thúc (kèm assessment tùy chọn).
+  */
+-interface WsChatMessage {
++interface WsChatMessage {
+     type: "delta" | "final" | "error";
+     delta?: string;
+     message_id?: string;
+     assessment?: BackendAssessResponse;
+-    modality?: "url" | "email" | "sms" | "text";
++    modality?: "url" | "email" | "sms" | "text";
+     error?: string;
+ }
+ 
+@@ -342,7 +342,7 @@
+         );
+     }
+ 
+-    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
++    async sandboxExecutable(file: File, shareWithProvider = false): Promise<ExeSandboxResult> {
+         const form = new FormData();
+         form.append("file", file);
+         const response = await fetch(`${getApiBase()}/v1/assess/file/exe-sandbox`,
+@@ -351,119 +351,119 @@
+         return response.json() as Promise<ExeSandboxResult>;
+     }
+ 
+-    async assessText(
++    async assessText(
+         text: string,
+         metadata?: AssessMetadata,
+     ): Promise<AssessResult> {
+-        const rawModality: "url" | "email" | "sms" | "text" = metadata?.modality ?? "email";
+-        // Gateway chỉ nhận modality "email" | "text" | "sms" cho endpoint text.
+-        const modality: "email" | "sms" | "text" = rawModality === "url" ? "text" : rawModality;
++        const rawModality: "url" | "email" | "sms" | "text" = metadata?.modality ?? "email";
++        // Gateway chỉ nhận modality "email" | "text" | "sms" cho endpoint text.
++        const modality: "email" | "sms" | "text" = rawModality === "url" ? "text" : rawModality;
+         const raw = await requestJson<BackendAssessResponse>("/v1/assess/text", {
+             ...withAuthentication({ method: "POST" }),
+-            body: JSON.stringify({
+-                text,
+-                modality,
+-                metadata: metadata ?? null,
+-                ai_context: metadata?.analysis_depth === "pro" ? "on" : "auto",
+-            }),
++            body: JSON.stringify({
++                text,
++                modality,
++                metadata: metadata ?? null,
++                ai_context: metadata?.analysis_depth === "pro" ? "on" : "auto",
++            }),
+         });
+-        return mapAssessResponse(raw, modality);
+-    }
+-
+-    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
+-        const form = new FormData();
+-        form.append("file", file);
+-        form.append("analysis_depth", String(metadata.analysis_depth || "balanced"));
+-        form.append("operator_context", String(metadata.operator_context || ""));
+-        form.append("ai_context", metadata.analysis_depth === "pro" ? "on" : "auto");
+-        const response = await fetch(
+-            `${getApiBase()}/v1/assess/email-file`,
+-            withAuthentication({ method: "POST", body: form }),
+-        );
+-        if (!response.ok) {
+-            throw new Error(`Phân tích Email thất bại: ${response.status} — ${await response.text()}`);
+-        }
+-        return mapAssessResponse(await response.json() as BackendAssessResponse, "email");
+-    }
+-
+-    async assessPhone(
+-        phoneNumber: string,
+-        sms: string,
+-        countryHint = "VN",
+-        metadata: AssessMetadata = {},
+-    ): Promise<PhoneAssessResult> {
+-        const raw = await requestJson<{
+-            provider?: string;
+-            provider_status?: PhoneAssessResult["providerStatus"];
+-            reputation?: PhoneAssessResult["reputation"];
+-            metadata?: Record<string, unknown>;
+-            assessment?: BackendAssessResponse | null;
+-        }>("/v1/assess/phone", {
+-            ...withAuthentication({ method: "POST" }),
+-            body: JSON.stringify({
+-                phone_number: phoneNumber,
+-                country_hint: countryHint,
+-                sms,
+-                transcript: "",
+-                metadata: { ...metadata, modality: "sms" },
+-                ai_context: metadata.analysis_depth === "pro" ? "on" : "auto",
+-            }),
+-        });
+-        return {
+-            provider: raw.provider ?? "",
+-            providerStatus: raw.provider_status ?? "unavailable",
+-            reputation: raw.reputation ?? null,
+-            metadata: raw.metadata ?? {},
+-            assessment: raw.assessment ? mapAssessResponse(raw.assessment, "sms") : null,
+-        };
+-    }
+-
+-    async getGmailStatus(): Promise<GmailStatus> {
+-        return requestJson<GmailStatus>(
+-            "/v1/integrations/gmail/status",
+-            withAuthentication({ method: "GET" }),
+-        );
+-    }
+-
+-    async connectGmail(): Promise<{authUrl: string}> {
+-        return requestJson<{authUrl: string}>(
+-            "/v1/integrations/gmail/connect",
+-            withAuthentication({ method: "POST" }),
+-        );
+-    }
+-
+-    async listGmailMessages(query = "", label = ""): Promise<GmailMessageSummary[]> {
+-        const params = new URLSearchParams();
+-        if (query.trim()) params.set("q", query.trim());
+-        if (label) params.set("label", label);
+-        const raw = await requestJson<{messages: GmailMessageSummary[]}>(
+-            `/v1/integrations/gmail/messages?${params.toString()}`,
+-            withAuthentication({ method: "GET" }),
+-        );
+-        return raw.messages;
+-    }
+-
+-    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}): Promise<AssessResult> {
+-        const raw = await requestJson<BackendAssessResponse>(
+-            `/v1/integrations/gmail/messages/${encodeURIComponent(messageId)}/assess`,
+-            {
+-                ...withAuthentication({ method: "POST" }),
+-                body: JSON.stringify({
+-                    analysis_depth: metadata.analysis_depth || "balanced",
+-                    operator_context: metadata.operator_context || "",
+-                }),
+-            },
+-        );
+-        return mapAssessResponse(raw, "email");
+-    }
+-
+-    async disconnectGmail(): Promise<void> {
+-        await requestJson<{disconnected: boolean}>(
+-            "/v1/integrations/gmail/connection",
+-            withAuthentication({ method: "DELETE" }),
+-        );
+-    }
++        return mapAssessResponse(raw, modality);
++    }
++
++    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
++        const form = new FormData();
++        form.append("file", file);
++        form.append("analysis_depth", String(metadata.analysis_depth || "balanced"));
++        form.append("operator_context", String(metadata.operator_context || ""));
++        form.append("ai_context", metadata.analysis_depth === "pro" ? "on" : "auto");
++        const response = await fetch(
++            `${getApiBase()}/v1/assess/email-file`,
++            withAuthentication({ method: "POST", body: form }),
++        );
++        if (!response.ok) {
++            throw new Error(`Phân tích Email thất bại: ${response.status} — ${await response.text()}`);
++        }
++        return mapAssessResponse(await response.json() as BackendAssessResponse, "email");
++    }
++
++    async assessPhone(
++        phoneNumber: string,
++        sms: string,
++        countryHint = "VN",
++        metadata: AssessMetadata = {},
++    ): Promise<PhoneAssessResult> {
++        const raw = await requestJson<{
++            provider?: string;
++            provider_status?: PhoneAssessResult["providerStatus"];
++            reputation?: PhoneAssessResult["reputation"];
++            metadata?: Record<string, unknown>;
++            assessment?: BackendAssessResponse | null;
++        }>("/v1/assess/phone", {
++            ...withAuthentication({ method: "POST" }),
++            body: JSON.stringify({
++                phone_number: phoneNumber,
++                country_hint: countryHint,
++                sms,
++                transcript: "",
++                metadata: { ...metadata, modality: "sms" },
++                ai_context: metadata.analysis_depth === "pro" ? "on" : "auto",
++            }),
++        });
++        return {
++            provider: raw.provider ?? "",
++            providerStatus: raw.provider_status ?? "unavailable",
++            reputation: raw.reputation ?? null,
++            metadata: raw.metadata ?? {},
++            assessment: raw.assessment ? mapAssessResponse(raw.assessment, "sms") : null,
++        };
++    }
++
++    async getGmailStatus(): Promise<GmailStatus> {
++        return requestJson<GmailStatus>(
++            "/v1/integrations/gmail/status",
++            withAuthentication({ method: "GET" }),
++        );
++    }
++
++    async connectGmail(): Promise<{authUrl: string}> {
++        return requestJson<{authUrl: string}>(
++            "/v1/integrations/gmail/connect",
++            withAuthentication({ method: "POST" }),
++        );
++    }
++
++    async listGmailMessages(query = "", label = ""): Promise<GmailMessageSummary[]> {
++        const params = new URLSearchParams();
++        if (query.trim()) params.set("q", query.trim());
++        if (label) params.set("label", label);
++        const raw = await requestJson<{messages: GmailMessageSummary[]}>(
++            `/v1/integrations/gmail/messages?${params.toString()}`,
++            withAuthentication({ method: "GET" }),
++        );
++        return raw.messages;
++    }
+ 
++    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}): Promise<AssessResult> {
++        const raw = await requestJson<BackendAssessResponse>(
++            `/v1/integrations/gmail/messages/${encodeURIComponent(messageId)}/assess`,
++            {
++                ...withAuthentication({ method: "POST" }),
++                body: JSON.stringify({
++                    analysis_depth: metadata.analysis_depth || "balanced",
++                    operator_context: metadata.operator_context || "",
++                }),
++            },
++        );
++        return mapAssessResponse(raw, "email");
++    }
++
++    async disconnectGmail(): Promise<void> {
++        await requestJson<{disconnected: boolean}>(
++            "/v1/integrations/gmail/connection",
++            withAuthentication({ method: "DELETE" }),
++        );
++    }
++
+     /**
+      * Mở luồng chat qua WebSocket `${wsBase}/v1/chat`.
+      *
+@@ -499,13 +499,13 @@
+                 notify = resolve;
+             });
+ 
+-        socket.onopen = () => {
+-            try {
+-                const accessToken = readStoredAccessToken();
+-                socket.send(JSON.stringify({
+-                    ...payload,
+-                    ...(accessToken ? { access_token: accessToken } : {}),
+-                }));
++        socket.onopen = () => {
++            try {
++                const accessToken = readStoredAccessToken();
++                socket.send(JSON.stringify({
++                    ...payload,
++                    ...(accessToken ? { access_token: accessToken } : {}),
++                }));
+             } catch (err) {
+                 streamError = err instanceof Error ? err : new Error(String(err));
+                 wake();
+@@ -673,4 +673,4 @@
+             withAuthentication({ method: "POST", body: JSON.stringify(input) }),
+         );
+     }
+-}
++}

@@ -1,0 +1,9 @@
+@@ -20,7 +20,7 @@
+             size = path.stat().st_size
+             path.unlink()
+             removed.append({"path": str(path), "bytes": size})
+-    after = shutil.disk_usage(r"C:\").free
++    after = shutil.disk_usage("C:/").free
+     print(json.dumps({
+         "removed": removed,
+         "freed_gb": round((after - before) / (1024 ** 3), 2),

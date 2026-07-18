@@ -9,6 +9,25 @@ from .overrides import OverrideRule, evaluate_overrides
 from .scoring import score_external, score_internal
 from .types import CriterionStatus, EvidenceV2, OverrideResult, RiskResultV2
 
+# Only direct, independently actionable hazards may force an immediate danger
+# floor. Contextual or circumstantial criteria remain additive and can still be
+# escalated by the explicit multi-signal rules in ``url_overrides.py``.
+_IMMEDIATE_DANGER_FINDINGS = frozenset(
+    {
+        "public_malicious_listing",
+        "credential_exfiltration",
+        "credential_form_with_external_destination",
+        "credential_field_with_deception_or_exfiltration",
+        "cross_origin_form_action",
+        "external_form_action",
+        "canary_exfiltration_blocked",
+        "private_network_request_blocked",
+        "websocket_request_blocked",
+        "disguised_executable_download",
+        "malicious_javascript_behavior",
+    }
+)
+
 
 def _level(score: float) -> str:
     if score >= 80:
@@ -35,6 +54,16 @@ def assess(
     external, awards = score_external(resolved, cfg, {e.evidence_id for e in internal_items})
     base = min(100.0, internal + external)
     overrides, effective = evaluate_overrides(resolved, override_rules)
+    immediate_evidence_ids = {
+        item.evidence_id
+        for item in internal_items
+        if item.criterion_id in DANGEROUS_CRITERION_IDS
+        and item.status == CriterionStatus.MALICIOUS
+        and item.evidence_quality >= 0.75
+        and item.adjusted_score > 0
+        and item.finding_type in _IMMEDIATE_DANGER_FINDINGS
+        and not item.source_id.startswith("web_context:")
+    }
     dangerous = sorted(
         (
             item
@@ -43,6 +72,7 @@ def assess(
             and item.status == CriterionStatus.MALICIOUS
             and item.evidence_quality >= 0.75
             and item.adjusted_score > 0
+            and bool(immediate_evidence_ids.intersection(item.evidence_ids))
         ),
         key=lambda item: item.criterion_id,
     )
@@ -52,7 +82,14 @@ def assess(
             floor=60.0,
             minimum_decision="soft_block",
             matched_evidence_ids=tuple(
-                sorted({evidence_id for item in dangerous for evidence_id in item.evidence_ids})
+                sorted(
+                    {
+                        evidence_id
+                        for item in dangerous
+                        for evidence_id in item.evidence_ids
+                        if evidence_id in immediate_evidence_ids
+                    }
+                )
             ),
             reason=(
                 "At least one high-confidence access-hazard criterion was malicious: "

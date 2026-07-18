@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.config import settings
 from backend.db import get_db
-from backend.models import ApiKey, DailyQuotaUsage, PasswordResetToken, ScanEvent, SessionRecord, Subscription, User
+from backend.models import (
+    ApiKey,
+    DailyQuotaUsage,
+    PasswordResetToken,
+    ScanEvent,
+    SessionRecord,
+    Subscription,
+    User,
+)
 from backend.security_utils import (
     create_api_key_value,
     create_password_salt,
@@ -123,6 +131,11 @@ class PlanInfo(BaseModel):
     label: str
     renewsAt: str | None = None
     dailyScanLimit: int
+    aiCreditDailyLimit: int
+    deepScanDailyLimit: int
+    chatFollowupLimit: int
+    autoMessageContext: bool = False
+    autoWebContext: bool = False
 
 
 class Session(BaseModel):
@@ -176,6 +189,14 @@ class QuotaInfo(BaseModel):
     usedToday: int
     dailyScanLimit: int
     remaining: int
+    aiUsedToday: int
+    aiEvaluationUsedToday: int
+    aiExplanationUsedToday: int
+    aiCreditDailyLimit: int
+    aiRemaining: int
+    deepUsedToday: int
+    deepScanDailyLimit: int
+    deepRemaining: int
 
 
 class ExtensionActivation(BaseModel):
@@ -218,6 +239,61 @@ def infer_plan_tier(email: str) -> str:
     return "free"
 
 
+_PLAN_ENTITLEMENT_DEFAULTS: dict[str, dict[str, int | bool]] = {
+    "free": {
+        "ai_credit_daily_limit": 5,
+        "deep_scan_daily_limit": 1,
+        "chat_followup_limit": 3,
+        "auto_message_context": False,
+        "auto_web_context": False,
+    },
+    "pro": {
+        "ai_credit_daily_limit": 50,
+        "deep_scan_daily_limit": 10,
+        "chat_followup_limit": 20,
+        "auto_message_context": True,
+        "auto_web_context": True,
+    },
+    "team": {
+        "ai_credit_daily_limit": 100,
+        "deep_scan_daily_limit": 100,
+        "chat_followup_limit": 50,
+        "auto_message_context": True,
+        "auto_web_context": True,
+    },
+    "enterprise": {
+        "ai_credit_daily_limit": 999_999,
+        "deep_scan_daily_limit": 999_999,
+        "chat_followup_limit": 999_999,
+        "auto_message_context": True,
+        "auto_web_context": True,
+    },
+}
+
+
+def _plan_entitlements(tier: str, features: dict | None = None) -> dict[str, int | bool]:
+    values = dict(_PLAN_ENTITLEMENT_DEFAULTS.get(tier, _PLAN_ENTITLEMENT_DEFAULTS["free"]))
+    for key in values:
+        if features and key in features:
+            values[key] = features[key]
+    return values
+
+
+def build_free_plan_info() -> PlanInfo:
+    entitlements = _plan_entitlements("free")
+    return PlanInfo(
+        tier="free",
+        label="FREE",
+        renewsAt=None,
+        dailyScanLimit=50,
+        aiCreditDailyLimit=int(entitlements["ai_credit_daily_limit"]),
+        deepScanDailyLimit=int(entitlements["deep_scan_daily_limit"]),
+        chatFollowupLimit=int(entitlements["chat_followup_limit"]),
+        autoMessageContext=bool(entitlements["auto_message_context"]),
+        autoWebContext=bool(entitlements["auto_web_context"]),
+    )
+
+
 def _active_subscription(db: DbSession, user_id: str) -> Subscription | None:
     return db.execute(
         select(Subscription)
@@ -229,9 +305,13 @@ def _active_subscription(db: DbSession, user_id: str) -> Subscription | None:
 def build_plan_info(db: DbSession, user_id: str) -> PlanInfo:
     subscription = _active_subscription(db, user_id)
     if subscription is None:
-        return PlanInfo(tier="free", label="FREE", renewsAt=None, dailyScanLimit=50)
+        return build_free_plan_info()
 
     plan = subscription.plan
+    entitlements = _plan_entitlements(
+        subscription.plan_tier,
+        plan.features if plan is not None else None,
+    )
     renews_at = subscription.renews_at
     if renews_at is None and subscription.plan_tier != "free":
         renews_at = datetime.combine(date.today() + timedelta(days=30), datetime.min.time())
@@ -240,7 +320,16 @@ def build_plan_info(db: DbSession, user_id: str) -> PlanInfo:
         label=plan.label if plan is not None else subscription.plan_tier.upper(),
         renewsAt=renews_at.strftime("%d/%m/%Y") if renews_at is not None else None,
         dailyScanLimit=plan.daily_scan_limit if plan and plan.daily_scan_limit is not None else 999_999,
+        aiCreditDailyLimit=int(entitlements["ai_credit_daily_limit"]),
+        deepScanDailyLimit=int(entitlements["deep_scan_daily_limit"]),
+        chatFollowupLimit=int(entitlements["chat_followup_limit"]),
+        autoMessageContext=bool(entitlements["auto_message_context"]),
+        autoWebContext=bool(entitlements["auto_web_context"]),
     )
+
+
+def build_actor_plan_info(db: DbSession, actor: ActorContext) -> PlanInfo:
+    return build_plan_info(db, actor.user.id) if actor.user is not None else build_free_plan_info()
 
 
 def _create_api_key_record(
@@ -455,13 +544,32 @@ def verify_extension_key(
         )
     ).scalar_one_or_none()
     used = usage.scan_count if usage is not None else 0
+    ai_used = usage.ai_credit_count if usage is not None else 0
+    ai_evaluation_used = usage.ai_evaluation_count if usage is not None else 0
+    ai_explanation_used = usage.ai_explanation_count if usage is not None else 0
+    deep_used = usage.deep_scan_count if usage is not None else 0
     limit = plan.dailyScanLimit
+    ai_limit = plan.aiCreditDailyLimit
+    deep_limit = plan.deepScanDailyLimit
     remaining = max(0, limit - used) if limit < 999_999 else 999_999
     return ExtensionActivation(
         valid=True,
         user=UserProfile(id=actor.user.id, email=actor.user.email, displayName=actor.user.display_name, role=actor.user.role),
         plan=plan,
-        quota=QuotaInfo(usageDay=today.isoformat(), usedToday=used, dailyScanLimit=limit, remaining=remaining),
+        quota=QuotaInfo(
+            usageDay=today.isoformat(),
+            usedToday=used,
+            dailyScanLimit=limit,
+            remaining=remaining,
+            aiUsedToday=ai_used,
+            aiEvaluationUsedToday=ai_evaluation_used,
+            aiExplanationUsedToday=ai_explanation_used,
+            aiCreditDailyLimit=ai_limit,
+            aiRemaining=max(0, ai_limit - ai_used) if ai_limit < 999_999 else 999_999,
+            deepUsedToday=deep_used,
+            deepScanDailyLimit=deep_limit,
+            deepRemaining=max(0, deep_limit - deep_used) if deep_limit < 999_999 else 999_999,
+        ),
         keyPrefix=actor.api_key.key_prefix,
     )
 
@@ -658,13 +766,27 @@ def get_quota(auth: CurrentSession, db: DbSession = Depends(get_db)) -> QuotaInf
         )
     ).scalar_one_or_none()
     used = usage.scan_count if usage is not None else 0
+    ai_used = usage.ai_credit_count if usage is not None else 0
+    ai_evaluation_used = usage.ai_evaluation_count if usage is not None else 0
+    ai_explanation_used = usage.ai_explanation_count if usage is not None else 0
+    deep_used = usage.deep_scan_count if usage is not None else 0
     limit = plan.dailyScanLimit
+    ai_limit = plan.aiCreditDailyLimit
+    deep_limit = plan.deepScanDailyLimit
     remaining = max(0, limit - used) if limit < 999_999 else 999_999
     return QuotaInfo(
         usageDay=today.isoformat(),
         usedToday=used,
         dailyScanLimit=limit,
         remaining=remaining,
+        aiUsedToday=ai_used,
+        aiEvaluationUsedToday=ai_evaluation_used,
+        aiExplanationUsedToday=ai_explanation_used,
+        aiCreditDailyLimit=ai_limit,
+        aiRemaining=max(0, ai_limit - ai_used) if ai_limit < 999_999 else 999_999,
+        deepUsedToday=deep_used,
+        deepScanDailyLimit=deep_limit,
+        deepRemaining=max(0, deep_limit - deep_used) if deep_limit < 999_999 else 999_999,
     )
 
 

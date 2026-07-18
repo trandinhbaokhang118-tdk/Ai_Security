@@ -1,0 +1,11 @@
+@@ -612,6 +612,10 @@
+ 
+     async sandboxExecutable(file: File, _shareWithProvider = false): Promise<ExeSandboxResult> {
+         return { ok: false, execution_status: "failed", analysis_mode: "quick_scan", dynamic_execution: false, filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để phân tích EXE thật."], processes: [], files_created: [], network_attempts: [], provider_available: false, upload_consent_required: false, elapsed_ms: 0 };
++    }
++
++    async getExecutableProviderReport(_dataId: string): Promise<ExeProviderResult> {
++        return { name: "mock", configured: false, status: "disabled", data_id: null, progress: 0, detected_engines: 0, total_engines: 0, detections: [], risk_score: 0, sample_shared: false, error: null };
+     }
+ 
+     async assessText(

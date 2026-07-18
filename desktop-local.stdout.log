@@ -1,0 +1,78 @@
+
+> ai-security-armor-desktop@0.1.0 dev
+> concurrently -k "vite --host 127.0.0.1" "wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron ."
+
+[0] [2m8:09:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+[0] 
+[0]   [32m[1mVITE[22m v8.1.4[39m  [2mready in [0m[1m769[22m[2m[0m ms[22m
+[0] 
+[0]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[0] [2m8:09:07 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[1] 
+[0] [2m9:12:27 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[0] [2m9:13:13 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[0] [2m9:13:13 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: AuthScreen is not defined
+[0] [39m > App src/App.tsx:24:22
+[0]     22 |    function exportReport(){const r=view==='web'?result:selected.result;if(!r)return;const text=`AI SECURITY ARMOR\nĐiể...
+[0]     23 |    async function signOut(){try{await logout()}catch{/* Session may already be expired. */}finally{setSession(null);se...
+[0]     24 |    if(!session)return <AuthScreen onAuthenticated={next=>{setSession(next);setView('home')}}/>;
+[0]        |                        ^
+[0]     25 |    return <main className="app-shell">
+[0]     26 |      <header className="topbar"><button className="brand" onClick={()=>setView('home')} aria-label="AI Security Armor ...
+[0]  > renderWithHooks node_modules/react-dom/cjs/react-dom.development.js:15486:17
+[0]  > mountIndeterminateComponent node_modules/react-dom/cjs/react-dom.development.js:20103:12
+[0]  > beginWork node_modules/react-dom/cjs/react-dom.development.js:21626:15
+[0]  > HTMLUnknownElement.callCallback node_modules/react-dom/cjs/react-dom.development.js:4164:13
+[0]  > Object.invokeGuardedCallbackDev node_modules/react-dom/cjs/react-dom.development.js:4213:15
+[0]  > invokeGuardedCallback node_modules/react-dom/cjs/react-dom.development.js:4277:30
+[0]  > beginWork$1 node_modules/react-dom/cjs/react-dom.development.js:27490:6
+[0]  > performUnitOfWork node_modules/react-dom/cjs/react-dom.development.js:26596:11
+[0]  > workLoopSync node_modules/react-dom/cjs/react-dom.development.js:26505:4
+[0] 
+[0] [2m9:13:13 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: AuthScreen is not defined
+[0] [39m > App src/App.tsx:24:22
+[0]     22 |    function exportReport(){const r=view==='web'?result:selected.result;if(!r)return;const text=`AI SECURITY ARMOR\nĐiể...
+[0]     23 |    async function signOut(){try{await logout()}catch{/* Session may already be expired. */}finally{setSession(null);se...
+[0]     24 |    if(!session)return <AuthScreen onAuthenticated={next=>{setSession(next);setView('home')}}/>;
+[0]        |                        ^
+[0]     25 |    return <main className="app-shell">
+[0]     26 |      <header className="topbar"><button className="brand" onClick={()=>setView('home')} aria-label="AI Security Armor ...
+[0]  > renderWithHooks node_modules/react-dom/cjs/react-dom.development.js:15486:17
+[0]  > mountIndeterminateComponent node_modules/react-dom/cjs/react-dom.development.js:20103:12
+[0]  > beginWork node_modules/react-dom/cjs/react-dom.development.js:21626:15
+[0]  > HTMLUnknownElement.callCallback node_modules/react-dom/cjs/react-dom.development.js:4164:13
+[0]  > Object.invokeGuardedCallbackDev node_modules/react-dom/cjs/react-dom.development.js:4213:15
+[0]  > invokeGuardedCallback node_modules/react-dom/cjs/react-dom.development.js:4277:30
+[0]  > beginWork$1 node_modules/react-dom/cjs/react-dom.development.js:27490:6
+[0]  > performUnitOfWork node_modules/react-dom/cjs/react-dom.development.js:26596:11
+[0]  > workLoopSync node_modules/react-dom/cjs/react-dom.development.js:26505:4
+[0] 
+[0] [2m9:13:13 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mThe above error occurred in the <App> component:
+[0] 
+[0]     at App (http://127.0.0.1:5173/src/App.tsx?t=1784297593226:44:32)
+[0] 
+[0] Consider adding an error boundary to your tree to customize error handling behavior.
+[0] Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+[0] [2m9:13:13 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mReferenceError[22m: AuthScreen is not defined
+[0] [39m > App src/App.tsx:24:22
+[0]     22 |    function exportReport(){const r=view==='web'?result:selected.result;if(!r)return;const text=`AI SECURITY ARMOR\nĐiể...
+[0]     23 |    async function signOut(){try{await logout()}catch{/* Session may already be expired. */}finally{setSession(null);se...
+[0]     24 |    if(!session)return <AuthScreen onAuthenticated={next=>{setSession(next);setView('home')}}/>;
+[0]        |                        ^
+[0]     25 |    return <main className="app-shell">
+[0]     26 |      <header className="topbar"><button className="brand" onClick={()=>setView('home')} aria-label="AI Security Armor ...
+[0]  > renderWithHooks node_modules/react-dom/cjs/react-dom.development.js:15486:17
+[0]  > mountIndeterminateComponent node_modules/react-dom/cjs/react-dom.development.js:20103:12
+[0]  > beginWork node_modules/react-dom/cjs/react-dom.development.js:21626:15
+[0]  > beginWork$1 node_modules/react-dom/cjs/react-dom.development.js:27465:13
+[0]  > performUnitOfWork node_modules/react-dom/cjs/react-dom.development.js:26596:11
+[0]  > workLoopSync node_modules/react-dom/cjs/react-dom.development.js:26505:4
+[0]  > renderRootSync node_modules/react-dom/cjs/react-dom.development.js:26473:6
+[0]  > recoverFromConcurrentError node_modules/react-dom/cjs/react-dom.development.js:25889:19
+[0]  > performSyncWorkOnRoot node_modules/react-dom/cjs/react-dom.development.js:26135:19
+[0] 
+[0] [2m9:13:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[1] ^C
+[1] wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron . exited with code 3221225786
+--> Sending SIGTERM to other processes..
+[0] vite --host 127.0.0.1 exited with code 3221225786

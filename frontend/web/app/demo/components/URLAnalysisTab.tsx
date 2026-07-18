@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Fingerprint, ImageIcon, Link2, Loader2, Play, ScanSearch, ShieldCheck, Upload, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Fingerprint, ImageIcon, Link2, Loader2, Play, ScanSearch, ShieldCheck, Upload, Video, VolumeX, XCircle } from "lucide-react";
 
-import type { DeepfakeImageResponse, URLAnalysisResponse } from "../types";
+import type { DeepfakeImageResponse, DeepfakeVideoResponse, URLAnalysisResponse } from "../types";
 
 const URL_EXAMPLES = [
     { label: "Giả mạo Facebook", value: "https://facebook.com.security-login-check.xyz/verify" },
@@ -31,6 +31,8 @@ export default function URLAnalysisTab() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [deepfakeResult, setDeepfakeResult] = useState<DeepfakeImageResponse | null>(null);
     const [deepfakeLoading, setDeepfakeLoading] = useState(false);
+    const [videoResult, setVideoResult] = useState<DeepfakeVideoResponse | null>(null);
+    const [videoLoading, setVideoLoading] = useState(false);
 
     useEffect(() => {
         if (!imageFile) { setImagePreview(null); return; }
@@ -80,6 +82,18 @@ export default function URLAnalysisTab() {
         await analyzeDeepfake(new File([blob], "ai-generated-demo.png", { type: "image/png" }));
     }
 
+    async function analyzeDeepfakeVideo(file: File) {
+        setVideoLoading(true); setVideoResult(null); setError(null);
+        try {
+            const form = new FormData(); form.append("video", file);
+            const response = await fetch("/api/demo/deepfake/analyze-video", { method: "POST", body: form });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || "Deepfake video analysis failed");
+            setVideoResult(data as DeepfakeVideoResponse);
+        } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể phân tích video"); }
+        finally { setVideoLoading(false); }
+    }
+
     const armorBlocked = result ? result.risk_score >= 0.5 : false;
     const scanSteps = advancedAnalysis ? [...BASE_STEPS, SANDBOX_STEP] : BASE_STEPS;
 
@@ -97,8 +111,10 @@ export default function URLAnalysisTab() {
                 <Capability icon={<Link2 className="h-4 w-4" />} label="Phishing URL" status="LIVE" tone="green" />
                 <Capability icon={<ScanSearch className="h-4 w-4" />} label="Phishing email/text" status="LIVE" tone="green" />
                 <Capability icon={<Eye className="h-4 w-4" />} label="Deepfake ảnh tĩnh" status="LIVE" tone="green" />
+                <Capability icon={<Video className="h-4 w-4" />} label="Video · lấy mẫu frame" status="BETA" tone="amber" />
+                <Capability icon={<VolumeX className="h-4 w-4" />} label="Deepfake audio" status="CHƯA CÓ MODEL" tone="amber" />
             </div>
-            <p className="mt-2 text-xs text-zinc-500">Deepfake hiện sàng lọc ảnh tĩnh/ảnh AI-generated bằng model ViT cục bộ. Video, audio và kết luận pháp y tuyệt đối không nằm trong phạm vi.</p>
+            <p className="mt-2 text-xs text-zinc-500">Ảnh dùng model ViT cục bộ. Video được lấy mẫu tối đa 12 frame rồi chạy cùng model ảnh; không kiểm tra chuyển động hay audio. Audio chưa được hỗ trợ vì chưa có detector đã đóng gói và kiểm định.</p>
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
@@ -138,6 +154,18 @@ export default function URLAnalysisTab() {
             <div className="flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4"><label className="flex cursor-pointer items-center gap-2 rounded-md bg-fuchsia-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fuchsia-900"><Upload className="h-4 w-4" /> Chọn ảnh để phân tích<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void analyzeDeepfake(file); }} /></label><button type="button" onClick={() => void loadBuiltInAiImage()} disabled={deepfakeLoading} className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50">{deepfakeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Dùng ảnh AI demo có sẵn</button><span className="self-center text-xs text-zinc-500">PNG, JPG hoặc WebP · tối đa 15 MB</span></div>
             {deepfakeResult && imagePreview && <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr_auto_1fr]"><div className="relative aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100"><Image src={imagePreview} alt="Ảnh đang được phân tích" fill unoptimized className="object-cover" /></div><article className="rounded-lg border border-red-300 bg-red-50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-red-700">Trước · Kiểm tra file</p><h3 className="mt-1 text-lg font-bold text-zinc-950">Không xác minh được nội dung</h3><div className="mt-5 space-y-3 text-sm"><StatusRow label="Định dạng hợp lệ" value="CÓ" /><StatusRow label="Phân tích pixel" value="KHÔNG" /><StatusRow label="Quyết định" value="ALLOW" danger /></div><div className="mt-5 rounded-md bg-red-100 px-3 py-3 text-sm font-semibold text-red-900">Ảnh giả vẫn vượt qua vì file hoàn toàn hợp lệ.</div></article><div className="hidden items-center text-zinc-400 lg:flex"><ArrowRight className="h-6 w-6" /></div><article className={`rounded-lg border p-5 ${deepfakeResult.verdict === "likely_fake" ? "border-amber-300 bg-amber-50" : "border-emerald-300 bg-emerald-50"}`}><p className={`text-xs font-bold uppercase tracking-wide ${deepfakeResult.verdict === "likely_fake" ? "text-amber-800" : "text-emerald-700"}`}>Sau · Armor ON</p><h3 className="mt-1 text-lg font-bold text-zinc-950">{deepfakeResult.verdict === "likely_fake" ? "Nghi ngờ ảnh AI/deepfake" : deepfakeResult.verdict === "likely_real" ? "Có khả năng là ảnh thật" : "Cần kiểm tra thêm"}</h3><div className="mt-5 grid grid-cols-2 gap-3"><Metric label="FAKE" value={`${(deepfakeResult.fake_probability * 100).toFixed(1)}%`} /><Metric label="REAL" value={`${(deepfakeResult.real_probability * 100).toFixed(1)}%`} /><Metric label="Decision" value={deepfakeResult.decision} /><Metric label="Latency" value={`${deepfakeResult.analysis_time_ms} ms`} /></div><div className="mt-4 space-y-1 border-t border-black/10 pt-3">{deepfakeResult.evidence.map((item) => <p key={item} className="text-xs text-zinc-700">· {item}</p>)}</div><p className="mt-3 text-[11px] text-zinc-500">{deepfakeResult.model_version}</p></article></div>}
             {deepfakeResult && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><strong>Giới hạn:</strong> {deepfakeResult.limitations.join(" ")}</div>}
+            <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div><h3 className="flex items-center gap-2 font-bold text-zinc-900"><Video className="h-4 w-4" /> Sàng lọc video bằng frame sampling</h3><p className="mt-1 text-xs text-zinc-600">MP4, WebM, MOV hoặc AVI · tối đa 50 MB / 120 giây · lấy mẫu tối đa 12 frame.</p></div>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md bg-fuchsia-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fuchsia-900"><Upload className="h-4 w-4" /> {videoLoading ? "Đang lấy mẫu…" : "Chọn video"}<input type="file" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" disabled={videoLoading} className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void analyzeDeepfakeVideo(file); }} /></label>
+                </div>
+                {videoResult && <div className="mt-4 rounded-lg border border-white bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"><Metric label="FAKE tổng hợp" value={`${(videoResult.fake_probability * 100).toFixed(1)}%`} /><Metric label="Quyết định" value={videoResult.decision} /><Metric label="Frame đã đọc" value={`${videoResult.sampled_frames}`} /><Metric label="Frame nghi ngờ" value={`${videoResult.suspicious_frames}`} /><Metric label="Thời lượng" value={`${videoResult.duration_seconds.toFixed(1)} s`} /><Metric label="Latency" value={`${videoResult.analysis_time_ms} ms`} /></div>
+                    <div className="mt-4 flex h-16 items-end gap-1" aria-label="Xác suất FAKE theo frame">{videoResult.frame_results.map((frame) => <div key={frame.frame_index} title={`${frame.timestamp_seconds}s · ${(frame.fake_probability * 100).toFixed(1)}%`} className={`min-w-2 flex-1 rounded-t ${frame.fake_probability >= 0.65 ? "bg-amber-500" : "bg-cyan-600"}`} style={{ height: `${Math.max(8, frame.fake_probability * 100)}%` }} />)}</div>
+                    <div className="mt-3 space-y-1">{videoResult.evidence.map((item) => <p key={item} className="text-xs text-zinc-700">· {item}</p>)}</div>
+                    <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900"><strong>Giới hạn:</strong> {videoResult.limitations.join(" ")}</p>
+                </div>}
+            </div>
         </section>
         {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><AlertTriangle className="h-4 w-4" /> {error}</div>}
     </div>;

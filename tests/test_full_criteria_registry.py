@@ -42,6 +42,9 @@ def test_all_external_adapters_exist_and_unconfigured_is_not_no_hit(monkeypatch)
     for spec in SPECS:
         monkeypatch.delenv(spec.endpoint_env, raising=False)
         monkeypatch.delenv(spec.key_env, raising=False)
+        if spec.enable_env:
+            monkeypatch.delenv(spec.enable_env, raising=False)
+    monkeypatch.delenv("GOOGLE_SAFE_BROWSING_API_KEY", raising=False)
     evidence = collect_external("https://example.com", default_config())
     assert len(evidence) == 14
     assert {item.source_id for item in evidence} == {str(i) for i in range(51, 65)}

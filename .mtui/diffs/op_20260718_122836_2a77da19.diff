@@ -1,0 +1,15 @@
+@@ -526,6 +526,14 @@
+                                               }
+                                             : undefined
+                                     }
++                                    onRefresh={
++                                        exe.provider?.data_id
++                                            ? () =>
++                                                  void refreshExeProvider(
++                                                      exe.provider?.data_id as string,
++                                                  )
++                                            : undefined
++                                    }
+                                 />
+                             )}
+                         </article>

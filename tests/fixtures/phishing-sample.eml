@@ -1,0 +1,14 @@
+From: Microsoft Security <alert@unknown.example>
+Reply-To: collect@other.example
+Return-Path: <bounce@unknown.example>
+To: user@example.com
+Subject: Xac minh tai khoan khan cap
+Message-ID: <notice@unknown.example>
+Authentication-Results: mx.example; spf=fail; dkim=fail; dmarc=fail
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Tài khoản của bạn sẽ bị khóa. Hãy đăng nhập và xác minh ngay.</p>
+<a href="http://micr0soft-login.example/verify">https://microsoft.com</a>
+</body></html>

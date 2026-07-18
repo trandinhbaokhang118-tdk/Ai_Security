@@ -1,0 +1,9 @@
+@@ -335,7 +335,7 @@
+     family_hash = v3.h(family_key)
+     rnd = random.Random(int(v3.h(f"{family_key}|{variant_idx}")[:16], 16))
+     channel = v3.choose_channel(archetype["id"], rnd)
+-    content, style = v3.render_content(archetype, template_idx, wrapper_idx, label, channel, rnd)
++    content, style = render_content_v4(archetype, template_idx, wrapper_idx, label, channel, rnd)
+     context = build_context(archetype, label, channel, content, template_idx, rnd)
+     conversation, conversation_refs = v3.build_conversation(content, label, archetype["id"], rnd)
+     question = v3.question_for(archetype["id"], context, rnd)

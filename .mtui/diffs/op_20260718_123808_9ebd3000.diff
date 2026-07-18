@@ -1,0 +1,46 @@
+@@ -324,17 +324,43 @@
+     def _headers(self, **extra: str) -> dict[str, str]:
+         return {"apikey": self.api_key, "Accept": "application/json", **extra}
+ 
++    @staticmethod
++    def _ensure_success(response: httpx.Response) -> None:
++        if response.is_success:
++            return
++        status = response.status_code
++        if status == 401:
++            message = "MetaDefender từ chối API key."
++        elif status == 403:
++            message = "MetaDefender không cho phép thao tác này với gói API hiện tại."
++        elif status == 413:
++            message = "Tệp vượt quá giới hạn dung lượng của MetaDefender."
++        elif status == 429:
++            reset = response.headers.get("x-ratelimit-reset-in") or response.headers.get(
++                "retry-after"
++            )
++            suffix = f" Thử lại sau khoảng {reset} giây." if reset and reset.isdigit() else ""
++            message = f"MetaDefender đã hết quota hoặc đang giới hạn tần suất.{suffix}"
++        elif status >= 500:
++            message = "MetaDefender đang tạm thời không khả dụng."
++        else:
++            message = f"MetaDefender trả về lỗi HTTP {status}."
++        raise ProviderRequestError(message)
++
+     def lookup_hash(self, sha256: str) -> dict[str, Any]:
+         if not self.configured:
+             return self.disabled_result()
++        clean_hash = sha256.strip()
++        if not _SHA256_PATTERN.fullmatch(clean_hash):
++            raise ValueError("SHA-256 không hợp lệ")
+         with httpx.Client(timeout=self.timeout, follow_redirects=False) as client:
+             response = client.get(
+-                f"{self.base_url}/hash/{sha256}",
++                f"{self.base_url}/hash/{clean_hash.lower()}",
+                 headers=self._headers(),
+             )
+         if response.status_code == 404:
+             return self.not_found_result()
+-        response.raise_for_status()
++        self._ensure_success(response)
+         return self._normalize(response.json(), fallback_status="known")
+ 
+     def submit(self, data: bytes, filename: str) -> dict[str, Any]:

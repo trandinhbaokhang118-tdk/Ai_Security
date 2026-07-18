@@ -1,0 +1,61 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','frontend/web/lib/types.ts','line','212','replace','    execution_status: \x22completed\x22 | \x22queued\x22 | \x22failed\x22;'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/types.ts','line','225','replace','    signer?: string | null;'],check=True);lines=['    analysis_mode?: \x22quick_scan\x22 | \x22windows_sandbox\x22;','    dynamic_execution?: boolean;','    local_analysis?: ExeLocalAnalysis;','    provider?: ExeProviderResult;','    provider_available?: boolean;','    upload_consent_required?: boolean;','    privacy_notice?: string;'];c='\n'.join(lines)+'\n';subprocess.run(['mtui','--json','edit','frontend/web/lib/types.ts','insert-after','    defender_detections?: Record<string, unknown>[];',c],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 636
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_114948_db5bd493",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\types.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_114948_db5bd493\\types.ts",
+  "diff_summary": "+123 -123",
+  "matches": null,
+  "line": 212,
+  "current_hash": "441ed36e7867de17fd51d03e70b7d81bdca9189636ddb01fd2153789483b1831",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_114948_8231110d",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\types.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_114948_8231110d\\types.ts",
+  "diff_summary": "+1 -1",
+  "matches": null,
+  "line": 225,
+  "current_hash": "affc031c9a03fb16696fa8705050e2c74eafed129c16c060004c0884367cd275",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_114948_56abcf3c",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\types.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_114948_56abcf3c\\types.ts",
+  "diff_summary": "+8 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "0e7ef79704edd0821541cdbb84d1f84d664a948072c9015c3f12f975144a77a0",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

@@ -45,6 +45,7 @@ def _word_signature(word: str) -> str:
 def _typoglycemia_view(value: str) -> str:
     return " ".join(_word_signature(word) for word in re.findall(r"[a-zA-Z]+|[^a-zA-Z]+", value))
 
+
 @dataclass(frozen=True)
 class PromptFirewallAssessment:
     score: float
@@ -106,38 +107,57 @@ def assess_prompt_firewall(content: str) -> PromptFirewallAssessment:
     score = .02
     evidence: list[Evidence] = []
     families: list[str] = []
-    def hit(terms: tuple[str, ...]) -> list[str]: return [term for term in terms if term in joined]
-    override, privilege, exfiltration, tools, delimiters = hit(OVERRIDE), hit(PRIVILEGE), hit(EXFILTRATION), hit(TOOL_COERCION), hit(DELIMITER)
+
+    def hit(terms: tuple[str, ...]) -> list[str]:
+        return [term for term in terms if term in joined]
+
+    override, privilege, exfiltration, tools, delimiters = (
+        hit(OVERRIDE),
+        hit(PRIVILEGE),
+        hit(EXFILTRATION),
+        hit(TOOL_COERCION),
+        hit(DELIMITER),
+    )
     memory, policy = hit(MEMORY_POISONING), hit(POLICY_TAMPERING)
     if suspicious_scramble:
-        score += .10; families.append("typoglycemia_evasion")
+        score += .10
+        families.append("typoglycemia_evasion")
         evidence.append(_e("Phát hiện từ khóa bảo mật bị đảo ký tự bên trong để né bộ lọc.", Severity.HIGH, "typoglycemia_evasion", .10))
     if memory:
-        score += .18; families.append("memory_poisoning")
+        score += .18
+        families.append("memory_poisoning")
         evidence.append(_e("Nội dung cố cài chỉ dẫn lâu dài vào bộ nhớ/ngữ cảnh tương lai của agent.", Severity.CRITICAL, "memory_poisoning", .18))
     if policy:
-        score += .18; families.append("policy_tampering")
+        score += .18
+        families.append("policy_tampering")
         evidence.append(_e("Nội dung cố thay đổi policy, trust hoặc allowlist của agent.", Severity.CRITICAL, "policy_tampering", .18))
     if override:
-        score += .35; families.append("instruction_override")
+        score += .35
+        families.append("instruction_override")
         evidence.append(_e("Phát hiện lệnh ghi đè/chống lại chỉ dẫn ưu tiên.", Severity.CRITICAL, "instruction_override", .35))
     if privilege:
-        score += .22; families.append("privilege_escalation")
+        score += .22
+        families.append("privilege_escalation")
         evidence.append(_e("Nội dung cố giả mạo hoặc yêu cầu quyền hệ thống/developer.", Severity.CRITICAL, "privilege_escalation", .22))
     if exfiltration:
-        score += .24; families.append("data_exfiltration")
+        score += .24
+        families.append("data_exfiltration")
         evidence.append(_e("Nội dung yêu cầu bí mật, token hoặc gửi dữ liệu ra ngoài.", Severity.CRITICAL, "data_exfiltration", .24))
     if tools:
-        score += .14; families.append("tool_coercion")
+        score += .14
+        families.append("tool_coercion")
         evidence.append(_e("Nội dung thúc ép agent gọi công cụ/thực thi thao tác không được ủy quyền.", Severity.HIGH, "tool_coercion", .14))
     if delimiters:
-        score += .12; families.append("role_delimiter_spoofing")
+        score += .12
+        families.append("role_delimiter_spoofing")
         evidence.append(_e("Phát hiện delimiter/role giả mạo nhằm làm lẫn thứ bậc chỉ dẫn.", Severity.HIGH, "role_delimiter_spoofing", .12))
     if len(views) > 1:
-        score += .10; families.append("encoded_payload")
+        score += .10
+        families.append("encoded_payload")
         evidence.append(_e("Phát hiện payload mã hóa; nội dung giải mã được kiểm tra như dữ liệu không tin cậy.", Severity.HIGH, "encoded_payload", .10))
     if override and (exfiltration or tools):
-        score += .15; families.append("multi_stage_attack")
+        score += .15
+        families.append("multi_stage_attack")
         evidence.append(_e("Chuỗi tấn công đa giai đoạn: override kết hợp hành động/tool hoặc exfiltration.", Severity.CRITICAL, "multi_stage_attack", .15))
     if not evidence:
         evidence.append(_e("Không thấy mẫu prompt injection rõ rệt ở lớp firewall xác định.", Severity.INFO, "no_firewall_signal", 0.0))

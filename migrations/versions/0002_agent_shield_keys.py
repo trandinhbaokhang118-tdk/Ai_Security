@@ -23,6 +23,18 @@ _DEFAULT_SCOPES = (
 
 def upgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        # PostgreSQL's JSON type has no equality operator. Compare through
+        # JSONB and cast bound values explicitly so fresh production installs
+        # can run this data migration under psycopg 3.
+        bind.execute(
+            text(
+                "UPDATE api_keys SET scopes = CAST(:scopes AS JSON) "
+                "WHERE scopes IS NULL OR CAST(scopes AS JSONB) = CAST(:legacy AS JSONB)"
+            ),
+            {"scopes": _DEFAULT_SCOPES, "legacy": '["scan"]'},
+        )
+        return
     bind.execute(
         text("UPDATE api_keys SET scopes = :scopes WHERE scopes IS NULL OR scopes = :legacy"),
         {"scopes": _DEFAULT_SCOPES, "legacy": '["scan"]'},
@@ -31,6 +43,15 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        bind.execute(
+            text(
+                "UPDATE api_keys SET scopes = CAST(:legacy AS JSON) "
+                "WHERE CAST(scopes AS JSONB) = CAST(:scopes AS JSONB)"
+            ),
+            {"legacy": '["scan"]', "scopes": _DEFAULT_SCOPES},
+        )
+        return
     bind.execute(
         text("UPDATE api_keys SET scopes = :legacy WHERE scopes = :scopes"),
         {"legacy": '["scan"]', "scopes": _DEFAULT_SCOPES},

@@ -8,11 +8,13 @@ const BACKEND_URL =
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+        const authorization = request.headers.get("authorization");
 
         const response = await fetch(`${BACKEND_URL}/v1/demo/url/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(authorization ? { Authorization: authorization } : {}),
             },
             body: JSON.stringify(body),
         });

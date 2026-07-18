@@ -52,6 +52,55 @@ class User(Base):
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
 
 
+class SystemSetting(Base):
+    """Small persistent global controls managed through the admin console."""
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class GmailOAuthState(Base):
+    __tablename__ = "gmail_oauth_states"
+
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    code_verifier_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    consumed_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class GmailConnection(Base):
+    __tablename__ = "gmail_connections"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_gmail_connection_user"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    gmail_address: Mapped[str] = mapped_column(String(320), default="", nullable=False)
+    access_token_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token_ciphertext: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    token_expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    last_used_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
@@ -213,8 +262,16 @@ class DailyQuotaUsage(Base):
     anonymous_id: Mapped[str | None] = mapped_column(String(128))
     usage_day: Mapped[object] = mapped_column(Date, nullable=False)
     scan_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ai_credit_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ai_evaluation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ai_explanation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    deep_scan_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     limit_snapshot: Mapped[int | None] = mapped_column(Integer)
+    ai_limit_snapshot: Mapped[int | None] = mapped_column(Integer)
+    deep_limit_snapshot: Mapped[int | None] = mapped_column(Integer)
     last_scan_at: Mapped[object | None] = mapped_column(DateTime)
+    last_ai_at: Mapped[object | None] = mapped_column(DateTime)
+    last_deep_at: Mapped[object | None] = mapped_column(DateTime)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[object] = mapped_column(
         DateTime, default=utcnow, onupdate=utcnow, nullable=False
@@ -283,6 +340,84 @@ class AssessmentCache(Base):
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
 
+class URLTelemetryObservation(Base):
+    """Minimal IOC observation; raw machine identifiers and system logs are excluded."""
+
+    __tablename__ = "url_telemetry_observations"
+    __table_args__ = (
+        UniqueConstraint("sensor_hash", "event_id", name="uq_url_telemetry_sensor_event"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    event_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    sensor_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    api_key_id: Mapped[str | None] = mapped_column(
+        ForeignKey("api_keys.id", ondelete="SET NULL")
+    )
+    exact_url_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    campaign_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    registrable_domain: Mapped[str] = mapped_column(String(253), index=True, nullable=False)
+    verdict: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    malware_family: Mapped[str | None] = mapped_column(String(120))
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    observed_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class ThreatFeedIndicator(Base):
+    """Normalized public threat-feed IOC used for local private lookups."""
+
+    __tablename__ = "threat_feed_indicators"
+    __table_args__ = (
+        UniqueConstraint("source", "exact_url_key", name="uq_threat_feed_source_url"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    source: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(String(160), index=True)
+    indicator_type: Mapped[str] = mapped_column(String(24), default="url", nullable=False)
+    normalized_value: Mapped[str] = mapped_column(Text, nullable=False)
+    exact_url_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    campaign_key: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    registrable_domain: Mapped[str] = mapped_column(String(253), index=True, nullable=False)
+    verdict: Mapped[str] = mapped_column(String(24), default="malicious", nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.9, nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    extra_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    first_seen_at: Mapped[object] = mapped_column(DateTime, nullable=False)
+    last_seen_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ThreatFeedSyncState(Base):
+    """ETag, scheduling, and audit state for one configured feed."""
+
+    __tablename__ = "threat_feed_sync_state"
+
+    source: Mapped[str] = mapped_column(String(32), primary_key=True)
+    endpoint: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="never", nullable=False)
+    etag: Mapped[str | None] = mapped_column(String(255))
+    last_modified: Mapped[str | None] = mapped_column(String(255))
+    last_attempt_at: Mapped[object | None] = mapped_column(DateTime)
+    last_success_at: Mapped[object | None] = mapped_column(DateTime, index=True)
+    next_allowed_at: Mapped[object | None] = mapped_column(DateTime, index=True)
+    records_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    records_upserted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
 class PaymentOrder(Base):
     __tablename__ = "payment_orders"
 
@@ -322,6 +457,15 @@ class CloudSandboxSession(Base):
     provider_instance_id: Mapped[str | None] = mapped_column(String(100), unique=True)
     remote_url: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(Text)
+    agent_token_hash: Mapped[str | None] = mapped_column(String(64))
+    sample_filename: Mapped[str | None] = mapped_column(String(260))
+    sample_storage_path: Mapped[str | None] = mapped_column(Text)
+    sample_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
+    sample_size: Mapped[int | None] = mapped_column(Integer)
+    sample_status: Mapped[str] = mapped_column(String(32), default="none", index=True, nullable=False)
+    sample_report: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    sample_uploaded_at: Mapped[object | None] = mapped_column(DateTime)
+    sample_completed_at: Mapped[object | None] = mapped_column(DateTime)
     expires_at: Mapped[object] = mapped_column(DateTime, nullable=False)
     terminated_at: Mapped[object | None] = mapped_column(DateTime)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)

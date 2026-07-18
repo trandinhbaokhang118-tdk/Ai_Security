@@ -1,0 +1,12 @@
+@@ -153,9 +153,11 @@
+                 )
+ 
+             sections: list[dict[str, Any]] = []
++            raw_ranges: list[tuple[int, int, str]] = []
+             max_raw_end = 0
+             entry_in_executable_section = False
+             score = 0
++            headers_end = min(len(data), section_table_offset + (section_count * 40))
+             for index in range(section_count):
+                 offset = section_table_offset + (index * 40)
+                 if offset + 40 > len(data):

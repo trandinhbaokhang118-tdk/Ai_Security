@@ -1,0 +1,43 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','line','355','replace','    }'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/real.ts','line','363','replace',''],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 398
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115154_3fba5a90",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115154_3fba5a90\\real.ts",
+  "diff_summary": "+9 -9",
+  "matches": null,
+  "line": 355,
+  "current_hash": "adafd3fc698eb5c7711c8e79d595d351a79f20f16d32321d4ea158d6624ec951",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115154_a14f207d",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\real.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115154_a14f207d\\real.ts",
+  "diff_summary": "+1 -1",
+  "matches": null,
+  "line": 363,
+  "current_hash": "b5bb5758994119962d3858bf57101f49450e20e3e5f8c030af7b41df5ca8df05",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

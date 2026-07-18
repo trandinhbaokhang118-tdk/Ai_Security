@@ -1,0 +1,79 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','frontend/web/lib/api/client.ts','insert-after','    ExeSandboxResult,','\n    ExeProviderResult,'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/client.ts','line','51','replace','    /** Phân tích nhanh PE cục bộ và tùy chọn tra cứu/chia sẻ với provider. */'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/client.ts','line','52','replace','    sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/client.ts','insert-after','    sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;','\n    getExecutableProviderReport(dataId: string): Promise<ExeProviderResult>;'],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 942
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_115016_1791c223",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\client.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115016_1791c223\\client.ts",
+  "diff_summary": "+2 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "4c4947d8d029c2fa863ee790377828db0a28744d447b7bbbbde39e4813f2e5c4",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115017_205a3832",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\client.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115017_205a3832\\client.ts",
+  "diff_summary": "+21 -21",
+  "matches": null,
+  "line": 51,
+  "current_hash": "b6a05fbb381cebb81158b0b1786be49fe29aab65a89964453b70fb1d7bc55d5f",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115017_f34d0cb5",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\client.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115017_f34d0cb5\\client.ts",
+  "diff_summary": "+1 -1",
+  "matches": null,
+  "line": 52,
+  "current_hash": "5915942a5c3f458e8d4a3c0a299faa12b4e43085afc3f29c039db18094c02157",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_115017_263d7371",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\client.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115017_263d7371\\client.ts",
+  "diff_summary": "+2 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "8e4495540cae282834e6f63c08d5b7459536374ecfbdcf0b8e7fe0dbb1eae8ba",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

@@ -55,3 +55,46 @@ def test_rejects_incomplete_adapter_package(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="adapter_model"):
         detect_model_package(tmp_path)
+
+
+def test_builds_one_vllm_server_with_multiple_loras(tmp_path: Path) -> None:
+    adapters = []
+    for name in ("message", "web", "explanation"):
+        path = tmp_path / name
+        path.mkdir()
+        (path / "adapter_config.json").write_text(
+            json.dumps({"base_model_name_or_path": "Qwen/Qwen3.5-4B"}),
+            encoding="utf-8",
+        )
+        (path / "adapter_model.safetensors").write_bytes(b"placeholder")
+        adapters.append(
+            {
+                "adapter_id": name,
+                "task": f"{name}-context-adapter" if name != "explanation" else "explanation-adapter",
+                "path": name,
+                "served_model_name": f"{name}-adapter",
+                "enabled": True,
+            }
+        )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "base_model": "Qwen/Qwen3.5-4B",
+                "adapters": adapters,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    command = build_command(
+        {
+            "ADAPTER_MANIFEST_PATH": str(manifest),
+            "LLM_API_KEY": "test-secret",
+        }
+    )
+
+    assert command[:3] == ["vllm", "serve", "Qwen/Qwen3.5-4B"]
+    assert "--enable-lora" in command
+    assert sum("adapter=" in item for item in command) == 3

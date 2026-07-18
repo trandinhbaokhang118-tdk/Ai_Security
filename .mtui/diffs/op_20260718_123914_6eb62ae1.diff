@@ -1,0 +1,8 @@
+@@ -9,6 +9,7 @@
+     ExeQuickScanService,
+     MetaDefenderProvider,
+     PEQuickAnalyzer,
++    ProviderRequestError,
+ )
+ 
+ 

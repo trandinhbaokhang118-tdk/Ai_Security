@@ -1,0 +1,17 @@
+@@ -103,6 +103,16 @@
+ SCRIPT_RE = re.compile(r"(?is)<script\b[^>]*>.*?</script\s*>")
+ IFRAME_RE = re.compile(r"(?is)<(?:iframe|object|embed)\b[^>]*>.*?</(?:iframe|object|embed)\s*>")
+ STYLE_RE = re.compile(r"(?is)<style\b[^>]*>.*?</style\s*>")
++# Some legitimate documentation pages render escaped source code as visible text.
++# Remove those inert code samples from the SFT payload while retaining separately
++# counted structural features from the original HTML.
++VISIBLE_DOCUMENT_CODE_RE = re.compile(
++    r"(?is)<!\s*doctype\s+html\b.*?<\s*/\s*html\s*>"
++)
++VISIBLE_SCRIPT_STYLE_RE = re.compile(
++    r"(?is)<\s*(?:script|style)\b.*?<\s*/\s*(?:script|style)\s*>"
++)
++VISIBLE_TAG_RE = re.compile(r"(?is)<\s*/?\s*[a-z!][^>]{0,1000}>")
+ 
+ KNOWN_BRANDS = (
+     "paypal", "facebook", "google", "apple", "microsoft", "amazon", "netflix",

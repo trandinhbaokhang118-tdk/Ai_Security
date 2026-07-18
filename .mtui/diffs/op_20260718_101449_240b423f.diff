@@ -1,0 +1,11 @@
+@@ -557,7 +557,9 @@
+     value = URL_RE.sub("<URL>", value)
+     value = EMAIL_RE.sub("<EMAIL>", value)
+     value = PHONE_RE.sub("<PHONE>", value)
+-    return truncate(value, limit)
++    # Truncate does another whitespace normalization; run the numeric redactor
++    # once more so truncation cannot expose a newly adjacent sequence.
++    return PHONE_RE.sub("<PHONE>", truncate(value, limit))
+ 
+ 
+ def hash_hostname(value: str) -> str:

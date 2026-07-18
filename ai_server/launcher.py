@@ -85,8 +85,106 @@ def detect_model_package(model_path: Path) -> tuple[str, dict]:
     return "merged", manifest
 
 
+def _build_multi_lora_command(env: Mapping[str, str], manifest_path: Path) -> list[str]:
+    manifest = _load_json(manifest_path)
+    if str(manifest.get("schema_version", "")) != "1":
+        raise ValueError("adapter manifest schema_version must be 1")
+    base_model = env.get("LLM_BASE_MODEL", "").strip() or str(
+        manifest.get("base_model", "")
+    ).strip()
+    if not base_model:
+        raise ValueError("adapter manifest must declare base_model")
+    rows = manifest.get("adapters")
+    if not isinstance(rows, list):
+        raise ValueError("adapter manifest adapters must be an array")
+    modules: list[str] = []
+    names: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("enabled", True):
+            continue
+        if row.get("runtime", "openai_lora") != "openai_lora":
+            continue
+        name = str(row.get("served_model_name", "")).strip()
+        relative_path = str(row.get("path", "")).strip()
+        if not name or not relative_path:
+            raise ValueError("enabled LoRA adapters require served_model_name and path")
+        if name in names:
+            raise ValueError(f"duplicate served_model_name: {name}")
+        names.add(name)
+        adapter_path = Path(relative_path)
+        if not adapter_path.is_absolute():
+            adapter_path = manifest_path.parent / adapter_path
+        adapter_path = adapter_path.resolve()
+        package_type, metadata = detect_model_package(adapter_path)
+        if package_type != "lora":
+            raise ValueError(f"adapter path is not a LoRA package: {adapter_path}")
+        declared_base = str(metadata.get("base_model", "")).strip()
+        if declared_base and declared_base != base_model:
+            raise ValueError(
+                f"adapter {name} base_model {declared_base!r} does not match "
+                f"manifest base_model {base_model!r}"
+            )
+        modules.append(f"{name}={adapter_path}")
+    if not modules:
+        raise ValueError("adapter manifest contains no enabled LoRA adapters")
+
+    host = env.get("LLM_SERVER_HOST", "0.0.0.0")
+    port = _positive_int(env, "LLM_SERVER_PORT", 8000)
+    api_key = env.get("LLM_API_KEY", "").strip()
+    if not api_key and host not in {"127.0.0.1", "localhost", "::1"}:
+        if not _truthy(env.get("LLM_ALLOW_UNAUTHENTICATED")):
+            raise ValueError("LLM_API_KEY is required when binding beyond localhost")
+    command = [
+        "vllm",
+        "serve",
+        base_model,
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--max-model-len",
+        str(
+            _positive_int(
+                env,
+                "LLM_MAX_MODEL_LEN",
+                int(manifest.get("context_length", 4096)),
+            )
+        ),
+        "--tensor-parallel-size",
+        str(_positive_int(env, "LLM_TENSOR_PARALLEL_SIZE", 1)),
+        "--gpu-memory-utilization",
+        str(_ratio(env, "LLM_GPU_MEMORY_UTILIZATION", 0.9)),
+        "--dtype",
+        env.get("LLM_DTYPE", "auto"),
+        "--enable-lora",
+        "--lora-modules",
+        *modules,
+    ]
+    if api_key:
+        command.extend(["--api-key", api_key])
+    revision = env.get("LLM_BASE_REVISION", "").strip() or str(
+        manifest.get("base_revision", "")
+    ).strip()
+    if revision:
+        command.extend(["--revision", revision])
+    quantization = env.get("LLM_QUANTIZATION", "").strip()
+    if quantization:
+        command.extend(["--quantization", quantization])
+    if _truthy(env.get("LLM_TRUST_REMOTE_CODE")):
+        command.append("--trust-remote-code")
+    extra_args = env.get("LLM_VLLM_EXTRA_ARGS", "").strip()
+    if extra_args:
+        command.extend(shlex.split(extra_args))
+    return command
+
+
 def build_command(env: Mapping[str, str] | None = None) -> list[str]:
     env = os.environ if env is None else env
+    adapter_manifest = env.get("ADAPTER_MANIFEST_PATH", "").strip()
+    if adapter_manifest:
+        manifest_path = Path(adapter_manifest).resolve()
+        if manifest_path.exists():
+            return _build_multi_lora_command(env, manifest_path)
     model_path = Path(env.get("LLM_MODEL_PATH", "/models/current")).resolve()
     package_type, metadata = detect_model_package(model_path)
     served_name = env.get("LLM_SERVED_MODEL_NAME", "prewise-security-v1").strip()

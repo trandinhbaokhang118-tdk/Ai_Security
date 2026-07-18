@@ -53,17 +53,20 @@ function CheckoutContent() {
     }).then(setPayment).catch(reason => { if (reason instanceof Error && reason.message) setError(reason.message); }).finally(() => setLoading(false));
   }, [period, router, session?.token, setSession]);
 
+  const paymentOrderId = payment?.orderId;
+  const paymentStatus = payment?.status;
+
   useEffect(() => {
-    if (!payment || payment.status !== "pending") return;
+    if (!paymentOrderId || paymentStatus !== "pending") return;
     const token = readStoredAccessToken();
     const timer = window.setInterval(async () => {
       try {
-        const response = await fetch(`${apiBase()}/v1/sandbox-cloud/subscription-payments/${payment.orderId}`, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await fetch(`${apiBase()}/v1/sandbox-cloud/subscription-payments/${paymentOrderId}`, { headers: { Authorization: `Bearer ${token}` } });
         if (response.ok) setPayment(await response.json() as Payment);
       } catch { /* Giữ màn QR để người dùng có thể tiếp tục thanh toán. */ }
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [payment?.orderId, payment?.status]);
+  }, [paymentOrderId, paymentStatus]);
 
   const copyContent = async () => { if (payment) await navigator.clipboard?.writeText(payment.transferContent); };
   if (loading) return <QrPreview />;

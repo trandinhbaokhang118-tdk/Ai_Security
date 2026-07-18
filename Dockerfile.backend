@@ -3,17 +3,25 @@ FROM python:3.11-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
+    curl locales tesseract-ocr tesseract-ocr-eng tesseract-ocr-vie \
+    && sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
-# Dependency layer (runtime-only; ML extras optional at build time).
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Production image excludes pytest, coverage and lint tooling.
+COPY requirements.runtime.txt ./
+RUN pip install --no-cache-dir --no-compile -r requirements.runtime.txt
 
 # The browser sandbox uses Chromium in a temporary Playwright profile.  Keep the
-# browser and its OS libraries in the image so deep analysis does not silently
-# fall back to HTTP-only inspection after deployment.
-RUN python -m playwright install --with-deps chromium
+# headless shell and its OS libraries in the image so deep analysis does not
+# silently fall back to HTTP-only inspection after deployment.
+RUN python -m playwright install --with-deps --only-shell chromium
 
 # Source
 COPY backend/ ./backend/
@@ -31,6 +39,8 @@ USER armor
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-  CMD curl -f http://localhost:8000/v1/health || exit 1
+  CMD curl -f http://localhost:8000/v1/ready || exit 1
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# OAuth authorization codes must not be copied into generic access logs. Put a
+# reverse proxy in front with query-string redaction and structured request IDs.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

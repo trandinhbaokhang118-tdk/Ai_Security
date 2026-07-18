@@ -1,0 +1,60 @@
+@@ -489,6 +489,7 @@
+         )
+ 
+     def _guard_request(self, session: FreeBrowserSession, route: object, request: object) -> None:
++        """Apply isolation rules without ever crashing Playwright's route callback."""
+         request_url = str(self._request_value(request, "url", "") or "")
+         resource_type = str(self._request_value(request, "resource_type", "") or "")
+         try:
+@@ -506,18 +507,41 @@
+                     url=self._safe_event_url(request_url) or None,
+                     blocked=True,
+                 )
+-            route.abort()
++            try:
++                route.abort()
++            except Exception:
++                pass
+             return
+-        if self._request_is_download(request):
+-            self._record_download(session, url=request_url)
+-            route.abort()
+-            return
+-        self._observe_canary_request(session, request)
+-        if resource_type in {"media", "font"}:
+-            route.abort()
+-        else:
+-            route.continue_()
+ 
++        try:
++            if self._request_is_download(request):
++                self._record_download(session, url=request_url)
++                route.abort()
++                return
++
++            # Observation is best-effort. A malformed or binary request body must not
++            # interrupt the page action that caused the request.
++            try:
++                self._observe_canary_request(session, request)
++            except Exception:
++                pass
++
++            if resource_type in {"media", "font"}:
++                route.abort()
++            else:
++                route.continue_()
++        except Exception:
++            # Keep browsing usable even if a third-party request exposes an edge case
++            # in Playwright. Continuing is safer for functionality than leaking the
++            # exception and turning the user's click/type into a 500 response.
++            try:
++                route.continue_()
++            except Exception:
++                try:
++                    route.abort()
++                except Exception:
++                    pass
++
+     def _handle_download(self, session: FreeBrowserSession, download: object) -> None:
+         try:
+             url = str(self._request_value(download, "url", "") or "")

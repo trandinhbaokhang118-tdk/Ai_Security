@@ -18,9 +18,11 @@ if os.name == "nt" and not os.environ.get("SYSTEMROOT"):
         os.environ["SYSTEMROOT"] = r"C:\Windows"
         os.environ["WINDIR"] = r"C:\Windows"
 
+import hashlib  # noqa: E402
 import http.client  # noqa: E402
 import ipaddress  # noqa: E402
 import json  # noqa: E402
+import re  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
@@ -332,6 +334,62 @@ def _inspect_html(body: bytes, content_type: str, url: str) -> tuple[dict, list[
                          and not email.lower().endswith(("@gmail.com", "@outlook.com", "@yahoo.com"))]
     is_commercial = any(term in page_text for term in commercial_terms)
     collects_data = parser.sensitive_inputs > 0 or any(term in page_text for term in data_terms)
+    address_terms = ("address", "registered office", "head office", "dia chi")
+    legal_terms = (
+        "company", "corporation", "limited", "ltd", "llc", "copyright", "cong ty", "doanh nghiep"
+    )
+    payment_terms = {
+        "bank_transfer": ("bank transfer", "wire transfer", "chuyen khoan"),
+        "crypto": ("bitcoin", "crypto", "usdt", "ethereum"),
+        "gift_card": ("gift card", "the qua tang"),
+        "card": ("credit card", "debit card", "visa", "mastercard"),
+        "cod": ("cash on delivery", " cod "),
+    }
+    prices = re.findall(
+        r"(?:[$]|vnd|usd|eur|dong)\s?\d[\d.,]*|\d[\d.,]*\s?(?:vnd|usd|eur|dong)",
+        page_text,
+        flags=re.IGNORECASE,
+    )[:20]
+    discount_values = [
+        int(value)
+        for value in re.findall(r"\b(\d{1,2})\s*%\s*(?:off|discount|sale|giam)", page_text)
+        if int(value) <= 99
+    ]
+    recipient_hints = re.findall(
+        r"(?:account|stk|so tai khoan|wallet|vi)\s*(?:number|no|:|-)?\s*[a-z0-9]{8,34}",
+        page_text,
+        flags=re.IGNORECASE,
+    )[:8]
+    social_links = [
+        href
+        for href, _label in parser.links
+        if any(
+            host in href.lower()
+            for host in (
+                "facebook.com", "instagram.com", "linkedin.com", "tiktok.com",
+                "youtube.com", "x.com", "twitter.com", "zalo.me",
+            )
+        )
+    ][:12]
+    complaint_terms = [
+        term
+        for term in ("scam", "fraud", "lua dao", "complaint", "khieu nai", "not received")
+        if term in page_text
+    ]
+    rating_mentions = re.findall(
+        r"(?:[1-5](?:\.\d)?\s*/\s*5|[1-5](?:\.\d)?\s*(?:stars?|sao))",
+        page_text,
+    )[:30]
+    site_name = parser.meta.get("og:site_name", "")
+    title_tokens = {token for token in re.findall(r"[a-z0-9]{4,}", parser.title.lower())}
+    site_tokens = {token for token in re.findall(r"[a-z0-9]{4,}", site_name.lower())}
+    is_commercial = is_commercial or bool(prices)
+    has_contact = any(term in page_text or term in link_text for term in contact_terms)
+    has_address = any(term in page_text for term in address_terms)
+    has_legal_identity = any(term in page_text for term in legal_terms)
+    detected_payments = [
+        method for method, values in payment_terms.items() if any(value in page_text for value in values)
+    ]
 
     if not any(term in page_text or term in link_text for term in contact_terms) and is_commercial:
         issues.append(_issue("missing_contact_information", "medium", "content", "Trang thương mại không có thông tin liên hệ rõ ràng."))
@@ -341,6 +399,26 @@ def _inspect_html(body: bytes, content_type: str, url: str) -> tuple[dict, list[
         issues.append(_issue("missing_privacy_policy", "medium", "content", "Trang thu thập dữ liệu nhưng không thấy chính sách bảo mật."))
     if is_commercial and not any(term in page_text or term in link_text for term in terms_terms):
         issues.append(_issue("missing_terms_refund", "medium", "content", "Trang giao dịch không thấy điều khoản hoặc chính sách hoàn tiền."))
+    if is_commercial and not has_address:
+        issues.append(_issue("missing_business_address", "medium", "content", "Commercial page has no public business address."))
+    if is_commercial and not has_legal_identity:
+        issues.append(_issue("missing_legal_identity", "high", "content", "Commercial page has no public legal business identity."))
+    if is_commercial and not has_contact:
+        issues.append(_issue("invalid_support_channel", "medium", "content", "Commercial page has no public support channel."))
+    if discount_values and max(discount_values) >= 90:
+        issues.append(_issue("extreme_price_discount", "high", "content", "The page advertises a discount of at least 90 percent.", f"Max={max(discount_values)}%"))
+    irreversible = sorted(set(detected_payments) & {"bank_transfer", "crypto", "gift_card"})
+    if irreversible and urgency_hits:
+        issues.append(_issue("irreversible_payment_method", "high", "content", "An irreversible payment method is coupled with urgency language.", ", ".join(irreversible)))
+    if recipient_hints and not has_legal_identity:
+        issues.append(_issue("unverified_payment_recipient", "critical", "content", "A payment recipient is shown without a legal identity to compare.", ", ".join(recipient_hints[:3])))
+    if complaint_terms and rating_mentions:
+        issues.append(_issue("user_complaint_signal", "medium", "content", "Review context includes complaint or scam wording.", ", ".join(complaint_terms[:5])))
+    normalized_ratings = [value.lower().replace(" ", "") for value in rating_mentions]
+    if len(normalized_ratings) >= 10 and len(set(normalized_ratings)) == 1:
+        issues.append(_issue("review_manipulation_pattern", "high", "content", "Many visible reviews repeat exactly the same rating.", f"Mentions={len(normalized_ratings)}"))
+    if title_tokens and site_tokens and not title_tokens.intersection(site_tokens):
+        issues.append(_issue("metadata_identity_mismatch", "medium", "content", "Title and og:site_name have no shared identity token.", f"title={parser.title[:80]}; site={site_name[:80]}"))
     scam_hits = [term for term in scam_template_terms if term in page_text]
     if scam_hits:
         issues.append(_issue("scam_template_content", "high", "content", "Nội dung khớp mẫu lừa đảo đã biết.", ", ".join(scam_hits)))
@@ -373,6 +451,19 @@ def _inspect_html(body: bytes, content_type: str, url: str) -> tuple[dict, list[
         "has_privacy_policy": any(term in page_text or term in link_text for term in privacy_terms),
         "has_terms_refund": any(term in page_text or term in link_text for term in terms_terms),
         "has_contact_channel": any(term in page_text or term in link_text for term in contact_terms),
+        "has_business_address": has_address,
+        "has_legal_identity": has_legal_identity,
+        "prices": prices,
+        "max_discount_percent": max(discount_values) if discount_values else None,
+        "payment_methods": detected_payments,
+        "payment_recipient_hints": recipient_hints,
+        "social_links": social_links,
+        "complaint_terms": complaint_terms,
+        "rating_mentions": rating_mentions,
+        "review_context": bool(rating_mentions or "review" in page_text or "danh gia" in page_text),
+        "content_fingerprint": hashlib.sha256(
+            " ".join(page_text.split()).encode("utf-8")
+        ).hexdigest(),
         "metadata": parser.meta,
         "favicons": parser.favicons[:5],
     }

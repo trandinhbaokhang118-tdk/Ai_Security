@@ -41,7 +41,60 @@ def test_hybrid_score_uses_all_available_components(tmp_path):
     assert engine._hybrid_score(None, None, 0.8) == pytest.approx(0.8)
 
 
-def test_text_transformer_branch_is_executed(tmp_path):
+def test_url_model_uses_metadata_schema_and_dynamic_context(tmp_path, monkeypatch):
+    engine = InferenceEngine(model_dir=str(tmp_path))
+    engine.url_session = object()
+    engine.model_metadata["url_lgbm.onnx"] = {
+        "feature_names": [
+            "url_length",
+            "dns_available",
+            "domain_age_days_normalized",
+            "local_feed_hit",
+        ]
+    }
+    captured: list[float] = []
+
+    def fake_run(_session, features):
+        captured.extend(features)
+        return 0.2
+
+    monkeypatch.setattr(engine, "_run_lgbm", fake_run)
+
+    result = engine.predict_url(
+        "https://example.com/login",
+        context={
+            "dns_available": 1,
+            "domain_age_days": 30,
+            "local_feed_hit": 1,
+        },
+    )
+
+    assert result.model_version.startswith("url_lgbm.onnx+enriched-context+")
+    assert captured[1] == 1.0
+    assert captured[2] == pytest.approx(30 / 3650)
+    assert captured[3] == 1.0
+
+
+def test_url_model_keeps_legacy_vector_when_metadata_has_no_schema(tmp_path, monkeypatch):
+    engine = InferenceEngine(model_dir=str(tmp_path))
+    engine.url_session = object()
+    captured: list[float] = []
+
+    def fake_run(_session, features):
+        captured.extend(features)
+        return 0.2
+
+    monkeypatch.setattr(engine, "_run_lgbm", fake_run)
+
+    engine.predict_url(
+        "https://example.com",
+        context={"dns_available": 1, "local_feed_hit": 1},
+    )
+
+    assert len(captured) == 15
+
+
+def test_text_transformer_branch_is_executed_but_cannot_block_alone(tmp_path):
     engine = InferenceEngine(model_dir=str(tmp_path))
     session = _TransformerSession(malicious_logit=3.0)
     engine.text_transformer_session = session
@@ -49,7 +102,9 @@ def test_text_transformer_branch_is_executed(tmp_path):
 
     result = engine.predict_text("Please verify this account request")
 
-    assert result.risk_score > 0.8
+    # A model-only verdict is bounded by the message policy. Independent sender,
+    # URL, attachment or scam-combination evidence is required for a high score.
+    assert result.risk_score <= 0.25
     assert result.model_version == "hybrid-text[transformer+rules]"
     assert any(item.source == "text_transformer" for item in result.evidence)
     assert session.last_feed["token_type_ids"].tolist() == [[0, 0, 0]]

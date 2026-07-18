@@ -1,0 +1,56 @@
+@@ -196,6 +196,55 @@
+     assert state["lastEvent"]["blocked"] is True
+ 
+ 
++def test_real_playwright_page_receives_canary_not_original_text() -> None:
++    try:
++        from playwright.sync_api import Error as PlaywrightError
++        from playwright.sync_api import sync_playwright
++    except ImportError:
++        pytest.skip("Playwright is not installed")
++
++    playwright = sync_playwright().start()
++    try:
++        try:
++            browser = playwright.chromium.launch(headless=True)
++        except PlaywrightError:
++            pytest.skip("Playwright Chromium is not installed")
++        context = browser.new_context()
++        page = context.new_page()
++        page.set_content(
++            '<form><input id="password" type="password" name="password">'
++            '<button type="submit">Send</button></form>'
++        )
++        page.focus("#password")
++        manager = FreeWebSandboxManager()
++        manager._sessions["playwright-smoke"] = FreeBrowserSession(
++            playwright=playwright,
++            browser=browser,
++            context=context,
++            page=page,
++            expires_at=datetime.utcnow() + timedelta(minutes=1),
++            canary_token="ABC123",
++        )
++
++        state = manager._type_text("playwright-smoke", "REAL_SECRET")
++        field_value = page.input_value("#password")
++
++        assert field_value.startswith("Pw-SBX-ABC123-")
++        assert "REAL_SECRET" not in field_value
++        assert state["lastEvent"]["type"] == "input_substituted"
++    finally:
++        session = locals().get("manager")
++        if session is not None:
++            session._sessions.pop("playwright-smoke", None)
++        context_value = locals().get("context")
++        if context_value is not None:
++            context_value.close()
++        browser_value = locals().get("browser")
++        if browser_value is not None:
++            browser_value.close()
++        playwright.stop()
++
++
+ def test_download_request_is_aborted_and_reported() -> None:
+     manager = FreeWebSandboxManager()
+     page = SimpleNamespace(url="https://shop.example")

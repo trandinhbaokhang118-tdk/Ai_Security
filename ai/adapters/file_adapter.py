@@ -18,6 +18,10 @@ _SUSPICIOUS_STRINGS = (
     b"RegSetValue", b"IsDebuggerPresent",
 )
 _PACKER_SIGNS = (b"UPX!", b"ASPack", b"PECompact", b".themida")
+_ACTIVE_EXTENSIONS = re.compile(
+    r"\.(apk|bat|cmd|com|exe|hta|iso|js|jar|lnk|msi|ps1|scr|svg|vbs|wsf|sh)$",
+    re.I,
+)
 
 
 def byte_entropy(data: bytes) -> float:
@@ -35,7 +39,9 @@ def analyze_file_bytes(data: bytes, filename: str = "") -> tuple[float, list[Evi
     score = 0.05
 
     is_pe = data[:2] == b"MZ"
-    is_script = bool(re.search(r"\.(bat|cmd|ps1|vbs|js|jar|sh)$", filename, re.I))
+    is_script = bool(_ACTIVE_EXTENSIONS.search(filename))
+    suffixes = re.findall(r"\.[a-z0-9]{1,8}", filename.lower())
+    double_extension = len(suffixes) >= 2 and bool(_ACTIVE_EXTENSIONS.search(filename))
 
     if is_pe:
         ev.append(Evidence(source="file_adapter", message="File thực thi PE (MZ header)",
@@ -66,9 +72,31 @@ def analyze_file_bytes(data: bytes, filename: str = "") -> tuple[float, list[Evi
         score += 0.1 * min(len(hits), 3)
 
     if is_script:
-        ev.append(Evidence(source="file_adapter", message="File script có thể thực thi lệnh",
+        ev.append(Evidence(source="file_adapter", message="Tệp có đuôi có thể thực thi hoặc kích hoạt nội dung",
                            severity=Severity.MEDIUM, feature="script_type", contribution=0.15))
         score += 0.15
+
+    if double_extension:
+        ev.append(Evidence(
+            source="file_adapter",
+            message="Tên tệp dùng đuôi kép để che giấu loại có thể thực thi",
+            severity=Severity.HIGH,
+            feature="double_extension",
+            contribution=0.2,
+        ))
+        score += 0.2
+
+    if data.startswith(b"%PDF-") and re.search(
+        rb"/(?:JavaScript|JS|OpenAction|Launch)\b", data[:2_000_000], re.I
+    ):
+        ev.append(Evidence(
+            source="file_adapter",
+            message="PDF chứa hành động hoặc script có thể tự kích hoạt",
+            severity=Severity.HIGH,
+            feature="pdf_active_content",
+            contribution=0.25,
+        ))
+        score += 0.25
 
     if not ev:
         ev.append(Evidence(source="file_adapter", message="Không phát hiện dấu hiệu tĩnh đáng ngờ",

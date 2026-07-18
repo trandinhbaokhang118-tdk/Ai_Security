@@ -1,0 +1,39 @@
+@@ -129,18 +129,31 @@
+         lowered_keys = {str(key).lower() for key in output}
+         if lowered_keys & DECISION_KEYS:
+             raise ValueError(f"{path}:{line_number}: context adapter contains a policy-decision field")
+-        user_blob = json.dumps(payload, ensure_ascii=False)
+-        if task == "web-context-adapter":
+-            if FORBIDDEN_HTML.search(user_blob):
++        if task == "message-context-adapter":
++            semantic_blob = str(payload.get("content", ""))
++        else:
++            semantic_fields: list[str] = [
++                str(payload.get("content", "")),
++                str(payload.get("stated_purpose", "")),
++                str(payload.get("metadata", {}).get("title", "")),
++            ]
++            for form in payload.get("forms", []):
++                if isinstance(form, dict):
++                    semantic_fields.extend(str(item) for item in form.get("field_names", []))
++            for action in payload.get("actions", []):
++                if isinstance(action, dict):
++                    semantic_fields.append(str(action.get("text", "")))
++            semantic_blob = "\n".join(semantic_fields)
++            if FORBIDDEN_HTML.search(semantic_blob):
+                 raise ValueError(f"{path}:{line_number}: executable/raw HTML marker retained")
+             if payload.get("metadata", {}).get("raw_html_retained") is not False:
+                 raise ValueError(f"{path}:{line_number}: raw_html_retained must be false")
+-        if RAW_URL.search(user_blob):
++        if RAW_URL.search(semantic_blob):
+             raise ValueError(f"{path}:{line_number}: raw URL retained")
+-        if RAW_EMAIL.search(user_blob):
++        if RAW_EMAIL.search(semantic_blob):
+             raise ValueError(f"{path}:{line_number}: raw email address retained")
+-        if RAW_PHONE.search(user_blob):
+-            raise ValueError(f"{path}:{line_number}: raw phone number retained")
++        if RAW_PHONE.search(semantic_blob):
++            raise ValueError(f"{path}:{line_number}: raw phone/account-like number retained")
+ 
+     if task == "explanation-adapter":
+         supplied = {str(item.get("evidence_id")) for item in payload.get("evidence", [])}

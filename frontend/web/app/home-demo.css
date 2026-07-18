@@ -1,0 +1,27 @@
+.demo-video-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.demo-video-media object,
+.demo-video-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.demo-video-media > span {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  padding: 6px 8px;
+  border: 1px solid #31534f;
+  background: #06100fdd;
+  color: var(--cyan);
+  font: 6px ui-monospace, monospace;
+  letter-spacing: .1em;
+  pointer-events: none;
+}

@@ -8,8 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from backend.middleware import sanitize_text
 from backend.dependencies import get_inference_service
+from backend.middleware import sanitize_text
 from backend.services.inference_service import InferenceService
 from shared.schemas import AgentContext, Decision
 
@@ -182,7 +182,7 @@ class MCPTools:
         }
 
     def assess_url(self, payload: URLInput) -> dict[str, Any]:
-        return _assessment_json(self.service.assess_url(payload.url))
+        return _assessment_json(self.service.assess_url(payload.url, payload.context))
 
     def assess_text(self, payload: TextInput) -> dict[str, Any]:
         modality = payload.content_type if payload.content_type in {"email", "sms", "text"} else "text"

@@ -45,11 +45,12 @@ const QUOTA_EXCEEDED_TEXT =
 export default function ChatPage(): JSX.Element {
     const { messages, sendMessage, isStreaming, error, retryLast } =
         useChatSession();
-    const { quota } = useAuth();
+    const { quota, session } = useAuth();
 
     // Nội dung ô nhập (controlled) + thông báo hết quota (client-side).
     const [input, setInput] = useState("");
     const [quotaBlocked, setQuotaBlocked] = useState(false);
+    const [activeContext, setActiveContext] = useState<ChatContext | null>(null);
 
     // Vùng cuộn danh sách tin nhắn — tự cuộn tới tin mới nhất.
     const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -94,21 +95,31 @@ export default function ChatPage(): JSX.Element {
             return;
         }
 
-        // Kiểm tra quota trước khi gửi; hết lượt → hiện CTA, KHÔNG gửi.
-        if (!quota.canScan()) {
+        const startsNewAssessment =
+            activeContext === null ||
+            looksLikeUrl(question) ||
+            question.length > 240 ||
+            question.includes("\n");
+
+        // Chỉ nội dung mới tiêu thụ scan. Câu hỏi tiếp nối tái sử dụng assessment.
+        if (startsNewAssessment && !quota.canScan()) {
             setQuotaBlocked(true);
             return;
         }
 
         // Dựng context từ đầu vào: url nếu trông giống URL, ngược lại email —
         // để trợ lý trả về đánh giá đúng đối tượng (chat có ngữ cảnh).
-        const context: ChatContext = {
-            content: question,
-            modality: looksLikeUrl(question) ? "url" : "email",
-        };
+        const context: ChatContext = startsNewAssessment
+            ? {
+                content: question,
+                modality: looksLikeUrl(question) ? "url" : "email",
+            }
+            : activeContext;
 
-        // Tiêu thụ đúng 1 lượt cho lần gửi hợp lệ rồi mở luồng chat.
-        quota.consume();
+        if (startsNewAssessment) {
+            quota.consume();
+            setActiveContext(context);
+        }
         setQuotaBlocked(false);
         setInput("");
         void sendMessage(question, context);
@@ -237,7 +248,7 @@ export default function ChatPage(): JSX.Element {
                     </button>
 
                     {/* Quota còn lại hôm nay theo gói (∞ cho pro/team) */}
-                    <span>Còn lại hôm nay: {remainingLabel} scan</span>
+                    <span title="Nội dung mới dùng 1 scan; AI Evaluate và AI Explain là hai lần gọi riêng.">Core: {remainingLabel} scan · AI: {session?.plan.aiCreditDailyLimit ?? 5} credit/ngày</span>
                 </div>
             </div>
         </div>

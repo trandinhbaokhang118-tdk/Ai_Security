@@ -1,0 +1,19 @@
+@@ -297,14 +297,16 @@
+         providerPollGeneration.current += 1;
+         setProviderPolling(true);
+         setError("");
++        let continuePolling = false;
+         try {
+             const provider = await getApiClient().getExecutableProviderReport(dataId);
+             setExe((current) => (current ? mergeProviderResult(current, provider) : current));
+-            if (provider.status === "queued") void pollExeProvider(dataId);
++            continuePolling = provider.status === "queued";
++            if (continuePolling) void pollExeProvider(dataId);
+         } catch (caught) {
+             setError(caught instanceof Error ? caught.message : String(caught));
+         } finally {
+-            setProviderPolling(false);
++            if (!continuePolling) setProviderPolling(false);
+         }
+     }
+ 

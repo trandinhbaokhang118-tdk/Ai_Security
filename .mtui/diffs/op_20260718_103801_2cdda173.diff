@@ -1,0 +1,13 @@
+@@ -657,7 +657,11 @@
+         if len(actions) >= 30:
+             break
+ 
+-    visible_text = collapse_space(soup.get_text(" ", strip=True))
++    visible_text = soup.get_text(" ", strip=True)
++    visible_text = VISIBLE_DOCUMENT_CODE_RE.sub(" ", visible_text)
++    visible_text = VISIBLE_SCRIPT_STYLE_RE.sub(" ", visible_text)
++    visible_text = VISIBLE_TAG_RE.sub(" ", visible_text)
++    visible_text = collapse_space(visible_text)
+     content, pii_counts = redact_message(visible_text, limit=12_000)
+     return {
+         "content": content,

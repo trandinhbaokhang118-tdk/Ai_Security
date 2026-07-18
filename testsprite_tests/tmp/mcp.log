@@ -1,0 +1,5 @@
+{"timestamp":"2026-07-18T01:33:56.332Z","level":"info","message":"Tool invocation started","correlationId":"cea87d2e-2664-43a0-9b52-23c6a61f7497","tool":"testsprite_generate_code_summary"}
+{"timestamp":"2026-07-18T01:33:56.339Z","level":"debug","message":"Code analyze params","correlationId":"cea87d2e-2664-43a0-9b52-23c6a61f7497","tool":"testsprite_generate_code_summary","context":{"projectRootPath":"C:\\NDT\\PJ\\Ai_Security-main"}}
+{"timestamp":"2026-07-18T01:33:56.343Z","level":"info","message":"Tool invocation completed","correlationId":"cea87d2e-2664-43a0-9b52-23c6a61f7497","tool":"testsprite_generate_code_summary"}
+{"timestamp":"2026-07-18T01:33:56.342Z","level":"info","message":"Scope determined","correlationId":"cea87d2e-2664-43a0-9b52-23c6a61f7497","tool":"testsprite_generate_code_summary","context":{}}
+{"timestamp":"2026-07-18T01:33:56.342Z","level":"error","message":"readConfig error: Error: ENOENT: no such file or directory, open 'C:\\NDT\\PJ\\Ai_Security-main\\testsprite_tests\\tmp\\config.json'","correlationId":"cea87d2e-2664-43a0-9b52-23c6a61f7497","tool":"testsprite_generate_code_summary"}

@@ -1,0 +1,79 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','frontend/web/lib/api/mock.ts','line','613','replace','    async sandboxExecutable(file: File, _shareWithProvider = false): Promise<ExeSandboxResult> {'],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/mock.ts','line','614','replace','        return { ok: false, execution_status: \x22failed\x22, analysis_mode: \x22quick_scan\x22, dynamic_execution: false, filename: file.name, sha256: \x22\x22, size_bytes: file.size, sandbox: \x22mock\x22, network: \x22disabled\x22, verdict: \x22unknown\x22, risk_score: 0, issues: [\x22Hãy đặt NEXT_PUBLIC_API_MODE=real để phân tích EXE thật.\x22], processes: [], files_created: [], network_attempts: [], provider_available: false, upload_consent_required: false, elapsed_ms: 0 };'],check=True);lines=['    }','','    async getExecutableProviderReport(_dataId: string): Promise<ExeProviderResult> {','        return { name: \x22mock\x22, configured: false, status: \x22disabled\x22, data_id: null, progress: 0, detected_engines: 0, total_engines: 0, detections: [], risk_score: 0, sample_shared: false, error: null };','    }'];c='\n'.join(lines);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/mock.ts','line','615','replace',c],check=True);subprocess.run(['mtui','--json','edit','frontend/web/lib/api/mock.ts','insert-after','    ExeSandboxResult,','\n    ExeProviderResult,'],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 711
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115228_6aeda0da",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\mock.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115228_6aeda0da\\mock.ts",
+  "diff_summary": "+55 -55",
+  "matches": null,
+  "line": 613,
+  "current_hash": "d9b183dced6c64d2f862e3356b18f6774fdfb4d3b7462a3df25816578c291d64",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115228_6b0ed624",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\mock.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115228_6b0ed624\\mock.ts",
+  "diff_summary": "+1 -1",
+  "matches": null,
+  "line": 614,
+  "current_hash": "fe0ed4765c5b8fea4a28643808eddc8e0ed665ee976283d055c1efb99d5350c0",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "line_replace",
+  "operation_id": "op_20260718_115228_976a52ba",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\mock.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115228_976a52ba\\mock.ts",
+  "diff_summary": "+4 -0",
+  "matches": null,
+  "line": 615,
+  "current_hash": "00b3926a93695a800d10b7e460f8c4e7f70caea93a3218b09e51dc6d3d41dd68",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "insert_after",
+  "operation_id": "op_20260718_115228_598405c6",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\frontend\\web\\lib\\api\\mock.ts",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115228_598405c6\\mock.ts",
+  "diff_summary": "+2 -0",
+  "matches": 1,
+  "line": null,
+  "current_hash": "c3e4eced1ce5b4a9f2b8bfe8d9e9735507dfdb77e8862f8838b6c21bb4bb6fb9",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

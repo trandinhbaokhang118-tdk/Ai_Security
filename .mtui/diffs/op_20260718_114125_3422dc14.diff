@@ -1,0 +1,9 @@
+@@ -21,6 +21,8 @@
+     resolve_actor,
+ )
+ from backend.security_utils import input_sha256, utcnow
++
++from backend.services.exe_quick_scan_service import exe_quick_scan_service
+ from backend.services.inference_service import InferenceService
+ from backend.services.quota_service import (
+     refund_ai_credits,

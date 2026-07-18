@@ -1,0 +1,32 @@
+@@ -156,3 +156,31 @@
+ 
+     assert response.status_code == 400
+     assert "Chỉ chấp nhận" in response.json()["detail"]
++
++
++def test_quick_scan_provider_report_endpoint_returns_normalized_result(monkeypatch) -> None:
++    provider = ConsentProvider()
++    monkeypatch.setattr(
++        assess,
++        "exe_quick_scan_service",
++        ExeQuickScanService(provider=provider),  # type: ignore[arg-type]
++    )
++
++    response = client.get("/v1/assess/file/exe-quick-scan/provider/job-1")
++
++    assert response.status_code == 200
++    body = response.json()
++    assert body["status"] == "completed"
++    assert body["name"] == "fake"
++
++
++def test_quick_scan_endpoint_enforces_upload_limit(monkeypatch) -> None:
++    monkeypatch.setattr(assess, "exe_quick_scan_service", ExeQuickScanService())
++    monkeypatch.setattr(assess.settings, "max_upload_bytes", 32)
++
++    response = client.post(
++        "/v1/assess/file/exe-quick-scan",
++        files={"file": ("sample.exe", build_pe(), "application/octet-stream")},
++    )
++
++    assert response.status_code == 413

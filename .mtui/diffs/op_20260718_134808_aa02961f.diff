@@ -1,0 +1,19 @@
+@@ -108,6 +108,18 @@
+ 
+     lowered = payload["content"].lower()
+     assert "http://" not in lowered and "https://" not in lowered, where
++    for bad_phrase in (
++        "trước trong ",
++        "trước trước ",
++        "trước ngay lập tức",
++        "truoc trong ",
++        "truoc truoc ",
++        "truoc ngay lap tuc",
++    ):
++        assert bad_phrase not in lowered, (where, bad_phrase, payload["content"])
++    if row["label"] == "scam" and wrapper_index == 4:
++        assert "mọi thông tin cần được đối chiếu qua kênh độc lập" not in lowered, where
++        assert "moi thong tin can duoc doi chieu qua kenh doc lap" not in lowered, where
+ 
+     return {
+         "case_id": row["case_id"],

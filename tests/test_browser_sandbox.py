@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 
 from security import browser_sandbox_worker
@@ -115,3 +116,36 @@ def test_websocket_attempt_is_reported_as_blocked() -> None:
     )
 
     assert "websocket_request_blocked" in {issue["code"] for issue in issues}
+
+
+def test_completed_browser_result_is_checkpointed_with_screenshot(tmp_path, monkeypatch) -> None:
+    checkpoint = tmp_path / "browser-result.json"
+    monkeypatch.setenv("AISEC_BROWSER_RESULT_PATH", str(checkpoint))
+    result = browser_sandbox_worker._completed_result(
+        raw_url="https://example.com",
+        started=0.0,
+        initial_ip="93.184.216.34",
+        canary={"email": "clone@example.invalid"},
+        status_code=200,
+        final_url="https://example.com/",
+        title="Example",
+        fill_report={"fields": []},
+        probe_report={"sensitive_forms": 0},
+        browser_events=[],
+        network_events=[],
+        download_events=[],
+        console_errors=[],
+        visual_analysis={},
+        page_identity={"page_title": "Example"},
+        screenshot_data_url="data:image/jpeg;base64,dGVzdA==",
+    )
+
+    browser_sandbox_worker._write_result_checkpoint(result)
+
+    persisted = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert persisted["ok"] is True
+    assert persisted["execution_status"] == "completed"
+    assert persisted["screenshot_data_url"].startswith("data:image/jpeg;base64,")
+    validated = BrowserSandboxRunner._read_result(checkpoint)
+    assert validated is not None
+    assert validated.ok is True

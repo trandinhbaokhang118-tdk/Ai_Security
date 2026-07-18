@@ -7,16 +7,15 @@ import os
 from typing import Any, Literal
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP
+from fastapi import HTTPException
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from fastapi import HTTPException
-
-from mcp_server.auth import MCPApiKeyMiddleware, current_mcp_identity, reserve_mcp_scan_quota
-from mcp_server.tools import MCPTools
-from mcp_server.oauth import OAUTH_SCOPES, PrewiseOAuthProvider, install_oauth_routes
 from backend.config import settings
+from mcp_server.auth import MCPApiKeyMiddleware, current_mcp_identity, reserve_mcp_scan_quota
+from mcp_server.oauth import OAUTH_SCOPES, PrewiseOAuthProvider, install_oauth_routes
+from mcp_server.tools import MCPTools
 
 
 def build_server(host: str = "127.0.0.1", port: int = 3001) -> FastMCP:

@@ -9,12 +9,89 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 _ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff"), None)
 _HTML_TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?。？！])\s+|\n+")
 _LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t"})
+_PLAIN_URL = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.I)
+
+
+class _MessageLinkParser(HTMLParser):
+    """Collect link targets before HTML is converted to visible text."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.urls: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        candidates: list[str | None] = []
+        if tag.lower() in {"a", "area", "link"}:
+            candidates.append(values.get("href"))
+        elif tag.lower() in {"img", "iframe", "form"}:
+            candidates.extend((values.get("src"), values.get("action")))
+        for value in candidates:
+            if value:
+                self.urls.append(value.strip())
+
+
+def extract_message_urls(raw_text: str, metadata: dict | None = None) -> list[str]:
+    """Extract visible and hidden HTTP(S) links from message content/metadata.
+
+    The old preprocessing removed HTML tags before inspecting ``href``. That made
+    a phishing button such as ``<a href=evil>microsoft.com</a>`` invisible to the
+    URL risk core. Only web links are returned; mailto/tel/data/javascript targets
+    are intentionally excluded.
+    """
+
+    candidates = list(_PLAIN_URL.findall(raw_text or ""))
+    parser = _MessageLinkParser()
+    try:
+        parser.feed(raw_text or "")
+        candidates.extend(parser.urls)
+    except Exception:
+        # Malformed marketing/phishing HTML must not break text assessment.
+        pass
+
+    metadata = metadata or {}
+    for key in ("html", "raw_html", "body_html"):
+        value = metadata.get(key)
+        if isinstance(value, str):
+            candidates.extend(_PLAIN_URL.findall(value))
+            try:
+                extra = _MessageLinkParser()
+                extra.feed(value)
+                candidates.extend(extra.urls)
+            except Exception:
+                pass
+    for key in ("links", "urls", "qr_urls", "attachment_urls"):
+        value = metadata.get(key)
+        if isinstance(value, str):
+            candidates.append(value)
+        elif isinstance(value, (list, tuple, set)):
+            candidates.extend(str(item) for item in value if item)
+
+    output: list[str] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        value = raw.strip().rstrip(".,;:!?)]}")
+        if value.lower().startswith("www."):
+            value = "https://" + value
+        try:
+            parts = urlsplit(value)
+        except ValueError:
+            continue
+        if parts.scheme.lower() not in {"http", "https"} or not parts.hostname:
+            continue
+        key = value.casefold()
+        if key not in seen:
+            seen.add(key)
+            output.append(value)
+    return output[:20]
 
 
 def normalize_unicode(text: str) -> str:
@@ -36,6 +113,7 @@ def preprocess_email(raw_text: str, metadata: dict | None = None) -> str:
     """Strip HTML, normalize Unicode, collapse whitespace. Prepend metadata hints."""
     if not raw_text:
         return ""
+    urls = extract_message_urls(raw_text, metadata)
     text = strip_html(raw_text)
     text = normalize_unicode(text)
     text = _WS.sub(" ", text).strip()
@@ -47,6 +125,9 @@ def preprocess_email(raw_text: str, metadata: dict | None = None) -> str:
             parts.append(f"[sender] {metadata['sender']}")
         if parts:
             text = " ".join(parts) + " " + text
+    if urls:
+        # Keep hidden button/QR targets available to both ML and deterministic rules.
+        text = text + " " + " ".join(f"[link] {url}" for url in urls)
     return text[:50_000]
 
 

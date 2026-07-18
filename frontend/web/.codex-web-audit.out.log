@@ -1,0 +1,167 @@
+
+> ai-security-armor-web@0.1.0 dev
+> next dev -p 3000
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3000
+   - Network:      http://26.79.202.28:3000
+
+ ✓ Starting...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-dev-6420/types/**/*.ts'
+
+ ✓ Ready in 4.2s
+ ○ Compiling / ...
+ ✓ Compiled / in 8.3s (934 modules)
+ GET / 200 in 616ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 3.6s (774 modules)
+ GET /brand-logo?v=3 200 in 4359ms
+ ✓ Compiled in 1935ms (787 modules)
+ GET / 200 in 1046ms
+ GET / 200 in 760ms
+ GET /brand-logo?v=3 200 in 199ms
+ ○ Compiling /auth ...
+ ✓ Compiled /auth in 3.5s (768 modules)
+ GET /auth 200 in 5622ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 1380ms (463 modules)
+ GET /brand-logo?v=3 200 in 2897ms
+ ○ Compiling /about ...
+ ✓ Compiled /about in 2.1s (777 modules)
+ GET /about 200 in 4862ms
+ ○ Compiling /methodology ...
+ ✓ Compiled /methodology in 1417ms (783 modules)
+ GET /methodology 200 in 4181ms
+ ○ Compiling /downloads ...
+ ✓ Compiled /downloads in 1996ms (798 modules)
+ GET /downloads 200 in 3319ms
+ ○ Compiling /pricing ...
+ ✓ Compiled /pricing in 1965ms (808 modules)
+ GET /pricing 307 in 3259ms
+ ○ Compiling /account/billing ...
+ ✓ Compiled /account/billing in 2s (822 modules)
+ GET /account/billing 200 in 2997ms
+ ✓ Compiled in 2.1s (791 modules)
+ GET /account/billing 200 in 317ms
+ ✓ Compiled /auth in 450ms (453 modules)
+ GET /auth 200 in 2253ms
+ ✓ Compiled /about in 427ms (474 modules)
+ ✓ Compiled (476 modules)
+ GET /brand-logo?v=3 200 in 1891ms
+ GET /about 200 in 1401ms
+ ✓ Compiled /methodology in 353ms (481 modules)
+ GET /methodology 200 in 830ms
+ ✓ Compiled /downloads in 257ms (495 modules)
+ GET /downloads 200 in 941ms
+ ✓ Compiled /pricing in 330ms (505 modules)
+ GET /pricing 307 in 1025ms
+ GET /account/billing 200 in 120ms
+ ✓ Compiled in 1537ms (791 modules)
+ GET /account/billing 200 in 706ms
+ ✓ Compiled /auth in 276ms (453 modules)
+ GET /auth 200 in 1057ms
+ GET /account/billing 200 in 175ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 597ms (474 modules)
+ GET /brand-logo?v=3 200 in 854ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 1248ms (803 modules)
+ GET /analyze 200 in 1447ms
+ GET /auth 200 in 518ms
+ GET /brand-logo?v=3 200 in 457ms
+ GET /analyze 200 in 52ms
+ GET /auth 200 in 109ms
+ GET /brand-logo?v=3 200 in 68ms
+ GET /analyze 200 in 73ms
+ GET /auth 200 in 570ms
+ GET /brand-logo?v=3 200 in 500ms
+ ○ Compiling /about ...
+ ✓ Compiled /about in 1140ms (482 modules)
+ GET /analyze 200 in 4048ms
+ GET /about 200 in 4617ms
+ ○ Compiling /methodology ...
+ ✓ Compiled /methodology in 1528ms (487 modules)
+ GET /about 200 in 931ms
+ GET /methodology 200 in 3153ms
+ ○ Compiling /downloads ...
+ ✓ Compiled /downloads in 513ms (501 modules)
+ GET /downloads 200 in 1909ms
+ ○ Compiling /pricing ...
+ ✓ Compiled /pricing in 709ms (511 modules)
+ GET /pricing 307 in 2205ms
+ GET /downloads 200 in 1488ms
+ GET /account/billing 200 in 369ms
+ ✓ Compiled in 2.3s (823 modules)
+ GET /account/billing 200 in 687ms
+ ○ Compiling /methodology ...
+ ✓ Compiled /methodology in 658ms (477 modules)
+ GET /account/billing 200 in 1107ms
+ GET /methodology 200 in 2208ms
+ GET /auth 200 in 301ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 1133ms (496 modules)
+ GET /brand-logo?v=3 200 in 1656ms
+ GET /analyze 200 in 349ms
+ GET /auth 200 in 475ms
+ GET /brand-logo?v=3 200 in 99ms
+ GET /analyze 200 in 64ms
+ ✓ Compiled in 1380ms (836 modules)
+ GET /analyze 200 in 467ms
+ GET /auth 200 in 553ms
+ GET /brand-logo?v=3 200 in 392ms
+ GET /analyze 200 in 212ms
+ GET /about 200 in 347ms
+ GET /methodology 200 in 348ms
+ GET /downloads 200 in 483ms
+ ○ Compiling /pricing ...
+ ✓ Compiled /pricing in 776ms (496 modules)
+ GET /pricing 307 in 1395ms
+ GET /downloads 200 in 606ms
+ ○ Compiling /account/billing ...
+ ✓ Compiled /account/billing in 758ms (506 modules)
+ GET /downloads 200 in 409ms
+ GET /account/billing 200 in 1394ms
+ ✓ Compiled in 1030ms (856 modules)
+ GET /account/billing 200 in 402ms
+ GET /auth 200 in 381ms
+ GET /brand-logo?v=3 200 in 96ms
+ GET /analyze 200 in 244ms
+ GET /about 200 in 478ms
+ GET /methodology 200 in 636ms
+ GET /downloads 200 in 205ms
+ GET /pricing 307 in 645ms
+ GET /account/billing 200 in 296ms
+ ✓ Compiled in 2.2s (856 modules)
+ GET /account/billing 200 in 341ms
+ GET /pricing 307 in 527ms
+ GET /account/billing 200 in 158ms
+ GET /auth 200 in 268ms
+ GET /brand-logo?v=3 200 in 210ms
+ GET /about 200 in 336ms
+ GET /methodology 200 in 136ms
+ GET /downloads 200 in 575ms
+ GET /pricing 307 in 207ms
+ GET /account/billing 200 in 140ms
+ ✓ Compiled in 6.5s (809 modules)
+ ✓ Compiled in 932ms (795 modules)
+ ✓ Compiled in 2.2s (809 modules)
+ ✓ Compiled in 1689ms (337 modules)
+ ✓ Compiled in 904ms (337 modules)
+ ✓ Compiled in 982ms (352 modules)
+ ✓ Compiled in 693ms (797 modules)
+ ✓ Compiled in 3.1s (811 modules)
+ ✓ Compiled in 4.4s (811 modules)
+ ✓ Compiled in 26.7s (811 modules)
+ ✓ Compiled in 2.2s (797 modules)
+ GET /auth 200 in 5561ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 2.3s (491 modules)
+ GET /brand-logo?v=3 200 in 3953ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 2s (496 modules)
+ GET /analyze 200 in 2815ms
+ GET /analyze 200 in 181ms

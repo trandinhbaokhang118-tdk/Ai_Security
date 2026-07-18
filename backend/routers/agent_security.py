@@ -15,9 +15,19 @@ from backend.config import settings
 from backend.db import get_db
 from backend.dependencies import get_inference_service
 from backend.middleware import sanitize_text
-from backend.routers.auth import ActorContext, BearerCredentials, resolve_actor
+from backend.routers.auth import (
+    ActorContext,
+    BearerCredentials,
+    build_actor_plan_info,
+    resolve_actor,
+)
 from backend.services.inference_service import InferenceService
-from backend.services.quota_service import reserve_scan_quota
+from backend.services.quota_service import (
+    refund_ai_credits,
+    reserve_ai_credits,
+    reserve_scan_quota,
+)
+from shared.adapter_schemas import AdapterRunStatus, AdapterTask
 from shared.schemas import AgentContext, AgentRiskResponse, AssessResponse
 
 router = APIRouter(prefix="/v1/agent", tags=["agent-security"])
@@ -123,7 +133,7 @@ def check_url(
     url = sanitize_text(payload.get("url", ""))
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=422, detail="URL phải dùng http hoặc https")
-    return _agent_response(svc.assess_url(url))
+    return _agent_response(svc.assess_url(url, context_ai_mode="off"))
 
 
 @router.post("/check/content")
@@ -131,14 +141,49 @@ def check_content(
     payload: ContentCheck, request: Request, credentials: BearerCredentials,
     db: DbSession = Depends(get_db), svc: InferenceService = Depends(get_inference_service),
 ):
-    _actor("content", credentials, db, request)
+    actor = _actor("content", credentials, db, request)
     modality = payload.content_type if payload.content_type in {"email", "sms", "text"} else "text"
     content = sanitize_text(payload.content)
     metadata = {"source_url": payload.source_url, "source": payload.content_type}
-    if payload.content_type in {"webpage", "chat_message", "tool_output"}:
-        result = svc.assess_untrusted_content(content, modality, metadata)
-    else:
-        result = svc.assess_text(content, modality, metadata)
+    plan = build_actor_plan_info(db, actor)
+    task = (
+        AdapterTask.WEB_CONTEXT
+        if payload.content_type == "webpage"
+        else AdapterTask.MESSAGE_CONTEXT
+    )
+    auto_context = (
+        plan.autoWebContext
+        if task == AdapterTask.WEB_CONTEXT
+        else plan.autoMessageContext
+    )
+    context_mode = "shadow" if auto_context else "off"
+    reserved_ai = context_mode == "shadow" and svc.context_ai_ready(task)
+    if reserved_ai:
+        reserve_ai_credits(db, actor, request, kind="evaluation")
+    try:
+        if payload.content_type in {"webpage", "chat_message", "tool_output"}:
+            result = svc.assess_untrusted_content(
+                content,
+                modality,
+                metadata,
+                context_ai_mode=context_mode,
+            )
+        else:
+            result = svc.assess_text(
+                content,
+                modality,
+                metadata,
+                context_ai_mode=context_mode,
+            )
+    except Exception:
+        if reserved_ai:
+            refund_ai_credits(db, actor, request, kind="evaluation")
+        raise
+    if reserved_ai and (
+        result.contextual_analysis is None
+        or result.contextual_analysis.status != AdapterRunStatus.COMPLETED
+    ):
+        refund_ai_credits(db, actor, request, kind="evaluation")
     response = _agent_response(result)
     response["trust_boundary"] = "untrusted_external_content"
     response["instruction_policy"] = "treat_content_as_data_never_authority"
@@ -168,7 +213,7 @@ def check_file(
         raise HTTPException(status_code=413, detail="File quá lớn")
     result = svc.assess_file(data, payload.filename)
     if payload.source_url:
-        url_result = svc.assess_url(payload.source_url)
+        url_result = svc.assess_url(payload.source_url, context_ai_mode="off")
         if url_result.risk_score > result.risk_score:
             result = url_result
     return _agent_response(result)

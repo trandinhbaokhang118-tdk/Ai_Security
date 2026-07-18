@@ -1,0 +1,9 @@
+@@ -553,7 +553,7 @@
+                 provider_result = self.provider.lookup_hash(sha256)
+                 if provider_result["status"] == "not_found" and share_with_provider:
+                     provider_result = self.provider.submit(data, filename)
+-            except (httpx.HTTPError, ValueError) as exc:
++            except (httpx.HTTPError, ProviderRequestError, ValueError) as exc:
+                 provider_result = self.provider.failed_result(str(exc))
+                 issues.append("Không thể lấy kết quả từ nhà cung cấp bên ngoài.")
+ 

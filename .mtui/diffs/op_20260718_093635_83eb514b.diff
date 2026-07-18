@@ -1,0 +1,13 @@
+@@ -413,9 +413,10 @@
+         args.seed,
+         "validation",
+     )
+-    del model
++    del tokenizer
+     gc.collect()
+-    torch.cuda.empty_cache()
++    if torch.cuda.is_available():
++        torch.cuda.empty_cache()
+     barrier()
+ 
+     run_dir = output_root / task_config["adapter_dir"]

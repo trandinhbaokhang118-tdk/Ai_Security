@@ -50,6 +50,8 @@ node_modules/
 frontend/web/.next/
 frontend/web/out/
 frontend/web/.env.local
+frontend/desktop/release/
+artifacts/
 
 # Extension generated icons (produced by make_icons.py)
 frontend/extension/icons/*.png

@@ -1,0 +1,79 @@
+$ python -c import subprocess;subprocess.run(['mtui','--json','edit','security/exe_quick_scan.py','replace','from datetime import datetime, timezone','from datetime import UTC, datetime'],check=True);subprocess.run(['mtui','--json','edit','security/exe_quick_scan.py','replace','timezone.utc','UTC','--all'],check=True);subprocess.run(['mtui','--json','edit','security/exe_quick_scan.py','replace','import httpx\n\n\nPRIVACY_NOTICE','import httpx\n\nPRIVACY_NOTICE'],check=True);subprocess.run(['mtui','--json','edit','backend/services/exe_quick_scan_service.py','replace','from security.exe_quick_scan import ExeQuickScanService, MetaDefenderProvider\n\n\nmetadefender_provider','from security.exe_quick_scan import ExeQuickScanService, MetaDefenderProvider\n\nmetadefender_provider'],check=True)
+mode: fallback
+exit_code: 0
+duration_ms: 1035
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "replace",
+  "operation_id": "op_20260718_115332_bb9d00eb",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\security\\exe_quick_scan.py",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115332_bb9d00eb\\exe_quick_scan.py",
+  "diff_summary": "+1 -1",
+  "matches": 1,
+  "line": null,
+  "current_hash": "24db0da994cd74a3eedcb25d66b827584b5e92e1110a24874a3652fbc8a103aa",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "replace",
+  "operation_id": "op_20260718_115332_1e1601bf",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\security\\exe_quick_scan.py",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115332_1e1601bf\\exe_quick_scan.py",
+  "diff_summary": "+4 -4",
+  "matches": 4,
+  "line": null,
+  "current_hash": "0789e4a5dda895242c2f89f51a777ba5e3035c451ed5eb6b25fdede965fdc223",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "replace",
+  "operation_id": "op_20260718_115332_b36328c3",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\security\\exe_quick_scan.py",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115332_b36328c3\\exe_quick_scan.py",
+  "diff_summary": "+0 -1",
+  "matches": 1,
+  "line": null,
+  "current_hash": "1fe23970d41fbb56f0df91961a425ce4eef2874cee4c130342a431816d6c2bce",
+  "expected_hash": null,
+  "concurrency": null
+}
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "edit",
+  "operation": "replace",
+  "operation_id": "op_20260718_115332_a3add114",
+  "file": "\\\\?\\C:\\NDT\\PJ\\Ai_Security-main\\backend\\services\\exe_quick_scan_service.py",
+  "changed": true,
+  "backup": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui\\backups\\2026-07-18\\op_20260718_115332_a3add114\\exe_quick_scan_service.py",
+  "diff_summary": "+0 -1",
+  "matches": 1,
+  "line": null,
+  "current_hash": "4bcaab361d630033530715e79fc393334ab4e8f945002c786b574d54c32e1722",
+  "expected_hash": null,
+  "concurrency": null
+}
+
+---- stderr ----

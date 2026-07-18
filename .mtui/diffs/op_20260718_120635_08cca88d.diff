@@ -1,0 +1,15 @@
+@@ -188,11 +188,12 @@
+         if (view === "sandbox") void refresh();
+     }, [view]);
+ 
++    const provisioning = cloud?.session?.status === "provisioning";
+     useEffect(() => {
+-        if (!cloud?.session || cloud.session.status !== "provisioning") return;
++        if (!provisioning) return;
+         const timer = setInterval(() => void refresh(), 3000);
+         return () => clearInterval(timer);
+-    }, [cloud?.session?.status]);
++    }, [provisioning]);
+ 
+     async function startSession() {
+         setBusy(true);

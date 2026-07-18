@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import secrets
-import time
 from datetime import UTC, timedelta
 from urllib.parse import urlencode
 

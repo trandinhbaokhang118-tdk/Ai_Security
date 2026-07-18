@@ -1,0 +1,38 @@
+@@ -129,6 +129,37 @@
+     assert "S-CONV-01" in features(result)
+ 
+ 
++def test_sms_sender_abuse_is_high_evidence_but_not_a_standalone_block() -> None:
++    result = assess_text_risk(
++        "Chào bạn, đây là một tin nhắn bình thường.",
++        "sms",
++        {"sender_abuse_confirmed": True},
++    )
++    assert "S-ID-02" in features(result)
++    assert 0.15 <= result.score < 0.60
++
++
++def test_sms_voip_sender_is_only_a_supporting_signal() -> None:
++    result = assess_text_risk(
++        "Lịch hẹn của bạn lúc 14 giờ.",
++        "sms",
++        {"sender_line_type": "voip"},
++    )
++    assert "S-ID-03" in features(result)
++    assert result.score < 0.20
++
++
++def test_sms_country_mismatch_combines_with_scam_action() -> None:
++    result = assess_text_risk(
++        "Bưu kiện bị giữ, hãy bấm link và đóng phí ngay: https://ship-fee.example/pay",
++        "sms",
++        {"sender_country_mismatch": True},
++    )
++    assert "S-ID-01" in features(result)
++    assert "S-CONT-01" in features(result)
++    assert result.score >= 0.40
++
++
+ class _StubEngine:
+     models_loaded = False
+     model_status: dict = {}

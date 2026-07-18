@@ -1,0 +1,20 @@
+$ powershell -NoProfile -Command $content = 'line1' + [Environment]::NewLine + 'line2'; & mtui --json new '.mtui/tmp-block3.txt' --content $content --overwrite
+mode: fallback
+exit_code: 0
+duration_ms: 412
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "new",
+  "operation": "create_file",
+  "operation_id": "op_20260718_114349_21735e93",
+  "file": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui/tmp-block3.txt",
+  "changed": true,
+  "backup": null,
+  "diff_summary": "+2 -0"
+}
+
+---- stderr ----

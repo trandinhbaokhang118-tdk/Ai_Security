@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Literal
 
 from pydantic import model_validator
@@ -19,11 +21,116 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_timeout_seconds: float = 90
     llm_max_tokens: int = 500
+    adapter_registry_enabled: bool = True
+    adapter_manifest_path: str = "server/adapters/manifest.json"
+    adapter_base_url: str = ""
+    adapter_api_key: str = ""
+    adapter_timeout_seconds: float = 15
+    adapter_max_risk_contribution: float = 0.25
     # Backward-compatible local Ollama settings. Used only when LLM_BASE_URL is empty.
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
     ip2whois_api_key: str = ""
     whoisxml_api_key: str = ""
+
+    # Public-IP enrichment. Only globally routable IP literals are sent and
+    # results are cached; the full URL and query string never leave this service.
+    ip_geolocation_enabled: bool = True
+    ip2location_api_key: str = ""
+    ip_geolocation_timeout_seconds: float = 3.0
+    ip_geolocation_cache_ttl_seconds: int = 21600
+
+    # Optional external URL intelligence. Providers remain disabled until a
+    # server-side key/explicit enable flag is configured.
+    hudson_rock_api_url: str = ""
+    hudson_rock_api_key: str = ""
+    phishtank_api_url: str = ""
+    phishtank_api_key: str = ""
+    phishtank_enabled: bool = False
+    ipqs_api_url: str = ""
+    ipqs_api_key: str = ""
+    google_web_risk_api_url: str = ""
+    google_web_risk_api_key: str = ""
+    google_safe_browsing_api_key: str = ""
+    apivoid_api_url: str = ""
+    apivoid_api_key: str = ""
+    phishdestroy_api_url: str = ""
+    phishdestroy_api_key: str = ""
+    phishdestroy_enabled: bool = False
+
+    # Phone-number reputation for SMS assessment. The key stays server-side;
+    # responses are reduced to non-identifying carrier/risk fields before they
+    # are returned to clients.
+    ipqs_phone_api_url: str = "https://www.ipqualityscore.com/api/json/phone"
+    ipqs_phone_api_key: str = ""
+    phone_intelligence_timeout_seconds: float = 8.0
+
+    # Private attachment inspection. clamd must only be reachable on a trusted
+    # service network because its TCP protocol has no authentication or TLS.
+    clamav_host: str = ""
+    clamav_port: int = 3310
+    attachment_scan_timeout_seconds: float = 10.0
+    tesseract_executable: str = ""
+    tesseract_languages: str = "vie+eng"
+    attachment_ocr_timeout_seconds: float = 12.0
+    email_attachment_sandbox_enabled: bool = False
+    email_attachment_active_scan_limit: int = 12
+    email_ocr_image_limit: int = 5
+    email_sandbox_file_limit: int = 1
+    email_attachment_budget_seconds: float = 35.0
+    email_analysis_timeout_seconds: float = 90.0
+
+    # Gmail OAuth web-server flow. Encryption keys are comma-separated Fernet
+    # keys; the first encrypts new values and the remaining keys allow rotation.
+    gmail_oauth_client_id: str = ""
+    gmail_oauth_client_secret: str = ""
+    gmail_oauth_redirect_uri: str = ""
+    gmail_token_encryption_keys: str = ""
+    gmail_web_return_url: str = "http://localhost:3000/analyze?gmail=connected"
+    gmail_api_timeout_seconds: float = 12.0
+
+    # url.vet is a separately deployed service and is consumed over HTTP.
+    urlvet_enabled: bool = False
+    urlvet_api_url: str = "http://127.0.0.1:8080"
+    urlvet_timeout_seconds: float = 12.0
+
+    # Local threat-feed pipeline. Every source is opt-in and bounded.
+    threat_feed_scheduler_enabled: bool = False
+    threat_feed_scheduler_interval_minutes: int = 60
+    threat_feed_request_timeout_seconds: float = 45.0
+    threat_feed_max_download_bytes: int = 64 * 1024 * 1024
+    threat_feed_max_records_per_source: int = 250_000
+    threat_feed_retention_days: int = 30
+    threat_feed_user_agent: str = "AI-Security-Armor/0.2 threat-feed-collector"
+    threat_feed_allow_custom_endpoints: bool = False
+    threat_feed_phishtank_enabled: bool = False
+    threat_feed_phishtank_url: str = "https://data.phishtank.com/data/online-valid.csv.gz"
+    threat_feed_phishtank_app_key: str = ""
+    threat_feed_openphish_enabled: bool = False
+    threat_feed_openphish_url: str = (
+        "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt"
+    )
+    threat_feed_urlhaus_enabled: bool = False
+    threat_feed_urlhaus_url: str = (
+        "https://urlhaus-api.abuse.ch/v2/files/exports/{auth_key}/recent.csv"
+    )
+    threat_feed_urlhaus_auth_key: str = ""
+    threat_feed_openphish_interval_hours: int = 12
+    threat_feed_phishing_database_path: str = ".aisec-data/Phishing.Database"
+
+    # Optional self-hosted MISP lookup.
+    misp_enabled: bool = False
+    misp_base_url: str = ""
+    misp_api_key: str = ""
+    misp_verify_tls: bool = True
+    misp_timeout_seconds: float = 8.0
+    misp_lookup_last: str = "90d"
+
+    # Privacy-preserving endpoint consensus. Raw URLs and sensor IDs are not stored.
+    telemetry_sensor_pepper: str = "dev-telemetry-pepper-change-in-production"
+    telemetry_retention_days: int = 30
+    telemetry_consensus_window_days: int = 14
+    telemetry_min_independent_sensors: int = 2
 
     database_url: str = "sqlite:///./.aisec-data/armor.db"
     database_auto_create: bool = True
@@ -40,9 +147,26 @@ class Settings(BaseSettings):
     api_key: str = "dev-key-change-in-production"
     rate_limit_per_min: int = 60
     anonymous_daily_scan_limit: int = 50
+    anonymous_daily_ai_credit_limit: int = 5
+    anonymous_daily_deep_scan_limit: int = 1
     max_upload_bytes: int = 10 * 1024 * 1024
+
+    # Quick EXE Lab analysis. Local PE inspection is always available. Hash
+    # lookup and sample upload are enabled only when a server-side key exists.
+    metadefender_api_key: str = ""
+    metadefender_base_url: str = "https://api.metadefender.com/v4"
+    metadefender_timeout_seconds: float = 20.0
+
     shared_assessment_cache_enabled: bool = True
     shared_assessment_cache_ttl_seconds: int = 900
+
+    # Operational data lifecycle. Scan records are retained for account history
+    # and auditability, then purged with their evidence by the maintenance job.
+    # Set the scheduler explicitly in production (one worker only) so horizontal
+    # API replicas do not run redundant cleanup work.
+    scan_history_retention_days: int = 90
+    operational_maintenance_scheduler_enabled: bool = False
+    operational_maintenance_interval_minutes: int = 360
 
     # SePay webhook authentication. Prefer HMAC-SHA256 using X-SePay-Signature.
     sepay_webhook_api_key: str = ""
@@ -70,6 +194,8 @@ class Settings(BaseSettings):
     aws_sandbox_key_name: str = ""
     aws_sandbox_remote_port: int = 8443
     sandbox_public_base_url: str = ""
+    sandbox_sample_storage_path: str = ".aisec-data/cloud-sandbox-samples"
+    sandbox_sample_retention_hours: int = 24
 
     # Public MCP transport is authenticated independently from the web gateway.
     mcp_allow_anonymous: bool = False
@@ -124,6 +250,61 @@ class Settings(BaseSettings):
             unsafe.append("MCP_API_KEY_RATE_LIMIT_PER_MIN>0")
         if self.llm_base_url and not self.llm_api_key:
             unsafe.append("LLM_API_KEY when LLM_BASE_URL is configured")
+        if self.adapter_base_url and not (self.adapter_api_key or self.llm_api_key):
+            unsafe.append("ADAPTER_API_KEY when ADAPTER_BASE_URL is configured")
+        gmail_values = (
+            self.gmail_oauth_client_id,
+            self.gmail_oauth_client_secret,
+            self.gmail_oauth_redirect_uri,
+            self.gmail_token_encryption_keys,
+        )
+        if any(gmail_values) and not all(gmail_values):
+            unsafe.append("all GMAIL_OAUTH_* and GMAIL_TOKEN_ENCRYPTION_KEYS values")
+        if self.gmail_token_encryption_keys:
+            try:
+                decoded_keys = [
+                    base64.urlsafe_b64decode(item.strip().encode("ascii"))
+                    for item in self.gmail_token_encryption_keys.split(",")
+                    if item.strip()
+                ]
+                if not decoded_keys or any(len(item) != 32 for item in decoded_keys):
+                    raise ValueError
+            except (ValueError, UnicodeError, binascii.Error):
+                unsafe.append("GMAIL_TOKEN_ENCRYPTION_KEYS=valid Fernet key(s)")
+        if self.gmail_oauth_redirect_uri and not self.gmail_oauth_redirect_uri.startswith("https://"):
+            unsafe.append("GMAIL_OAUTH_REDIRECT_URI=https://...")
+        if any(gmail_values) and self.gmail_web_return_url and not self.gmail_web_return_url.startswith("https://"):
+            unsafe.append("GMAIL_WEB_RETURN_URL=https://...")
+        sepay_values = (
+            self.sepay_webhook_secret or self.sepay_webhook_api_key,
+            self.sepay_bank_account,
+            self.sepay_bank_name,
+            self.sepay_account_name,
+        )
+        if any(sepay_values) and not all(sepay_values):
+            unsafe.append(
+                "SePay webhook authentication plus SEPAY_BANK_ACCOUNT, "
+                "SEPAY_BANK_NAME and SEPAY_ACCOUNT_NAME"
+            )
+        aws_sandbox_values = (
+            self.aws_sandbox_ami_id,
+            self.aws_sandbox_subnet_id,
+            self.aws_sandbox_security_group_id,
+        )
+        if any(aws_sandbox_values) and not all(aws_sandbox_values):
+            unsafe.append(
+                "AWS_SANDBOX_AMI_ID, AWS_SANDBOX_SUBNET_ID and "
+                "AWS_SANDBOX_SECURITY_GROUP_ID"
+            )
+        if self.misp_enabled and (
+            not self.misp_base_url.startswith("https://") or not self.misp_api_key
+        ):
+            unsafe.append("MISP_BASE_URL=https://... and MISP_API_KEY when enabled")
+        if (
+            self.telemetry_sensor_pepper == "dev-telemetry-pepper-change-in-production"
+            or len(self.telemetry_sensor_pepper.encode("utf-8")) < 32
+        ):
+            unsafe.append("TELEMETRY_SENSOR_PEPPER>=32 bytes")
         if unsafe:
             raise ValueError("Unsafe production configuration: " + ", ".join(unsafe))
         return self

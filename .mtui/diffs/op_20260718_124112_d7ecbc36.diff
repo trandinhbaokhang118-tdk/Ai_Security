@@ -1,0 +1,13 @@
+@@ -58,6 +58,12 @@
+ METADEFENDER_BASE_URL=https://api.metadefender.com/v4
+ METADEFENDER_TIMEOUT_SECONDS=20
+ 
++# Quick EXE Lab. Leave the key empty to keep local PE analysis only.
++# File bytes are uploaded only after explicit user consent.
++METADEFENDER_API_KEY=
++METADEFENDER_BASE_URL=https://api.metadefender.com/v4
++METADEFENDER_TIMEOUT_SECONDS=20
++
+ # SePay QR checkout. Use HMAC-SHA256 in SePay; never commit the secret.
+ SEPAY_WEBHOOK_SECRET=CHANGE_ME_SEPAY_HMAC_SECRET
+ SEPAY_WEBHOOK_API_KEY=

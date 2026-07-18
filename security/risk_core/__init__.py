@@ -4,6 +4,7 @@ from .config import CriterionConfig, RiskConfig, SourceConfig, default_config
 from .detectors import (
     ScanObservations,
     add_browser_sandbox,
+    add_cross_source_intelligence,
     add_domain_intelligence,
     add_http_sandbox,
     add_offline_url_findings,
@@ -83,6 +84,7 @@ __all__ = [
     "SubjectKeys",
     "assess",
     "add_browser_sandbox",
+    "add_cross_source_intelligence",
     "add_domain_intelligence",
     "add_http_sandbox",
     "add_offline_url_findings",

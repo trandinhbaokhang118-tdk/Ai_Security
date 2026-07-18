@@ -1,0 +1,20 @@
+@@ -129,6 +129,19 @@
+     return "CHƯA XÁC ĐỊNH";
+ }
+ 
++function providerStatusLabel(provider?: ExeProviderResult): string {
++    if (!provider?.configured || provider.status === "disabled") {
++        return "Chưa cấu hình · chỉ phân tích cục bộ";
++    }
++    if (provider.status === "not_found") return "Hash chưa có kết quả";
++    if (provider.status === "queued") return `Đang quét ${provider.progress}%`;
++    if (provider.status === "failed") return "Không lấy được kết quả";
++    if (provider.total_engines > 0) {
++        return `${provider.detected_engines}/${provider.total_engines} engine phát hiện`;
++    }
++    return "Đã nhận báo cáo provider";
++}
++
+ function mergeProviderResult(
+     current: ExeSandboxResult,
+     provider: ExeProviderResult,

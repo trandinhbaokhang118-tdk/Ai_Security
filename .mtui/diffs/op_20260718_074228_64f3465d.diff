@@ -1,0 +1,60 @@
+@@ -263,18 +263,54 @@
+               const element = document.elementFromPoint(x, y);
+               if (!element) return null;
+               const anchor = element.closest?.('a');
+-              if (!anchor) return null;
++              const control = element.closest?.('button,input[type="submit"],input[type="image"]');
++              const form = control?.form || element.closest?.('form');
++              const controlType = (control?.getAttribute?.('type') ||
++                (control?.tagName?.toLowerCase() === 'button' ? 'submit' : '')).toLowerCase();
++              const isSubmit = Boolean(form && ['submit', 'image'].includes(controlType));
++              if (!anchor && !isSubmit) return null;
+               return {
+-                href: anchor.href || '',
+-                download: anchor.hasAttribute('download'),
+-                filename: anchor.getAttribute('download') || '',
+-                text: (anchor.textContent || '').trim().slice(0, 160),
++                href: anchor?.href || '',
++                download: Boolean(anchor?.hasAttribute('download')),
++                filename: anchor?.getAttribute('download') || '',
++                text: (anchor?.textContent || control?.textContent || '').trim().slice(0, 160),
++                isSubmit,
++                formAction: form?.action || '',
++                formMethod: (form?.method || 'get').toUpperCase(),
++                fieldIds: form
++                  ? Array.from(form.querySelectorAll('[data-prewise-canary-id]'))
++                      .map((item) => item.getAttribute('data-prewise-canary-id'))
++                      .filter(Boolean)
++                  : [],
+               };
+             }
+             """,
+             {"x": x, "y": y},
+         )
+ 
++    @staticmethod
++    def _inspect_active_form(page: object) -> dict[str, object] | None:
++        return page.evaluate(
++            """
++            () => {
++              let element = document.activeElement;
++              while (element?.shadowRoot?.activeElement) {
++                element = element.shadowRoot.activeElement;
++              }
++              const form = element?.form || element?.closest?.('form');
++              if (!form) return null;
++              return {
++                isSubmit: true,
++                formAction: form.action || location.href,
++                formMethod: (form.method || 'get').toUpperCase(),
++                fieldIds: Array.from(form.querySelectorAll('[data-prewise-canary-id]'))
++                  .map((item) => item.getAttribute('data-prewise-canary-id'))
++                  .filter(Boolean),
++              };
++            }
++            """
++        )
++
+     def _append_event(
+         self,
+         session: FreeBrowserSession,

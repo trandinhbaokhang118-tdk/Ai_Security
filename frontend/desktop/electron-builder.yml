@@ -1,0 +1,29 @@
+appId: vn.prewise.armor
+productName: Prewise Armor
+copyright: Copyright © 2026 Prewise
+asar: true
+compression: maximum
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+win:
+  executableName: PrewiseArmor
+  requestedExecutionLevel: asInvoker
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+  verifyUpdateCodeSignature: true
+nsis:
+  artifactName: Prewise-Armor-${version}-Setup-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Prewise Armor
+  uninstallDisplayName: Prewise Armor
+  deleteAppDataOnUninstall: false
+portable:
+  artifactName: Prewise-Armor-${version}-Portable-${arch}.${ext}

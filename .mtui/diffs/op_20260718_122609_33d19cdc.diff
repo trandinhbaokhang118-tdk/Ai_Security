@@ -1,0 +1,25 @@
+@@ -170,7 +170,23 @@
+                     "<IIII", data, offset + 8
+                 )
+                 flags = struct.unpack_from("<I", data, offset + 36)[0]
+-                raw_end = min(len(data), raw_pointer + raw_size)
++                declared_raw_end = raw_pointer + raw_size
++                raw_end = min(len(data), declared_raw_end)
++                if raw_size > 0 and raw_pointer < headers_end:
++                    score += 15
++                    anomalies.append(f"Section {name} trỏ vào vùng header PE.")
++                if raw_size > 0 and declared_raw_end > len(data):
++                    score += 15
++                    anomalies.append(f"Dữ liệu section {name} vượt quá kích thước tệp.")
++                if raw_size > 0 and raw_pointer < len(data):
++                    for previous_start, previous_end, previous_name in raw_ranges:
++                        if raw_pointer < previous_end and raw_end > previous_start:
++                            score += 18
++                            anomalies.append(
++                                f"Section {name} chồng lấn dữ liệu với section {previous_name}."
++                            )
++                            break
++                    raw_ranges.append((raw_pointer, raw_end, name))
+                 section_data = (
+                     data[raw_pointer:raw_end]
+                     if raw_pointer < len(data) and raw_size > 0

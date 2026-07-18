@@ -1,0 +1,123 @@
+
+> ai-security-armor-web@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3000
+
+   ▲ Next.js 15.5.18
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+
+ ✓ Starting...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-dev-37680/types/**/*.ts'
+
+ ✓ Ready in 5.4s
+ ○ Compiling / ...
+ ✓ Compiled / in 8.1s (902 modules)
+ GET / 200 in 8920ms
+ ○ Compiling /methodology ...
+ ✓ Compiled /methodology in 2s (752 modules)
+ GET /methodology 200 in 2520ms
+ ✓ Compiled in 445ms (738 modules)
+ GET / 200 in 951ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 2.3s (760 modules)
+ GET /brand-logo?v=3 200 in 3462ms
+ GET / 200 in 706ms
+ GET /brand-logo?v=3 200 in 78ms
+ GET /brand-logo?v=3 200 in 235ms
+ GET / 200 in 553ms
+ GET /brand-logo?v=3 200 in 158ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 1877ms (762 modules)
+ GET /analyze 200 in 2398ms
+ ○ Compiling /auth ...
+ ✓ Compiled /auth in 1849ms (777 modules)
+ GET /auth 200 in 2027ms
+ GET /brand-logo?v=3 200 in 114ms
+ GET /analyze 200 in 60ms
+ ✓ Compiled in 1084ms (770 modules)
+ GET /analyze 200 in 318ms
+ ✓ Compiled in 953ms (770 modules)
+ GET /analyze 200 in 335ms
+ GET /analyze 200 in 646ms
+ GET /analyze 200 in 241ms
+ ✓ Compiled in 1305ms (756 modules)
+ GET /analyze 200 in 588ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 3.5s (768 modules)
+ GET /admin 307 in 4294ms
+ ○ Compiling /armor-console ...
+ ✓ Compiled /armor-console in 1215ms (789 modules)
+ GET /armor-console 200 in 1977ms
+ ○ Compiling /api/admin/specs ...
+ ✓ Compiled /api/admin/specs in 1185ms (806 modules)
+ GET /api/admin/specs 500 in 1848ms
+ ✓ Compiled in 2.3s (791 modules)
+ GET /armor-console 200 in 510ms
+ ○ Compiling /api/admin/specs ...
+ ✓ Compiled /api/admin/specs in 541ms (476 modules)
+ GET /api/admin/specs 500 in 1931ms
+ GET /analyze 200 in 1934ms
+ GET /analyze 200 in 680ms
+ GET /auth 200 in 110ms
+ ○ Compiling /brand-logo ...
+ ✓ Compiled /brand-logo in 879ms (478 modules)
+ GET /brand-logo?v=3 200 in 1125ms
+ GET /analyze 200 in 199ms
+ ○ Compiling /account/api-key ...
+ ✓ Compiled /account/api-key in 1257ms (811 modules)
+ GET /account/api-key 200 in 1479ms
+ ✓ Compiled in 1195ms (804 modules)
+ GET /account/api-key 200 in 495ms
+ ✓ Compiled in 1101ms (790 modules)
+ GET /account/api-key 200 in 829ms
+ GET /auth 200 in 109ms
+ ✓ Compiled /brand-logo in 377ms (487 modules)
+ GET /brand-logo?v=3 200 in 668ms
+ GET /analyze 200 in 185ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1103ms (497 modules)
+ GET /admin 307 in 2469ms
+ GET /armor-console 200 in 620ms
+ ○ Compiling /api/admin/specs ...
+ ✓ Compiled /api/admin/specs in 1143ms (499 modules)
+ GET /api/admin/specs 500 in 1963ms
+ GET /api/admin/specs 200 in 253ms
+ GET /armor-console 200 in 859ms
+ GET /api/admin/specs 500 in 533ms
+ GET /api/admin/specs 200 in 367ms
+ GET /analyze 200 in 274ms
+ GET /auth 200 in 110ms
+ GET /brand-logo?v=3 200 in 87ms
+ ✓ Compiled in 3.2s (827 modules)
+ GET /auth 200 in 690ms
+ GET /analyze 200 in 126ms
+ GET /account/api-key 200 in 70ms
+ GET /armor-console 200 in 380ms
+ GET /auth 200 in 458ms
+ GET /brand-logo?v=3 200 in 263ms
+ GET /auth 200 in 2375ms
+ GET /brand-logo?v=3 200 in 1250ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1687ms (497 modules)
+ GET /admin 200 in 2810ms
+ GET /account/api-key 200 in 455ms
+ GET /admin 200 in 428ms
+ GET /armor-console 200 in 866ms
+ GET /armor-console 200 in 291ms
+ ○ Compiling /api/admin/specs ...
+ ✓ Compiled /api/admin/specs in 792ms (499 modules)
+ GET /api/admin/specs 200 in 1556ms
+ GET /api/admin/specs 200 in 431ms
+ ✓ Compiled in 1253ms (338 modules)
+ ✓ Compiled in 4s (832 modules)
+ GET /armor-console 200 in 5018ms
+ GET /account/api-key 200 in 5004ms
+ GET /armor-console 200 in 245ms
+ GET /account/api-key 200 in 303ms
+ GET /admin 200 in 695ms
+ GET /api/admin/specs 500 in 314ms
+ GET /api/admin/specs 200 in 91ms

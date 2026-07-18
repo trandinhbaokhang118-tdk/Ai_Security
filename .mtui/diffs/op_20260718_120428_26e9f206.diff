@@ -1,0 +1,13 @@
+@@ -291,7 +291,11 @@
+     def submit(self, data: bytes, filename: str) -> dict[str, Any]:
+         if not self.configured:
+             return self.disabled_result()
+-        safe_filename = PurePath(filename).name[:180] or "sample.exe"
++        raw_filename = PurePath(filename).name[:180] or "sample.exe"
++        safe_filename = "".join(
++            char if char.isascii() and (char.isalnum() or char in "._- ") else "_"
++            for char in raw_filename
++        )
+         with httpx.Client(timeout=self.timeout, follow_redirects=False) as client:
+             response = client.post(
+                 f"{self.base_url}/file",

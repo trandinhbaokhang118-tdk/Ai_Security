@@ -1,0 +1,14 @@
+@@ -888,6 +888,13 @@
+                 {polling && <i>Đang chờ báo cáo…</i>}
+             </div>
+ 
++            {provider?.error && <p className="exe-provider-error">{provider.error}</p>}
++            {onRefresh && provider?.data_id && !polling && provider.status === "queued" && (
++                <button className="exe-refresh-button" type="button" onClick={onRefresh}>
++                    Cập nhật báo cáo provider
++                </button>
++            )}
++
+             {result.upload_consent_required && onShare && (
+                 <button className="exe-share-button" type="button" onClick={onShare}>
+                     Đồng ý gửi mẫu để kiểm tra sâu

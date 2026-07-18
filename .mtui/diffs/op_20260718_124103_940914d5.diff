@@ -1,0 +1,8 @@
+@@ -3,6 +3,7 @@
+ - [URL phishing detection](./url-phishing-detection.md)
+ - [Live URL sandbox](./url-sandbox.md)
+ - [Advanced browser sandbox](./browser-sandbox.md)
++- [Quick EXE Lab](./exe-quick-scan.md)
+ - [Account authentication](./authentication.md)
+ - [Portable local deployment](./portable-local-deployment.md)
+ - [PostgreSQL production design](./postgresql-production-design.md)

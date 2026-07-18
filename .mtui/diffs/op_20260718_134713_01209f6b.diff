@@ -1,0 +1,45 @@
+@@ -113,6 +113,44 @@
+ }
+ 
+ 
++BAD_DEADLINE_PHRASES = {
++    "trước trong ": "trong ",
++    "trước trước ": "trước ",
++    "trước ngay lập tức": "ngay lập tức",
++}
++
++
++def normalize_rendered_content(content: str) -> str:
++    """Sửa các tổ hợp thời hạn không tự nhiên do template và placeholder cùng chứa giới từ."""
++    for bad, replacement in BAD_DEADLINE_PHRASES.items():
++        content = content.replace(bad, replacement)
++        content = content.replace(v3.strip_accents(bad), v3.strip_accents(replacement))
++    return " ".join(content.split())
++
++
++def render_content_v4(
++    archetype: dict[str, Any],
++    template_idx: int,
++    wrapper_idx: int,
++    label: str,
++    channel: str,
++    rnd: random.Random,
++) -> tuple[str, str]:
++    raw = normalize_rendered_content(v3.base.render(archetype["templates"][template_idx], rnd))
++    if wrapper_idx == 4 and label == "scam":
++        content = f"[THÔNG BÁO KHẨN] {raw}"
++    else:
++        content = v3.base.apply_content_wrapper(raw, label, channel, wrapper_idx, rnd)
++    style = rnd.choices(["vi", "vi_no_diacritics", "vi_chat", "vi_mixed"], [72, 10, 12, 6])[0]
++    if style == "vi_no_diacritics":
++        content = v3.strip_accents(content)
++    elif style == "vi_chat":
++        content = v3.base.chatify(content, rnd)
++    elif style == "vi_mixed":
++        content = content.replace("xác minh", "verify").replace("tài khoản", "account").replace("liên kết", "link")
++    return normalize_rendered_content(content), style
++
++
+ def selected_findings(archetype: dict[str, Any], template_idx: int) -> list[tuple[str, str, str, float]]:
+     per_template = TEMPLATE_FINDING_INDEXES.get(archetype["id"])
+     if per_template is None or template_idx >= len(per_template):

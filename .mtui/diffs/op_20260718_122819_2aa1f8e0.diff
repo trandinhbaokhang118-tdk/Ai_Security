@@ -1,0 +1,36 @@
+@@ -275,10 +275,11 @@
+ 
+     async function pollExeProvider(dataId: string) {
+         const generation = ++providerPollGeneration.current;
++        const delays = [10_000, 20_000, 30_000, 30_000, 30_000, 30_000];
+         setProviderPolling(true);
+         try {
+-            for (let attempt = 0; attempt < 16; attempt += 1) {
+-                await wait(attempt === 0 ? 1200 : 2500);
++            for (const delay of delays) {
++                await wait(delay);
+                 if (generation !== providerPollGeneration.current) return;
+                 const provider = await getApiClient().getExecutableProviderReport(dataId);
+                 if (generation !== providerPollGeneration.current) return;
+@@ -292,6 +293,21 @@
+         }
+     }
+ 
++    async function refreshExeProvider(dataId: string) {
++        providerPollGeneration.current += 1;
++        setProviderPolling(true);
++        setError("");
++        try {
++            const provider = await getApiClient().getExecutableProviderReport(dataId);
++            setExe((current) => (current ? mergeProviderResult(current, provider) : current));
++            if (provider.status === "queued") void pollExeProvider(dataId);
++        } catch (caught) {
++            setError(caught instanceof Error ? caught.message : String(caught));
++        } finally {
++            setProviderPolling(false);
++        }
++    }
++
+     async function scanExe(file?: File, shareWithProvider = shareExe) {
+         if (!file) return;
+         providerPollGeneration.current += 1;

@@ -1,0 +1,9 @@
+@@ -607,6 +607,8 @@
+                         filename=str(target.get("filename") or ""),
+                     )
+                     return self._state(session_id)
++                if bool(target.get("isSubmit")):
++                    self._record_form_attempt(session, target)
+             session.page.mouse.click(bounded_x, bounded_y)
+             session.page.wait_for_timeout(300)
+             return self._state(session_id)

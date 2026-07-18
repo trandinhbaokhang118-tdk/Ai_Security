@@ -71,3 +71,53 @@ def test_high_confidence_access_hazard_gets_immediate_danger_floor():
     assert result.risk_level == "dangerous"
     assert result.effective_override is not None
     assert result.effective_override.rule_id == "high-confidence-dangerous-criterion-v1"
+
+
+def test_clean_evidence_cannot_activate_override():
+    clean = replace(
+        ev(criterion=None),
+        finding_type="external_google_web_risk_known_malicious",
+        status=CriterionStatus.CLEAN,
+        provider_verdict=ProviderVerdict.CLEAN,
+        severity=0,
+    )
+    rule = OverrideRule(
+        "clean-must-not-match",
+        frozenset({"external_google_web_risk_known_malicious"}),
+        90,
+        "hard_block",
+        "confirmed",
+    )
+
+    result = assess([clean], override_rules=(rule,))
+
+    assert result.risk_score == 0
+    assert result.effective_override is None
+
+
+@pytest.mark.parametrize("criterion", [6, 10, 13, 16, 36, 37, 40, 48])
+def test_circumstantial_single_finding_does_not_force_sixty(criterion):
+    contextual = replace(
+        ev(criterion=criterion),
+        finding_type=f"circumstantial_{criterion}",
+        severity=0.75,
+        evidence_quality=0.8,
+    )
+
+    result = assess([contextual])
+
+    assert result.risk_score < 20
+    assert result.effective_override is None
+
+
+def test_confidence_does_not_jump_above_high_from_one_weak_signal():
+    from security.risk_core.detectors import ScanObservations, build_criteria_evidence
+
+    observations = ScanObservations("https://example.test")
+    observations.clean(*range(1, 50))
+    observations.risk(29, "weak_login_lure", 0.6, 0.8, "weak login signal")
+
+    result = assess(build_criteria_evidence(observations, default_config()))
+
+    assert result.risk_score < 20
+    assert result.confidence_score < 70

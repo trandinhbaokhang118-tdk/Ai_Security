@@ -6,12 +6,21 @@ server is unavailable, the service degrades to a deterministic local template.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import AsyncGenerator
 
 import httpx
 
+from backend.services.adapter_registry import AdapterRegistry
+from shared.adapter_schemas import (
+    AdapterRunStatus,
+    AdapterTask,
+    EvidenceFact,
+    ExplanationInput,
+    ExplanationOutput,
+)
 from shared.schemas import Evidence
 
 SYSTEM_PROMPT = """Bạn là trợ lý bảo mật Prewise. Nhiệm vụ: giải thích kết quả đánh giá an ninh.
@@ -71,6 +80,7 @@ class ExplanationService:
         timeout_seconds: float = 90,
         max_tokens: int = 500,
         transport: httpx.AsyncBaseTransport | None = None,
+        adapter_registry: AdapterRegistry | None = None,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
@@ -78,6 +88,7 @@ class ExplanationService:
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
         self.transport = transport
+        self.adapter_registry = adapter_registry
         self._last_success = False
         self._last_error = "not contacted"
 
@@ -89,6 +100,16 @@ class ExplanationService:
     def available(self) -> bool:
         """Whether the most recent generation reached the remote LLM."""
         return self._last_success
+
+    @property
+    def llm_ready(self) -> bool:
+        """Whether an explanation request is configured to attempt a real LLM."""
+
+        adapter_ready = bool(
+            self.adapter_registry is not None
+            and self.adapter_registry.is_llm_ready(AdapterTask.EXPLANATION)
+        )
+        return adapter_ready or self.configured
 
     @property
     def last_error(self) -> str:
@@ -109,6 +130,49 @@ class ExplanationService:
         assessment_context: dict | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream an explanation, falling back locally on any remote failure."""
+        if self.adapter_registry is not None and evidence:
+            facts = [
+                EvidenceFact(
+                    evidence_id=item.evidence_id or f"evidence-{index}",
+                    source=item.source,
+                    summary=_sanitize_excerpt(item.message, 600),
+                    severity=item.severity.value,
+                )
+                for index, item in enumerate(evidence[:50])
+            ]
+            safe_assessment = {}
+            for key, value in (assessment_context or {}).items():
+                if key not in {
+                    "risk_score",
+                    "risk_level",
+                    "decision",
+                    "confidence",
+                    "reasons",
+                    "recommended_agent_behavior",
+                }:
+                    continue
+                if isinstance(value, list):
+                    safe_assessment[key] = [
+                        _sanitize_excerpt(str(item), 300) for item in value[:10]
+                    ]
+                else:
+                    safe_assessment[key] = _sanitize_excerpt(str(value), 300)
+            outcome = await asyncio.to_thread(
+                self.adapter_registry.invoke_explanation,
+                ExplanationInput(
+                    evidence=facts,
+                    question=_sanitize_excerpt(user_question or "", 500),
+                    assessment=safe_assessment,
+                ),
+            )
+            if (
+                outcome.trace.status == AdapterRunStatus.COMPLETED
+                and isinstance(outcome.output, ExplanationOutput)
+            ):
+                self._last_success = True
+                self._last_error = ""
+                yield outcome.output.answer
+                return
         if not self.configured:
             self._last_success = False
             self._last_error = "LLM endpoint is not configured"

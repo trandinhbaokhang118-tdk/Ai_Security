@@ -35,6 +35,7 @@ def log_assessment(
     raw_input: str | bytes,
     normalized_url: str | None = None,
     metadata: dict | None = None,
+    retain_input_preview: bool = True,
 ) -> None:
     event = ScanEvent(
         request_id=result.request_id,
@@ -44,7 +45,7 @@ def log_assessment(
         modality=_value(result.modality),
         normalized_url=normalized_url,
         input_sha256=input_sha256(raw_input),
-        input_preview=input_preview(raw_input),
+        input_preview=input_preview(raw_input) if retain_input_preview else "",
         input_size_bytes=len(raw_input) if isinstance(raw_input, bytes) else len(raw_input.encode("utf-8")),
         risk_score=float(result.risk_score),
         risk_level=_value(result.risk_level),

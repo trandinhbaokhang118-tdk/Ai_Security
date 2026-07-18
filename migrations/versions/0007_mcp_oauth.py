@@ -4,8 +4,8 @@ Revision ID: 0007_mcp_oauth
 Revises: 0006_risk_core_v2_audit
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0007_mcp_oauth"
 down_revision = "0006_risk_core_v2_audit"

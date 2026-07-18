@@ -1,0 +1,21 @@
+@@ -119,8 +119,18 @@
+ 
+     @staticmethod
+     def _request_value(request: object, name: str, default: object = None) -> object:
+-        value = getattr(request, name, default)
+-        return value() if callable(value) else value
++        """Read a Playwright value without allowing malformed payloads to break routing.
++
++        Some sites send compressed or binary request bodies. Playwright's ``post_data``
++        property tries to decode those bytes as UTF-8 and can raise ``UnicodeDecodeError``.
++        Route handlers must never leak that exception because it poisons the pending page
++        operation and surfaces as an unrelated click/type failure.
++        """
++        try:
++            value = getattr(request, name, default)
++            return value() if callable(value) else value
++        except Exception:
++            return default
+ 
+     @staticmethod
+     def _looks_like_download_url(url: str) -> bool:

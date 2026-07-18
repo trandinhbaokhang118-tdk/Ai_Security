@@ -1,0 +1,11 @@
+# Kaggle already provides a CUDA-enabled PyTorch build.
+# Install Unsloth with --upgrade --force-reinstall --no-cache-dir first.
+unsloth
+unsloth_zoo
+transformers>=5.2.0
+trl>=0.26.2
+datasets>=4.7.0
+accelerate
+peft
+bitsandbytes
+jsonschema>=4.23.0

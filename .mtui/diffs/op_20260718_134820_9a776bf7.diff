@@ -1,0 +1,9 @@
+@@ -145,6 +145,8 @@
+         "scenario_specific_relationship": True,
+         "content_compatible_user_actions": True,
+         "exact_evidence_reference": True,
++        "natural_deadline_phrasing": True,
++        "scam_wrapper_realism": True,
+     }
+     (args.bundle_root / "validation_report.json").write_text(
+         json.dumps(report, ensure_ascii=False, indent=2),

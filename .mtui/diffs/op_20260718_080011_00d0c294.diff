@@ -1,0 +1,9 @@
+@@ -17,7 +17,7 @@
+ export default function SandboxPage(){
+  const [view,setView]=useState<View>("lab"),[url,setUrl]=useState("https://example.com"),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const [web,setWeb]=useState<BrowserSandboxResult|null>(null),[exe,setExe]=useState<ExeSandboxResult|null>(null),[cloud,setCloud]=useState<CloudStatus|null>(null),[selected,setSelected]=useState<Tier>("free"),[freeBrowser,setFreeBrowser]=useState<FreeBrowser|null>(null),[freeUrl,setFreeUrl]=useState("https://example.com"),[sandboxText,setSandboxText]=useState(""),[expanded,setExpanded]=useState(false);
+- const typingBuffer=useRef(""),typingTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
++ const typingBuffer=useRef(""),typingTimer=useRef<ReturnType<typeof setTimeout>|null>(null),typingPromise=useRef<Promise<void>|null>(null),actionQueue=useRef<Promise<void>>(Promise.resolve());
+  async function refresh(){try{const value=await cloudRequest<CloudStatus>("/status");setCloud(value);if(value.session)setSelected(value.session.tier)}catch(e){setError(e instanceof Error?e.message:String(e))}}
+  useEffect(()=>{if(view==="sandbox")void refresh()},[view]);
+  useEffect(()=>{if(!cloud?.session||!["provisioning"].includes(cloud.session.status))return;const timer=setInterval(()=>void refresh(),3000);return()=>clearInterval(timer)},[cloud?.session?.status]);

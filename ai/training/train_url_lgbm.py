@@ -3,7 +3,10 @@
 Usage:
     python -m ai.training.train_url_lgbm --data data/url_dataset.csv --out server/models
 
-Dataset CSV must have columns: url,label  (label: 1=phishing, 0=benign).
+Dataset CSV must have columns ``url,label`` (label: 1=phishing, 0=benign).
+It may also contain columns named after ``CONTEXT_FEATURE_NAMES`` so DNS, RDAP,
+TLS, redirect, DOM, visual and local-feed observations are learned rather than
+silently filled with zeroes.
 Sources (see dataset-plan.md): PhishTank, OpenPhish, Tranco (benign).
 
 This is the real training path. It requires the [ml] and [train] extras
@@ -15,7 +18,34 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Mapping
 from datetime import UTC, datetime
+
+from ai.adapters.url_adapter import CONTEXT_FEATURE_NAMES, STATIC_FEATURE_NAMES
+
+
+def select_trained_feature_names(
+    context_observations: Mapping[str, int],
+    *,
+    sample_count: int,
+    minimum_context_coverage: float,
+) -> tuple[str, ...]:
+    """Select only context features that were genuinely observed in training.
+
+    Empty CSV fields mean a collector was unavailable.  A zero is instead a
+    valid observation, so it counts toward coverage.  This prevents a model
+    from claiming it uses live DNS/RDAP/page signals when those columns were
+    silently filled with zeros during training.
+    """
+
+    if sample_count <= 0:
+        return tuple(STATIC_FEATURE_NAMES)
+    selected_context = tuple(
+        name
+        for name in CONTEXT_FEATURE_NAMES
+        if context_observations.get(name, 0) / sample_count >= minimum_context_coverage
+    )
+    return tuple(STATIC_FEATURE_NAMES) + selected_context
 
 
 def main() -> None:  # pragma: no cover - offline training job
@@ -31,25 +61,67 @@ def main() -> None:  # pragma: no cover - offline training job
     from sklearn.metrics import classification_report, f1_score
     from sklearn.model_selection import train_test_split
 
-    from ai.adapters.url_adapter import FEATURE_NAMES, extract_url_features
+    from ai.adapters.url_adapter import extract_url_features
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True, help="CSV with columns url,label")
     parser.add_argument("--out", default="server/models")
     parser.add_argument("--test-size", type=float, default=0.2)
+    parser.add_argument(
+        "--min-context-coverage",
+        type=float,
+        default=0.05,
+        help="Minimum non-empty row share required to train a context feature (default: 0.05)",
+    )
+    parser.add_argument(
+        "--require-context-features",
+        action="store_true",
+        help="Fail instead of producing a static-only model when no context feature qualifies",
+    )
     args = parser.parse_args()
 
-    X, y = [], []
+    if not 0 <= args.min_context_coverage <= 1:
+        raise ValueError("--min-context-coverage must be between 0 and 1")
+
+    rows: list[tuple[str, int, dict[str, float]]] = []
+    context_observations = {name: 0 for name in CONTEXT_FEATURE_NAMES}
     skipped_rows = 0
     with open(args.data, encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             try:
-                X.append(extract_url_features(row["url"]))
-                y.append(int(row["label"]))
-            except (ValueError, KeyError):
+                feature_context = {
+                    name: float(row[name])
+                    for name in CONTEXT_FEATURE_NAMES
+                    if row.get(name) not in {None, ""}
+                }
+                label = int(row["label"])
+                if label not in {0, 1}:
+                    raise ValueError("label must be 0 or 1")
+                for name in feature_context:
+                    context_observations[name] += 1
+                rows.append((row["url"], label, feature_context))
+            except (TypeError, ValueError, KeyError):
                 skipped_rows += 1
                 continue
 
+    feature_names = select_trained_feature_names(
+        context_observations,
+        sample_count=len(rows),
+        minimum_context_coverage=args.min_context_coverage,
+    )
+    selected_context_features = [
+        name for name in feature_names if name in CONTEXT_FEATURE_NAMES
+    ]
+    if args.require_context_features and not selected_context_features:
+        raise ValueError(
+            "No context features reached minimum coverage; collect labelled DNS/RDAP/TLS/DOM/feed observations first."
+        )
+
+    X = [
+        extract_url_features(url, feature_names=feature_names, context=feature_context)
+        for url, _, feature_context in rows
+    ]
+    y = [label for _, label, _ in rows]
     X = np.array(X, dtype=np.float32)
     y = np.array(y)
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=args.test_size, random_state=42,
@@ -68,7 +140,7 @@ def main() -> None:  # pragma: no cover - offline training job
 
     os.makedirs(args.out, exist_ok=True)
     onnx_model = convert_lightgbm(
-        model, initial_types=[("input", FloatTensorType([None, len(FEATURE_NAMES)]))]
+        model, initial_types=[("input", FloatTensorType([None, len(feature_names)]))]
     )
     out_path = os.path.join(args.out, "url_lgbm.onnx")
     payload = onnx_model.SerializeToString()
@@ -78,7 +150,7 @@ def main() -> None:  # pragma: no cover - offline training job
     metadata = {
         "artifact": "url_lgbm.onnx",
         "architecture": "LightGBM LGBMClassifier over handcrafted URL features",
-        "runtime_input": f"tensor(float) shape [N, {len(FEATURE_NAMES)}]",
+        "runtime_input": f"tensor(float) shape [N, {len(feature_names)}]",
         "runtime_outputs": ["label", "probabilities"],
         "purpose": "real-data URL phishing classifier for gateway serving",
         "trained_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
@@ -92,7 +164,13 @@ def main() -> None:  # pragma: no cover - offline training job
             "train_rows": int(len(ytr)),
             "test_rows": int(len(yte)),
         },
-        "feature_names": list(FEATURE_NAMES),
+        "feature_names": list(feature_names),
+        "context_feature_coverage": {
+            name: context_observations[name] / len(rows) if rows else 0.0
+            for name in CONTEXT_FEATURE_NAMES
+        },
+        "selected_context_features": selected_context_features,
+        "minimum_context_coverage": args.min_context_coverage,
         "model_config": {
             "n_estimators": 300,
             "num_leaves": 48,

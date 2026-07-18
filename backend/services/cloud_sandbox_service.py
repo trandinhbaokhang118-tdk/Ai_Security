@@ -21,7 +21,14 @@ class CloudSandboxService:
             and settings.aws_sandbox_security_group_id
         )
 
-    def provision(self, session_id: str, user_id: str, expires_iso: str, tier: str = "pro") -> tuple[str, str]:
+    def provision(
+        self,
+        session_id: str,
+        user_id: str,
+        expires_iso: str,
+        tier: str = "pro",
+        agent_token: str = "",
+    ) -> tuple[str, str]:
         if not self.configured():
             raise RuntimeError("AWS sandbox chưa được cấu hình đầy đủ")
         is_max = tier == "max"
@@ -48,6 +55,18 @@ class CloudSandboxService:
         }
         if settings.aws_sandbox_key_name:
             params["KeyName"] = settings.aws_sandbox_key_name
+        if settings.sandbox_public_base_url and agent_token:
+            api_base = settings.sandbox_public_base_url.rstrip("/")
+            # The AMI must contain a locked-down PrewiseSandboxAgent service.
+            # The token expires with this disposable VM and is never persisted in DB.
+            params["UserData"] = (
+                "<powershell>"
+                f"[Environment]::SetEnvironmentVariable('PREWISE_SANDBOX_API','{api_base}','Machine');"
+                f"[Environment]::SetEnvironmentVariable('PREWISE_SANDBOX_SESSION','{session_id}','Machine');"
+                f"[Environment]::SetEnvironmentVariable('PREWISE_SANDBOX_TOKEN','{agent_token}','Machine');"
+                "Start-Service -Name PrewiseSandboxAgent -ErrorAction SilentlyContinue"
+                "</powershell>"
+            )
         ec2 = self._client()
         instance_id = ec2.run_instances(**params)["Instances"][0]["InstanceId"]
         waiter = ec2.get_waiter("instance_running")

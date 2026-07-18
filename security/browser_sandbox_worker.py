@@ -8,6 +8,8 @@ ever be supplied to this worker.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import secrets
@@ -30,8 +32,10 @@ if os.name == "nt" and not os.environ.get("SYSTEMROOT"):
 
 try:  # pragma: no cover - import shape differs when run as a script.
     from .sandbox_worker import _issue, _normalize_url, _public_addresses
+    from .visual_hash import analyze_visual_hash
 except ImportError:  # pragma: no cover
     from sandbox_worker import _issue, _normalize_url, _public_addresses
+    from visual_hash import analyze_visual_hash
 
 
 MAX_NETWORK_EVENTS = 160
@@ -46,6 +50,7 @@ BROWSER_SCAN_STEPS = (
     ("fill_canary", "Fill only synthetic canary values"),
     ("probe_forms", "Probe sensitive forms and block submit"),
     ("inspect_events", "Inspect network, console and canary events"),
+    ("capture_visual_hash", "Hash screenshot and compare curated brand references"),
     ("close_context", "Close temporary browser context"),
 )
 
@@ -60,6 +65,32 @@ BROWSER_FAILURE_STEP = {
     "browser_navigation_failed": "navigate_page",
     "browser_sandbox_error": "inspect_events",
 }
+
+
+def _write_progress(stage: str) -> None:
+    path = os.environ.get("AISEC_BROWSER_PROGRESS_PATH")
+    if not path:
+        return
+    try:
+        Path(path).write_text(stage, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _write_result_checkpoint(result: dict) -> None:
+    """Publish a complete result before browser cleanup can block.
+
+    Chromium can occasionally hang while Playwright closes a persistent context
+    on Windows. The parent process treats this file as the completion boundary
+    and then owns termination of the isolated browser process tree.
+    """
+    path = os.environ.get("AISEC_BROWSER_RESULT_PATH")
+    if not path:
+        return
+    try:
+        Path(path).write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _read_proxy_headers(connection: socket.socket) -> bytes:
@@ -372,6 +403,8 @@ def _failure(raw_url: str, code: str, detail: str, started: float) -> dict:
         "network_events": [],
         "browser_events": [],
         "console_errors": [],
+        "page_identity": {},
+        "screenshot_data_url": None,
         "issues": [
             _issue(code, "high", "execution", messages.get(code, messages["browser_sandbox_error"]), detail[:800])
         ],
@@ -395,6 +428,7 @@ def _issues_from_signals(
     browser_events: list[dict],
     network_events: list[dict],
     canary: dict[str, str],
+    download_events: list[dict] | None = None,
 ) -> list[dict]:
     issues: list[dict] = []
     field_types = Counter(field.get("kind", "unknown") for field in fill_report.get("fields", []))
@@ -489,6 +523,65 @@ def _issues_from_signals(
                 f"Blocked attempts: {len(blocked_websockets)}",
             )
         )
+    permission_events = [
+        event for event in browser_events if event.get("type") == "permission_request_blocked"
+    ]
+    if permission_events:
+        issues.append(
+            _issue(
+                "permission_request_blocked",
+                "high",
+                "browser",
+                "The page requested a browser capability that the sandbox denied.",
+                ", ".join(str(event.get("permission", "unknown")) for event in permission_events[:8]),
+            )
+        )
+    popup_events = [event for event in browser_events if event.get("type") == "popup_open_blocked"]
+    if popup_events:
+        issues.append(
+            _issue(
+                "deceptive_popup",
+                "high",
+                "browser",
+                "The page attempted to open a popup window without leaving the sandbox.",
+                ", ".join(str(event.get("url", "")) for event in popup_events[:5]),
+            )
+        )
+    downloads = list(download_events or [])
+    if downloads:
+        issues.append(
+            _issue(
+                "download_attempt_blocked",
+                "high",
+                "download",
+                "The page attempted to start a download; the sandbox cancelled it.",
+                ", ".join(str(event.get("filename", "")) for event in downloads[:5]),
+            )
+        )
+    ad_markers = (
+        "doubleclick.net",
+        "googlesyndication.com",
+        "adservice.google.",
+        "taboola.com",
+        "outbrain.com",
+        "propellerads.com",
+        "popads.net",
+    )
+    ad_requests = [
+        event
+        for event in network_events
+        if any(marker in str(event.get("url", "")).lower() for marker in ad_markers)
+    ]
+    if ad_requests and (popup_events or downloads):
+        issues.append(
+            _issue(
+                "malvertising_behavior",
+                "critical",
+                "browser",
+                "Advertising traffic was coupled with a popup or download attempt.",
+                f"Ad requests: {len(ad_requests)}; popups: {len(popup_events)}; downloads: {len(downloads)}",
+            )
+        )
     return issues
 
 
@@ -519,6 +612,34 @@ INIT_SCRIPT_TEMPLATE = r"""
   const record = (type, detail) => {
     events.push({ type, at_ms: now(), ...detail });
   };
+
+  window.open = function(url) {
+    record("popup_open_blocked", { url: String(url || "") });
+    return null;
+  };
+  if (typeof Notification !== "undefined") {
+    Notification.requestPermission = function() {
+      record("permission_request_blocked", { permission: "notifications" });
+      return Promise.resolve("denied");
+    };
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia = function() {
+      record("permission_request_blocked", { permission: "camera_or_microphone" });
+      return Promise.reject(new DOMException("Denied by sandbox", "NotAllowedError"));
+    };
+  }
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition = function(_success, error) {
+      record("permission_request_blocked", { permission: "geolocation" });
+      if (error) error({ code: 1, message: "Denied by sandbox" });
+    };
+    navigator.geolocation.watchPosition = function(_success, error) {
+      record("permission_request_blocked", { permission: "geolocation" });
+      if (error) error({ code: 1, message: "Denied by sandbox" });
+      return 0;
+    };
+  }
 
   const originalFetch = window.fetch;
   window.fetch = function(input, init) {
@@ -722,11 +843,128 @@ def _launch_browser(playwright, user_data_dir: str, proxy_server: str):
     raise RuntimeError("No Chromium browser channel is available")
 
 
+def _completed_result(
+    *,
+    raw_url: str,
+    started: float,
+    initial_ip: str,
+    canary: dict,
+    status_code: int | None,
+    final_url: str,
+    title: str,
+    fill_report: dict,
+    probe_report: dict,
+    browser_events: list,
+    network_events: list[dict],
+    download_events: list[dict],
+    console_errors: list[str],
+    visual_analysis: dict,
+    page_identity: dict,
+    screenshot_data_url: str,
+    base_issues: list[dict] | None = None,
+) -> dict:
+    fields = fill_report.get("fields", []) if isinstance(fill_report, dict) else []
+    field_types = dict(Counter(field.get("kind", "unknown") for field in fields))
+    normalized_browser_events = browser_events if isinstance(browser_events, list) else []
+    normalized_probe_report = probe_report if isinstance(probe_report, dict) else {}
+    issues = list(base_issues or [])
+    issues.extend(_status_issue(status_code))
+    issues.extend(
+        _issues_from_signals(
+            fill_report,
+            normalized_browser_events,
+            network_events,
+            canary,
+            download_events,
+        )
+    )
+    if visual_analysis.get("brand_mismatch") is True:
+        issues.append(
+            _issue(
+                "visual_brand_impersonation",
+                "critical",
+                "credential",
+                "The page visually matches a curated brand reference on an unofficial domain.",
+                (
+                    f"Brand={visual_analysis.get('matched_brand')}; "
+                    f"similarity={visual_analysis.get('similarity')}"
+                ),
+            )
+        )
+        issues.append(
+            _issue(
+                "forged_brand_image",
+                "high",
+                "visual",
+                "A rendered page image matches a curated brand reference on an unofficial domain.",
+                (
+                    f"Brand={visual_analysis.get('matched_brand')}; "
+                    f"similarity={visual_analysis.get('similarity')}"
+                ),
+            )
+        )
+    canary_blocked = any(
+        event.get("reason") == "canary_payload_blocked" for event in network_events
+    )
+    scripted_canary = _event_contains_canary(normalized_browser_events, canary)
+    blocked_forms = [
+        event
+        for event in normalized_browser_events
+        if str(event.get("type", "")).endswith("form_submit_blocked")
+    ]
+
+    return {
+        "ok": True,
+        "execution_status": "completed",
+        "url": raw_url,
+        "final_url": final_url,
+        "status_code": status_code,
+        "page_title": title,
+        "isolation": {
+            "mode": "headless_browser",
+            "profile": "temporary",
+            "network_private_block": True,
+            "egress_proxy": "dns_pinned",
+            "downloads": "blocked",
+            "permissions": "denied",
+            "service_workers": "blocked",
+            "websockets": "blocked",
+            "webrtc_non_proxied_udp": "blocked",
+            "initial_resolved_ip": initial_ip,
+            "canary_credentials": "synthetic_only",
+        },
+        "canary": {
+            "enabled": True,
+            "mode": "dry_run",
+            "clone_email": canary["email"],
+            "fields_filled": len(fields),
+            "field_types": field_types,
+            "form_submissions_blocked": len(blocked_forms),
+            "exfiltration_blocked": bool(canary_blocked or scripted_canary),
+            "notes": [
+                "Synthetic clone values were used.",
+                f"Sensitive forms probed: {normalized_probe_report.get('sensitive_forms', 0)}",
+                "Form submissions were prevented inside the sandbox.",
+            ],
+        },
+        "network_events": network_events,
+        "browser_events": normalized_browser_events[:80],
+        "console_errors": console_errors[:20],
+        "visual_analysis": visual_analysis,
+        "page_identity": page_identity,
+        "screenshot_data_url": screenshot_data_url,
+        "issues": issues,
+        "scan_steps": _scan_steps(issues=issues),
+        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+
+
 def run(payload: dict) -> dict:
     started = time.perf_counter()
     raw_url = str(payload.get("url", ""))
     timeout_ms = min(max(int(payload.get("timeout_ms", 15_000)), 5_000), 30_000)
     canary = _make_canary()
+    _write_progress("preflight_public_url")
     current, initial_ip = _preflight_public_url(raw_url)
     root_origin = _origin(current)
 
@@ -744,7 +982,9 @@ def run(payload: dict) -> dict:
 
     network_events: list[dict] = []
     console_errors: list[str] = []
+    download_events: list[dict] = []
     issues: list[dict] = []
+    completed_result: dict | None = None
 
     def add_network_event(event: dict) -> None:
         if len(network_events) < MAX_NETWORK_EVENTS:
@@ -805,11 +1045,28 @@ def run(payload: dict) -> dict:
         )
         web_socket.close(code=1008, reason="Blocked by browser sandbox")
 
+    def download_handler(download) -> None:
+        try:
+            download_events.append(
+                {
+                    "filename": str(download.suggested_filename or "")[:240],
+                    "url": str(download.url or "")[:1000],
+                }
+            )
+            download.cancel()
+        except Exception:
+            return
+
     try:
+        _write_progress("start_egress_proxy")
         with _PinnedEgressProxy() as egress_proxy:
+            _write_progress("create_browser_profile")
             with tempfile.TemporaryDirectory(prefix="aisec-browser-sandbox-") as profile_dir:
+                _write_progress("start_playwright")
                 with sync_playwright() as pw:
+                    _write_progress("launch_browser")
                     context = _launch_browser(pw, profile_dir, egress_proxy.url)
+                    _write_progress("install_browser_guards")
                     context.set_default_timeout(timeout_ms)
                     context.route("**/*", route_handler)
                     context.route_web_socket("**/*", websocket_handler)
@@ -824,6 +1081,7 @@ def run(payload: dict) -> dict:
                         else None,
                     )
                     page.on("pageerror", lambda exc: console_errors.append(str(exc)[:500]))
+                    page.on("download", download_handler)
                     page.on(
                         "requestfailed",
                         lambda request: add_network_event(
@@ -838,7 +1096,9 @@ def run(payload: dict) -> dict:
                             }
                         ),
                     )
+                    _write_progress("navigate_page")
                     response = page.goto(current, wait_until="domcontentloaded", timeout=timeout_ms)
+                    _write_progress("inspect_page")
                     try:
                         page.wait_for_load_state("networkidle", timeout=2_500)
                     except PlaywrightTimeoutError:
@@ -854,68 +1114,141 @@ def run(payload: dict) -> dict:
                     browser_events = page.evaluate("window.__aisecSandboxEvents || []")
                     title = page.title()[:200]
                     final_url = page.url
+                    page_identity = page.evaluate(
+                        """() => {
+                            const meta = (selector) => document.querySelector(selector)?.content?.trim() || "";
+                            const text = (document.body?.innerText || "").slice(0, 200000);
+                            const folded = text.toLowerCase();
+                            const phones = Array.from(new Set((text.match(/(?:\\+?84|0)(?:[ .-]?\\d){8,10}/g) || [])
+                                .map((value) => value.replace(/\\s+/g, " ").trim()))).slice(0, 8);
+                            const emails = Array.from(new Set((text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])
+                                .map((value) => value.toLowerCase()))).slice(0, 8);
+                            const hrefs = Array.from(document.querySelectorAll('a[href]')).map((node) => ({
+                                href: node.href || "",
+                                label: (node.innerText || node.getAttribute('aria-label') || "").trim().slice(0, 120),
+                            }));
+                            const socialHosts = ['facebook.com', 'instagram.com', 'linkedin.com', 'tiktok.com', 'youtube.com', 'x.com', 'twitter.com', 'zalo.me'];
+                            const social_links = hrefs.filter((item) => socialHosts.some((host) => item.href.toLowerCase().includes(host))).slice(0, 12);
+                            const support_links = hrefs.filter((item) => /^(mailto:|tel:)/i.test(item.href) || /contact|support|help|lien he|ho tro|hotline/i.test(item.label + ' ' + item.href)).slice(0, 12);
+                            const paymentTerms = ['bank transfer', 'wire transfer', 'crypto', 'bitcoin', 'usdt', 'gift card', 'credit card', 'debit card', 'cash on delivery', 'cod', 'chuyen khoan', 'thanh toan'];
+                            const payment_methods = paymentTerms.filter((term) => folded.includes(term));
+                            const prices = (text.match(/(?:[$€£¥]|vnd|usd|eur|đ|dong)\\s?\\d[\\d.,]*|\\d[\\d.,]*\\s?(?:vnd|usd|eur|đ|dong)/gi) || []).slice(0, 20);
+                            const recipient_hints = (text.match(/(?:account|stk|so tai khoan|wallet|vi)\\s*(?:number|no|:|-)?\\s*[A-Z0-9]{8,34}/gi) || []).slice(0, 8);
+                            const address_terms = (text.match(/(?:address|dia chi|registered office|head office)\\s*[:-]?\\s*[^\\n]{8,160}/gi) || []).slice(0, 8);
+                            const complaint_terms = ['scam', 'fraud', 'lua dao', 'khieu nai', 'complaint', 'not received', 'mat tien'].filter((term) => folded.includes(term));
+                            const reviewNodes = Array.from(document.querySelectorAll('[itemprop="review"], [itemprop="ratingValue"], .review, .reviews, .testimonial, [class*="rating" i]'));
+                            const rating_mentions = (text.match(/(?:[1-5](?:\\.\\d)?\\s*[/]\\s*5|[1-5](?:\\.\\d)?\\s*(?:stars?|sao))/gi) || []).slice(0, 30);
+                            const legal_names = [];
+                            const addresses = [...address_terms];
+                            const ratings = [];
+                            const visit = (value) => {
+                                if (!value || typeof value !== 'object') return;
+                                if (Array.isArray(value)) { value.forEach(visit); return; }
+                                const type = String(value['@type'] || '').toLowerCase();
+                                if (/organization|corporation|localbusiness|store|financialservice/.test(type)) {
+                                    const name = String(value.legalName || value.name || '').trim();
+                                    if (name) legal_names.push(name.slice(0, 200));
+                                    const address = value.address;
+                                    if (typeof address === 'string') addresses.push(address.slice(0, 240));
+                                    else if (address && typeof address === 'object') addresses.push(Object.values(address).filter((part) => typeof part === 'string').join(', ').slice(0, 240));
+                                }
+                                const rating = value.aggregateRating || value.reviewRating;
+                                if (rating && typeof rating === 'object') ratings.push({ value: rating.ratingValue || '', count: rating.reviewCount || rating.ratingCount || '' });
+                                if (Array.isArray(value['@graph'])) value['@graph'].forEach(visit);
+                            };
+                            for (const node of document.querySelectorAll('script[type="application/ld+json"]')) {
+                                try { visit(JSON.parse(node.textContent || 'null')); } catch (_) {}
+                            }
+                            const commercial = prices.length > 0 || payment_methods.length > 0 || /add to cart|buy now|checkout|mua ngay|gio hang/.test(folded);
+                            const image_hosts = Array.from(new Set(Array.from(document.images).map((image) => { try { return new URL(image.currentSrc || image.src, location.href).hostname; } catch (_) { return ''; } }).filter(Boolean))).slice(0, 20);
+                            const script_hosts = Array.from(new Set(Array.from(document.scripts).map((script) => { try { return script.src ? new URL(script.src, location.href).hostname : ''; } catch (_) { return ''; } }).filter(Boolean))).slice(0, 20);
+                            return {
+                                description: meta('meta[name="description"]'),
+                                site_name: meta('meta[property="og:site_name"]'),
+                                image_url: meta('meta[property="og:image"]'),
+                                canonical_url: document.querySelector('link[rel="canonical"]')?.href || "",
+                                language: document.documentElement.lang || "",
+                                phones,
+                                emails,
+                                forms: document.forms.length,
+                                password_fields: document.querySelectorAll('input[type="password"]').length,
+                                legal_names: Array.from(new Set(legal_names)).slice(0, 8),
+                                addresses: Array.from(new Set(addresses.filter(Boolean))).slice(0, 8),
+                                social_links,
+                                support_links,
+                                is_commercial: commercial,
+                                prices,
+                                payment_methods,
+                                payment_recipient_hints: recipient_hints,
+                                review_elements: reviewNodes.length,
+                                rating_mentions,
+                                structured_ratings: ratings.slice(0, 8),
+                                complaint_terms,
+                                image_count: document.images.length,
+                                image_hosts,
+                                script_count: document.scripts.length,
+                                script_hosts,
+                                content_sample: text.replace(/\\s+/g, ' ').trim().slice(0, 80000),
+                            };
+                        }"""
+                    )
+                    content_sample = str(page_identity.pop("content_sample", ""))
+                    page_identity["content_fingerprint"] = (
+                        hashlib.sha256(content_sample.encode("utf-8")).hexdigest()
+                        if content_sample
+                        else ""
+                    )
+                    _write_progress("capture_screenshot")
+                    screenshot = page.screenshot(type="jpeg", quality=55, full_page=False)
+                    screenshot_data_url = "data:image/jpeg;base64," + base64.b64encode(screenshot).decode("ascii")
+                    _write_progress("analyze_visual_hash")
+                    visual_analysis = analyze_visual_hash(
+                        screenshot,
+                        host=urlsplit(final_url).hostname or "",
+                        title=title,
+                        registry_path=os.environ.get("BRAND_VISUAL_HASH_REGISTRY"),
+                    )
+                    for event in egress_proxy.events:
+                        if event.get("blocked"):
+                            add_network_event(event)
+                    completed_result = _completed_result(
+                        raw_url=raw_url,
+                        started=started,
+                        initial_ip=initial_ip,
+                        canary=canary,
+                        status_code=status_code,
+                        final_url=final_url,
+                        title=title,
+                        fill_report=fill_report,
+                        probe_report=probe_report,
+                        browser_events=browser_events,
+                        network_events=network_events,
+                        download_events=download_events,
+                        console_errors=console_errors,
+                        visual_analysis=visual_analysis,
+                        page_identity=page_identity,
+                        screenshot_data_url=screenshot_data_url,
+                        base_issues=issues,
+                    )
+                    _write_progress("write_result_checkpoint")
+                    _write_result_checkpoint(completed_result)
+                    _write_progress("close_browser_context")
                     context.close()
-                for event in egress_proxy.events:
-                    if event.get("blocked"):
-                        add_network_event(event)
+                    _write_progress("browser_context_closed")
     except PlaywrightTimeoutError as exc:
         return _failure(raw_url, "browser_navigation_failed", f"Timeout: {exc}", started)
     except PlaywrightError as exc:
         return _failure(raw_url, "browser_navigation_failed", str(exc), started)
 
-    fields = fill_report.get("fields", []) if isinstance(fill_report, dict) else []
-    field_types = dict(Counter(field.get("kind", "unknown") for field in fields))
-    browser_events = browser_events if isinstance(browser_events, list) else []
-    probe_report = probe_report if isinstance(probe_report, dict) else {}
-    issues.extend(_status_issue(status_code))
-    issues.extend(_issues_from_signals(fill_report, browser_events, network_events, canary))
-    canary_blocked = any(event.get("reason") == "canary_payload_blocked" for event in network_events)
-    scripted_canary = _event_contains_canary(browser_events, canary)
-    blocked_forms = [
-        event for event in browser_events if str(event.get("type", "")).endswith("form_submit_blocked")
-    ]
-
-    return {
-        "ok": True,
-        "execution_status": "completed",
-        "url": raw_url,
-        "final_url": final_url,
-        "status_code": status_code,
-        "page_title": title,
-        "isolation": {
-            "mode": "headless_browser",
-            "profile": "temporary",
-            "network_private_block": True,
-            "egress_proxy": "dns_pinned",
-            "downloads": "blocked",
-            "permissions": "denied",
-            "service_workers": "blocked",
-            "websockets": "blocked",
-            "webrtc_non_proxied_udp": "blocked",
-            "initial_resolved_ip": initial_ip,
-            "canary_credentials": "synthetic_only",
-        },
-        "canary": {
-            "enabled": True,
-            "mode": "dry_run",
-            "clone_email": canary["email"],
-            "fields_filled": len(fields),
-            "field_types": field_types,
-            "form_submissions_blocked": len(blocked_forms),
-            "exfiltration_blocked": bool(canary_blocked or scripted_canary),
-            "notes": [
-                "Synthetic clone values were used.",
-                f"Sensitive forms probed: {probe_report.get('sensitive_forms', 0)}",
-                "Form submissions were prevented inside the sandbox.",
-            ],
-        },
-        "network_events": network_events,
-        "browser_events": browser_events[:80],
-        "console_errors": console_errors[:20],
-        "issues": issues,
-        "scan_steps": _scan_steps(issues=issues),
-        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
-    }
+    _write_progress("serialize_result")
+    if completed_result is None:
+        return _failure(
+            raw_url,
+            "browser_sandbox_error",
+            "Browser inspection finished without a completed result.",
+            started,
+        )
+    return completed_result
 
 
 def main() -> None:
@@ -937,7 +1270,13 @@ def main() -> None:
         result = _failure(raw_url, str(exc), str(exc), started)
     except Exception as exc:
         result = _failure(raw_url, "browser_sandbox_error", f"{type(exc).__name__}: {exc}", started)
-    sys.stdout.write(json.dumps(result, ensure_ascii=False))
+    _write_progress("write_result")
+    result_path = os.environ.get("AISEC_BROWSER_RESULT_PATH")
+    if result_path:
+        _write_result_checkpoint(result)
+    else:
+        # Keep the stdout protocol for direct/manual worker execution.
+        sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

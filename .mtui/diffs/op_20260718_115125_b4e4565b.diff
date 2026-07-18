@@ -1,0 +1,9 @@
+@@ -31,6 +31,8 @@
+     AssessResult,
+     BrowserSandboxResult,
+     ExeSandboxResult,
++
++    ExeProviderResult,
+     ChatChunk,
+     ChatFinal,
+     ChatRequest,

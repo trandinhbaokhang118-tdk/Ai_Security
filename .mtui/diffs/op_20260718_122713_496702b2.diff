@@ -1,0 +1,26 @@
+@@ -441,14 +441,22 @@
+             for engine, detail in scan_details.items():
+                 if not isinstance(detail, dict):
+                     continue
+-                threat = detail.get("threat_found") or detail.get("scan_result")
++                threat = (
++                    detail.get("threat_found")
++                    or detail.get("scan_result_a")
++                    or detail.get("verdict")
++                    or detail.get("parent_verdict")
++                    or detail.get("scan_result")
++                )
+                 result_code = _safe_int(detail.get("scan_result_i"))
+-                if not threat and result_code <= 0:
++                threat_text = str(threat or "").strip()
++                is_detection = result_code > 0 or threat_text.lower() not in _BENIGN_SCAN_LABELS
++                if not is_detection:
+                     continue
+                 detections.append(
+                     {
+                         "engine": str(engine)[:80],
+-                        "threat": str(threat or "detected")[:160],
++                        "threat": (threat_text or "detected")[:160],
+                     }
+                 )
+                 if len(detections) >= 12:

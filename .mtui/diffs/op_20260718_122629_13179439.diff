@@ -1,0 +1,16 @@
+@@ -53,6 +53,15 @@
+     "vmp",
+     "themida",
+ )
++_DATA_ID_PATTERN = re.compile(r"[A-Za-z0-9._~=-]{1,256}")
++_BENIGN_SCAN_LABELS = {
++    "",
++    "clean",
++    "no threat detected",
++    "no threats found",
++    "not detected",
++    "undetected",
++}
+ 
+ 
+ def _entropy(data: bytes) -> float:

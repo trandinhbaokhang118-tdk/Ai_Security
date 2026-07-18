@@ -1,0 +1,9 @@
+@@ -210,7 +210,7 @@
+                 section_span = max(virtual_size, raw_size)
+                 if executable and virtual_address <= entry_point < virtual_address + section_span:
+                     entry_in_executable_section = True
+-                max_raw_end = max(max_raw_end, raw_pointer + raw_size)
++                max_raw_end = max(max_raw_end, raw_end)
+                 sections.append(
+                     {
+                         "name": name,

@@ -1,0 +1,20 @@
+$ powershell -NoProfile -Command $content=@('alpha','beta','gamma') -join [Environment]::NewLine; & mtui --json new '.mtui/tmp-array.txt' --content $content --overwrite
+mode: fallback
+exit_code: 0
+duration_ms: 645
+---- stdout ----
+{
+  "ok": true,
+  "schema_version": 1,
+  "mtui_version": "0.1.0",
+  "warnings": [],
+  "command": "new",
+  "operation": "create_file",
+  "operation_id": "op_20260718_114539_86ab6544",
+  "file": "C:\\NDT\\PJ\\Ai_Security-main\\.mtui/tmp-array.txt",
+  "changed": true,
+  "backup": null,
+  "diff_summary": "+3 -0"
+}
+
+---- stderr ----

@@ -1,0 +1,25 @@
+@@ -397,20 +397,11 @@
+         f"Raw rows: train={len(raw_train)}, validation={len(raw_validation)}, test={len(raw_test)}"
+     )
+ 
+-    # Tokenization needs the official tokenizer. Load the model together with the
+-    # tokenizer first, then render/filter datasets before constructing the trainer.
+-    from unsloth import FastLanguageModel
++    # Token audit only needs the official tokenizer, not a second model copy.
++    from transformers import AutoTokenizer
+ 
+-    log("Loading tokenizer/model for token audit...")
+-    model, tokenizer = FastLanguageModel.from_pretrained(
+-        model_name=args.model_name,
+-        max_seq_length=args.max_seq_length,
+-        load_in_4bit=False,
+-        load_in_8bit=False,
+-        load_in_16bit=True,
+-        full_finetuning=False,
+-        fast_inference=False,
+-    )
++    log("Loading tokenizer for token audit...")
++    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
+     train, train_stats = prepare_text_dataset(
+         raw_train, tokenizer, args.max_seq_length, max_train_samples, args.seed, "train"
+     )

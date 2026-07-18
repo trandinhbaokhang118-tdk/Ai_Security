@@ -1,0 +1,93 @@
+
+> ai-security-armor-web@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3000
+   - Network:      http://26.79.202.28:3000
+
+ ✓ Starting...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-dev-34248/types/**/*.ts'
+
+ ✓ Ready in 4.1s
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 9.2s (920 modules)
+ GET /analyze 200 in 3000ms
+ GET /analyze 200 in 128ms
+ GET /analyze 200 in 205ms
+ ✓ Compiled in 1579ms (751 modules)
+ GET /analyze 200 in 392ms
+ GET /analyze 200 in 112ms
+ ○ Compiling /api/demo/url/analyze ...
+ ✓ Compiled /api/demo/url/analyze in 685ms (407 modules)
+ POST /api/demo/url/analyze 200 in 8193ms
+ POST /api/demo/url/analyze 200 in 21374ms
+ POST /api/demo/url/analyze 200 in 24848ms
+ POST /api/demo/url/analyze 200 in 8162ms
+ ✓ Compiled /analyze in 353ms (433 modules)
+ GET /analyze 200 in 964ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 988ms (774 modules)
+ GET /admin 200 in 1191ms
+ GET /admin 200 in 1444ms
+ ✓ Compiled /api/admin/specs in 397ms (779 modules)
+ GET /api/admin/specs 200 in 710ms
+ GET /api/admin/specs 500 in 313ms
+ ○ Compiling /result/[id] ...
+ ✓ Compiled /result/[id] in 1444ms (788 modules)
+ GET /result/runtime-check?score=1&type=url&demo=1 200 in 4487ms
+ ✓ Compiled in 4.3s (764 modules)
+ GET /result/runtime-check?score=1&type=url&demo=1 200 in 2979ms
+ ✓ Compiled in 930ms (331 modules)
+ ✓ Compiled in 5.4s (778 modules)
+ ✓ Compiled in 1716ms (778 modules)
+ ○ Compiling /api/demo/url/analyze ...
+ ✓ Compiled /api/demo/url/analyze in 1056ms (466 modules)
+ POST /api/demo/url/analyze 200 in 19485ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 1215ms (452 modules)
+ GET /analyze 200 in 2871ms
+ GET /result/6ebe7c4c-99c1-49ac-a759-564d559e112c?score=85&type=email&demo=0 200 in 371ms
+ GET /analyze 200 in 621ms
+ GET /result/9bca1a08-3db4-4050-97eb-90cc6a14fd55?score=85&type=sms&demo=0 200 in 145ms
+ GET /analyze 200 in 57ms
+ GET /result/645b200b-47ec-48a3-863a-fb6ec125bfd0?score=85&type=sms&demo=0 200 in 59ms
+ GET /analyze 200 in 135ms
+ ✓ Compiled in 3.2s (783 modules)
+ ✓ Compiled in 1422ms (783 modules)
+ ✓ Compiled in 1660ms (783 modules)
+ ✓ Compiled in 1404ms (783 modules)
+ ✓ Compiled in 2s (783 modules)
+ ✓ Compiled in 873ms (783 modules)
+ ✓ Compiled in 1078ms (769 modules)
+ ✓ Compiled in 492ms (769 modules)
+ ✓ Compiled in 1188ms (783 modules)
+ ✓ Compiled in 497ms (331 modules)
+ ✓ Compiled in 426ms (331 modules)
+ ✓ Compiled in 732ms (331 modules)
+ ✓ Compiled in 771ms (331 modules)
+ GET /analyze 200 in 1844ms
+ GET /admin 200 in 302ms
+ GET /admin 200 in 66ms
+ ○ Compiling /api/admin/specs ...
+ ✓ Compiled /api/admin/specs in 1320ms (471 modules)
+ GET /api/admin/specs 200 in 1963ms
+ GET /api/admin/specs 200 in 58ms
+ GET /analyze 200 in 828ms
+ GET /analyze 200 in 126ms
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 420ms
+ GET /analyze 200 in 238ms
+ ✓ Compiled in 6.2s (783 modules)
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 1975ms
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 1724ms
+ ✓ Compiled in 2.3s (783 modules)
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 430ms
+ ✓ Compiled in 2.1s (783 modules)
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 841ms
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 1436ms
+ GET /result/911ea6ed-ffd5-4642-a6a9-036cac3ab830?score=100&type=email&demo=0 200 in 555ms
+ ✓ Compiled in 17s (783 modules)

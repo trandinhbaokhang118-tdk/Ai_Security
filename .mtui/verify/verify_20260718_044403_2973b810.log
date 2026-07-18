@@ -1,0 +1,11 @@
+$ powershell -NoProfile -Command $content = @'
+mode: fallback
+exit_code: 1
+duration_ms: 341
+---- stdout ----
+
+---- stderr ----
+The string is missing the terminator: '@.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : TerminatorExpectedAtEndOfString
+ 

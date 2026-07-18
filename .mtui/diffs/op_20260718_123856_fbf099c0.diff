@@ -1,0 +1,9 @@
+@@ -3,6 +3,8 @@
+ import struct
+ from typing import Any
+ 
++import httpx
++
+ from security.exe_quick_scan import (
+     ExeQuickScanService,
+     MetaDefenderProvider,

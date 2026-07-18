@@ -7,6 +7,7 @@ services:
       - "8001:8000"
     environment:
       LLM_MODEL_PATH: /models/current
+      ADAPTER_MANIFEST_PATH: /adapters/manifest.json
       LLM_SERVED_MODEL_NAME: ${LLM_MODEL:-prewise-security-v1}
       LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY before starting the AI server}
       LLM_MAX_MODEL_LEN: ${LLM_MAX_MODEL_LEN:-4096}
@@ -18,6 +19,7 @@ services:
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
       - ./server/llm-models/current:/models/current:ro
+      - ./server/adapters:/adapters:ro
       - huggingface-cache:/root/.cache/huggingface
     ipc: host
     deploy:

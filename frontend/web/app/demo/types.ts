@@ -81,6 +81,29 @@ export interface DeepfakeImageResponse {
   limitations: string[];
 }
 
+export interface DeepfakeVideoResponse {
+  filename: string;
+  duration_seconds: number;
+  width: number;
+  height: number;
+  sampled_frames: number;
+  suspicious_frames: number;
+  real_probability: number;
+  fake_probability: number;
+  verdict: "likely_real" | "likely_fake" | "uncertain";
+  decision: "ALLOW" | "WARN" | "REVIEW";
+  analysis_time_ms: number;
+  model_version: string;
+  evidence: string[];
+  frame_results: Array<{
+    frame_index: number;
+    timestamp_seconds: number;
+    fake_probability: number;
+    verdict: "likely_real" | "likely_fake" | "uncertain";
+  }>;
+  limitations: string[];
+}
+
 export interface ChatMessageRequest {
   message: string;
   protection_enabled: boolean;

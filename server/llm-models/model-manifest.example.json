@@ -1,0 +1,15 @@
+{
+  "model_id": "prewise-security-v1",
+  "base_model": "organization/base-instruct-model",
+  "base_revision": "replace-with-an-exact-commit",
+  "task": "causal-lm",
+  "format": "safetensors",
+  "adapter": "merged",
+  "context_length": 4096,
+  "languages": ["vi", "en"],
+  "prompt_version": "prewise-security-v1",
+  "metrics": {
+    "security_eval": 0.0,
+    "prompt_injection_resistance": 0.0
+  }
+}

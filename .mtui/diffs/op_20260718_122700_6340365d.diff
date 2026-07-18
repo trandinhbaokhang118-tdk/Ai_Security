@@ -1,0 +1,32 @@
+@@ -417,17 +417,25 @@
+         detected = _safe_int(scan.get("total_detected_avs"))
+         total = _safe_int(scan.get("total_avs"))
+         progress = _safe_int(
+-            process.get("progress_percentage"),
+-            _safe_int(candidate.get("progress_percentage")),
++            scan.get("progress_percentage"),
++            _safe_int(
++                process.get("progress_percentage"),
++                _safe_int(candidate.get("progress_percentage")),
++            ),
+         )
+         data_id = candidate.get("data_id")
+         raw_status = str(candidate.get("status") or "").lower()
+-        complete = progress >= 100 or bool(scan) and raw_status not in {"inqueue", "queued"}
+-        status = "completed" if complete else fallback_status
+-        if raw_status in {"inqueue", "queued", "processing"}:
++        queued_statuses = {"inqueue", "queued", "processing", "pending"}
++        if raw_status in queued_statuses or 0 < progress < 100:
+             status = "queued"
++        elif progress >= 100:
++            status = "completed"
++        elif fallback_status == "known" and bool(scan):
++            status = "known"
++        else:
++            status = fallback_status
+ 
+-        scan_details = candidate.get("scan_details")
++        scan_details = scan.get("scan_details") or candidate.get("scan_details")
+         detections: list[dict[str, str]] = []
+         if isinstance(scan_details, dict):
+             for engine, detail in scan_details.items():

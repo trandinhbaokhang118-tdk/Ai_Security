@@ -9,6 +9,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from shared.adapter_schemas import AdapterTrace
+from shared.schemas import RiskCoreTrace, URLBasicIntelligence
+
 
 # ------------------------------------------------------------------ Evidence
 class Evidence(BaseModel):
@@ -26,6 +29,11 @@ class Evidence(BaseModel):
 # ------------------------------------------------------------- Sandbox Models
 class SandboxReport(BaseModel):
     """Report from sandbox URL analysis containing observed behaviors."""
+
+    analysis_mode: Literal["http", "browser", "browser_http"] | None = Field(
+        default=None,
+        description="Which isolated live-analysis engine produced this report",
+    )
 
     behaviors: list[dict] = Field(
         default_factory=list,
@@ -46,6 +54,12 @@ class SandboxReport(BaseModel):
     cookies_set: list[dict] = Field(default_factory=list, description="Cookies set by the page")
     storage_access: list[dict] = Field(
         default_factory=list, description="LocalStorage/SessionStorage access"
+    )
+    page_identity: dict = Field(
+        default_factory=dict, description="Public identity metadata observed in the page"
+    )
+    screenshot_data_url: str | None = Field(
+        default=None, description="Low-resolution JPEG captured inside the isolated browser"
     )
     analysis_time_ms: int = Field(
         default=0, description="Time spent analyzing in sandbox (milliseconds)"
@@ -86,30 +100,68 @@ class URLAnalysisRequest(BaseModel):
         default=False,
         description="Run browser sandbox with synthetic canaries for ambiguous/high-risk URLs",
     )
+    llm_context: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Optional operator context for the configured web-analysis adapter",
+    )
+    ai_context: Literal["off", "auto", "on"] = Field(
+        default="auto",
+        description="Control contextual AI; scoring remains in shadow mode during calibration",
+    )
+    force_rescan: bool = Field(
+        default=False,
+        description="Bypass a compatible saved result and run the URL scan again",
+    )
 
 
 class URLScoreLayer(BaseModel):
     """Explainable result of one defensive URL-analysis layer."""
 
     layer: str
-    score: float = Field(..., ge=0.0, le=1.0)
+    score: float = Field(..., ge=0.0, le=100.0, description="Layer risk points on 0..100")
     status: Literal["completed", "skipped", "unavailable"] = "completed"
     summary: str
     signals: int = 0
     details: list[dict] = Field(default_factory=list)
 
 
+class URLDangerousCriterion(BaseModel):
+    criterion_id: int
+    name: str
+    status: Literal["malicious"] = "malicious"
+    contribution: float = Field(..., ge=0.0, le=100.0)
+    max_weight: float = Field(..., ge=0.0, le=100.0)
+    reason: str
+
+
+class URLAccessAnalysis(BaseModel):
+    performed: bool = False
+    analysis_mode: Literal["not_run", "http", "browser", "browser_http"] = "not_run"
+    verdict: Literal["safe", "caution", "dangerous", "unavailable"] = "safe"
+    warning: str = ""
+    causes: list[str] = Field(default_factory=list)
+    observed_effects: list[str] = Field(default_factory=list)
+    final_url: str = ""
+
+
 class URLAnalysisResponse(BaseModel):
     """Response containing URL analysis results."""
 
     url: str = Field(..., description="The analyzed URL")
+    score_scale: Literal["0..100"] = "0..100"
     risk_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Overall risk score (0.0=safe to 1.0=critical)"
+        ..., ge=0.0, le=100.0, description="Overall risk score on the shared 0..100 scale"
     )
     threat_level: Literal["safe", "low", "medium", "high", "critical"] = Field(
         ..., description="Categorized threat level"
     )
     analysis_time_ms: int = Field(..., description="Time taken to analyze (milliseconds)")
+    cache_hit: bool = Field(default=False, description="Whether this response reused a saved quick scan")
+    cache_status: Literal["hit", "miss", "bypassed", "refresh"] = Field(
+        default="bypassed",
+        description="High-level cache outcome without exposing storage internals",
+    )
     traditional_detection: TraditionalDetection = Field(
         ..., description="Results from traditional detection methods"
     )
@@ -123,8 +175,24 @@ class URLAnalysisResponse(BaseModel):
     deep_analysis_recommended: bool = Field(
         default=False, description="Whether isolated browser inspection is recommended"
     )
+    warning_required: bool = False
+    auto_deep_analysis: bool = False
+    dangerous_criteria: list[URLDangerousCriterion] = Field(default_factory=list)
+    access_analysis: URLAccessAnalysis = Field(default_factory=URLAccessAnalysis)
     sandbox_report: SandboxReport | None = Field(
         default=None, description="Detailed sandbox analysis report (if deep_analysis=True)"
+    )
+    risk_core: RiskCoreTrace | None = Field(
+        default=None,
+        description="Authoritative Risk Core v2 trace used by the production report UI",
+    )
+    url_intelligence: URLBasicIntelligence | None = Field(
+        default=None,
+        description="Registration, DNS and public-IP facts with source status",
+    )
+    contextual_analysis: AdapterTrace | None = Field(
+        default=None,
+        description="Optional LLM context evaluation status; shadow mode never changes the score",
     )
 
 
@@ -144,6 +212,40 @@ class DeepfakeImageResponse(BaseModel):
     model_version: str
     evidence: list[str]
     limitations: list[str]
+
+
+class DeepfakeVideoFrame(BaseModel):
+    frame_index: int
+    timestamp_seconds: float
+    fake_probability: float = Field(..., ge=0.0, le=1.0)
+    verdict: Literal["likely_real", "likely_fake", "uncertain"]
+
+
+class DeepfakeVideoResponse(BaseModel):
+    """Frame-sampled video screening using the local still-image model."""
+
+    filename: str
+    duration_seconds: float
+    width: int
+    height: int
+    sampled_frames: int
+    suspicious_frames: int
+    real_probability: float = Field(..., ge=0.0, le=1.0)
+    fake_probability: float = Field(..., ge=0.0, le=1.0)
+    verdict: Literal["likely_real", "likely_fake", "uncertain"]
+    decision: Literal["ALLOW", "WARN", "REVIEW"]
+    analysis_time_ms: int
+    model_version: str
+    evidence: list[str]
+    frame_results: list[DeepfakeVideoFrame]
+    limitations: list[str]
+
+
+class DeepfakeCapabilitiesResponse(BaseModel):
+    image: Literal["available", "unavailable"]
+    video: Literal["frame_sampling", "unavailable"]
+    audio: Literal["unavailable"]
+    audio_reason: str
 
 
 # ---------------------------------------------------- Chat Protection Endpoints

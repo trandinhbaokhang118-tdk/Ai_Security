@@ -1,0 +1,13 @@
+@@ -52,6 +52,12 @@
+ CORS_ALLOW_ORIGINS=["https://prewise.site","https://www.prewise.site","null"]
+ BACKEND_PORT=8000
+ 
++# Quick EXE Lab analysis. Local PE inspection works without a provider key.
++# Uploading a sample is always opt-in in the UI and may share it with security vendors.
++METADEFENDER_API_KEY=
++METADEFENDER_BASE_URL=https://api.metadefender.com/v4
++METADEFENDER_TIMEOUT_SECONDS=20
++
+ # SePay QR checkout. Use HMAC-SHA256 in SePay; never commit the secret.
+ SEPAY_WEBHOOK_SECRET=CHANGE_ME_SEPAY_HMAC_SECRET
+ SEPAY_WEBHOOK_API_KEY=

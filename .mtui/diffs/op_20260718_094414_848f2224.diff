@@ -1,0 +1,11 @@
+@@ -532,6 +532,10 @@
+             if candidate is None:
+                 stats["discard:invalid_or_unannotated"] += 1
+                 continue
++            if candidate.family_hash in family_seen:
++                stats["discard:family_duplicate"] += 1
++                continue
++            family_seen.add(candidate.family_hash)
+             bucket = message_bucket(source_id, label, candidate.quality_tier)
+             reservoir.add(bucket, candidate)
+             stats[f"eligible:{bucket}"] += 1

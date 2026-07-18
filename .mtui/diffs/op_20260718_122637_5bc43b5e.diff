@@ -1,0 +1,10 @@
+@@ -302,7 +302,8 @@
+     ) -> None:
+         self.api_key = api_key.strip()
+         self.base_url = base_url.rstrip("/")
+-        self.timeout = httpx.Timeout(timeout_seconds)
++        bounded_timeout = max(2.0, min(float(timeout_seconds), 120.0))
++        self.timeout = httpx.Timeout(bounded_timeout)
+ 
+     @property
+     def configured(self) -> bool:

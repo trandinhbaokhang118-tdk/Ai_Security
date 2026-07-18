@@ -1,0 +1,43 @@
+@@ -131,6 +131,42 @@
+     assert "real-password" not in repr(event)
+ 
+ 
++def test_submit_click_is_observed_before_canary_form_is_sent() -> None:
++    manager = FreeWebSandboxManager()
++    session_id = "submit-session"
++    clicked: list[tuple[float, float]] = []
++    page = SimpleNamespace(
++        evaluate=lambda _script, _argument=None: {
++            "href": "",
++            "download": False,
++            "filename": "",
++            "text": "Đăng nhập",
++            "isSubmit": True,
++            "formAction": "https://collector.example/login",
++            "formMethod": "POST",
++            "fieldIds": ["password-field"],
++        },
++        mouse=SimpleNamespace(click=lambda x, y: clicked.append((x, y))),
++        wait_for_timeout=lambda _milliseconds: None,
++        url="https://bank.example/login",
++        title=lambda: "Login",
++        screenshot=lambda **kwargs: b"image",
++    )
++    session = make_session(page)
++    session.canary_fields["password-field"] = CanaryField(
++        kind="password",
++        value="Pw-SBX-ABC123-1!",
++    )
++    manager._sessions[session_id] = session
++
++    state = manager.click(session_id, 320, 240)
++
++    assert clicked == [(320, 240)]
++    assert state["lastEvent"]["type"] == "form_submission_attempt"
++    assert state["lastEvent"]["destination"] == "collector.example"
++    assert state["lastEvent"]["crossDomain"] is True
++
++
+ def test_clicking_download_link_is_blocked_before_page_click() -> None:
+     manager = FreeWebSandboxManager()
+     session_id = "download-session"

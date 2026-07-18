@@ -1,0 +1,14 @@
+@@ -632,7 +632,12 @@
+ 
+     def _key(self, session_id: str, key: str) -> dict:
+         with self._lock:
+-            self._get(session_id).page.keyboard.press(key)
++            session = self._get(session_id)
++            if key == "Enter":
++                target = self._inspect_active_form(session.page)
++                if target:
++                    self._record_form_attempt(session, target)
++            session.page.keyboard.press(key)
+             return self._state(session_id)
+ 
+     def type_text(self, session_id: str, text: str) -> dict:

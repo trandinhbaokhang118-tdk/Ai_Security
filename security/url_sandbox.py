@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from shared.schemas import SandboxURLResponse
 
@@ -26,6 +28,25 @@ class URLSandboxRunner:
         self.worker_path = Path(__file__).with_name("sandbox_worker.py")
 
     def inspect(self, url: str) -> SandboxURLResponse:
+        # Reject literal private/reserved IPs before starting the isolated
+        # interpreter. The worker repeats this check (including DNS results),
+        # but this fast path keeps the security decision deterministic even on
+        # hosts where Python process startup is slower than a short timeout.
+        parsed = urlsplit(url.strip() if "://" in url else f"https://{url.strip()}")
+        if parsed.hostname:
+            try:
+                literal_address = ipaddress.ip_address(parsed.hostname)
+            except ValueError:
+                pass
+            else:
+                if not literal_address.is_global:
+                    return SandboxURLResponse.failed(
+                        url,
+                        "private_network_blocked",
+                        "Sandbox đã chặn địa chỉ nội bộ hoặc IP không công khai.",
+                        str(literal_address),
+                    )
+
         payload = json.dumps(
             {
                 "url": url,

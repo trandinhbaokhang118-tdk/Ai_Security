@@ -1,0 +1,15 @@
+@@ -139,9 +139,13 @@
+         provider.detected_engines > 0
+             ? `${provider.detected_engines}/${provider.total_engines || "?"} engine phát hiện tệp.`
+             : null;
++    const mergedProvider = {
++        ...provider,
++        sample_shared: Boolean(current.provider?.sample_shared || provider.sample_shared),
++    };
+     return {
+         ...current,
+-        provider,
++        provider: mergedProvider,
+         execution_status: provider.status === "queued" ? "queued" : "completed",
+         risk_score: score,
+         verdict: current.ok ? verdictForScore(score) : "unknown",

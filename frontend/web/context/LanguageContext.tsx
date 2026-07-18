@@ -8,7 +8,7 @@ const STORAGE_KEY = "prewise-language";
 const SETTINGS_KEY = "prewise-settings";
 const LANGUAGE_EVENT = "prewise-language-change";
 
-const ENGLISH_TRANSLATIONS: Record<string, string> = {
+export const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "Bỏ qua đến nội dung chính": "Skip to main content",
   "Điều hướng chức năng": "Feature navigation",
   "Phân tích": "Analyze",
@@ -81,7 +81,7 @@ const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "Ngôn ngữ giao diện": "Interface language",
   "Lựa chọn được lưu cho các phiên truy cập tiếp theo.": "Your choice is saved for future visits.",
   "Interface preference": "Interface preference",
-  "Bản dịch tiếng Anh đầy đủ sẽ được áp dụng khi gói ngôn ngữ hoàn tất.": "English is fully available across the website.",
+  "English đã sẵn sàng. Phạm vi bản dịch được kiểm tra tự động trong mỗi bản build.": "English is ready. Translation coverage is checked automatically in every build.",
   "Lịch sử phân tích": "Analysis history",
   "Các lần kiểm tra được lưu cục bộ trên thiết bị này để bạn có thể xem lại.": "Checks are stored locally on this device so you can review them.",
   "Tìm theo nội dung hoặc loại…": "Search by content or type…",
@@ -254,8 +254,10 @@ const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "THÔNG TIN": "INFORMATION",
   "Liên hệ": "Contact",
   "Điều khoản": "Terms",
-  "Video demo Prewise sắp được cập nhật": "Prewise demo video coming soon",
-  "VIDEO DEMO ĐANG ĐƯỢC CẬP NHẬT": "DEMO VIDEO COMING SOON",
+  "Mở product walkthrough tương tác": "Open the interactive product walkthrough",
+  "Product walkthrough Prewise": "Prewise product walkthrough",
+  "Ảnh dự phòng product walkthrough Prewise": "Fallback image for the Prewise product walkthrough",
+  "XEM DEMO TƯƠNG TÁC ↗": "VIEW INTERACTIVE DEMO ↗",
   "Dùng thử Scanner": "Try the Scanner",
   "Phương pháp phân tích": "Analysis methodology",
   "Liên hệ đội ngũ": "Contact the team",
@@ -347,6 +349,15 @@ const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "50 lượt phân tích/ngày": "50 analyses/day",
   "URL, email và SMS": "URLs, emails, and SMS",
   "Lịch sử cục bộ": "Local history",
+  "Lịch sử tài khoản": "Account history",
+  "Các lần quét URL và email được tải từ tài khoản trên máy chủ, không phải lịch sử cục bộ của trình duyệt.": "URL and email scans are loaded from your server account, not this browser's local history.",
+  "Các lần kiểm tra được lưu riêng trên trình duyệt này. Đây không phải lịch sử tài khoản đồng bộ từ máy chủ.": "Checks are stored only in this browser. This is separate from server-synced account history.",
+  "Các lần phân tích mới chỉ xuất hiện tại đây khi tùy chọn Lưu lịch sử trên thiết bị được bật.": "New analyses appear here only when Save history on this device is enabled.",
+  "Khi tắt, lần phân tích mới chỉ được giữ trong tab hiện tại và không xuất hiện trong lịch sử cục bộ.": "When disabled, new analyses remain only in the current tab and are not added to local history.",
+  "Che mật khẩu, OTP và số thẻ trong bản xem trước, lịch sử và kết quả được lưu. Nội dung gốc vẫn được gửi để phân tích khi bạn chủ động bấm nút.": "Mask passwords, OTPs, and card numbers in previews, history, and stored results. Original content is sent for analysis only when you explicitly submit it.",
+  "Trang Lịch sử trong workspace chỉ đọc dữ liệu trên trình duyệt này. Lịch sử tài khoản là dữ liệu riêng được tải từ máy chủ sau khi đăng nhập.": "Workspace history reads only this browser's data. Account history is separately loaded from the server after sign-in.",
+  "Xóa lịch sử phân tích cục bộ": "Delete local analysis history",
+  "Xóa danh sách lịch sử và mọi bản ghi kết quả ở cả bộ nhớ phiên lẫn bộ nhớ lâu dài. Thao tác này không thể hoàn tác.": "Delete the history list and all result records from session and persistent storage. This action cannot be undone.",
   "Dùng thử 7 ngày": "Try free for 7 days",
   "Phân tích không giới hạn": "Unlimited analyses",
   "Báo cáo và giải thích sâu": "Advanced reports and explanations",
@@ -438,7 +449,7 @@ function normalize(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function translateText(value: string): string | null {
+export function translateText(value: string): string | null {
   const normalized = normalize(value);
   if (!normalized) return null;
   const exact = normalizedTranslations.get(normalized);

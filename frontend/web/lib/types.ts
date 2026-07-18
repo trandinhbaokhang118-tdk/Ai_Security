@@ -43,7 +43,7 @@ export interface Evidence {
 
 /** Metadata tùy chọn kèm theo lời gọi assessText. */
 export interface AssessMetadata {
-    modality?: "url" | "email" | "text";
+    modality?: "url" | "email" | "sms" | "text";
     locale?: string;
     [key: string]: unknown;
 }
@@ -55,10 +55,67 @@ export interface AssessResult {
     reasons: string[]; // "Lý do chính" tiếng Việt
     evidence: Evidence[];
     explanation?: string; // giải thích ngôn ngữ tự nhiên (Layer 2)
-    modality: "url" | "email" | "text";
+    modality: "url" | "email" | "sms" | "text";
     modelVersion?: string;
     latencyMs?: number;
     requestId: string;
+    analysisCoverage?: Record<string, string>;
+    messageMetadata?: Record<string, unknown>;
+    embeddedUrlAssessments?: Array<Record<string, unknown>>;
+    contextualAnalysis?: ContextualAnalysis;
+}
+
+export interface ContextualAnalysis {
+    task: string;
+    adapter_id: string;
+    status: "completed" | "not_configured" | "disabled" | "artifact_missing" | "incompatible" | "timeout" | "error" | "invalid_schema";
+    scoring_mode: "none" | "shadow" | "active";
+    confidence?: number | null;
+    risk_signal?: number | null;
+    latency_ms?: number;
+    error?: string;
+}
+
+export interface PhoneAssessResult {
+    provider: string;
+    providerStatus: "completed" | "no_hit" | "unavailable";
+    reputation: "malicious" | "suspicious" | "neutral" | "unknown" | null;
+    metadata: Record<string, unknown>;
+    assessment: AssessResult | null;
+}
+
+export interface GmailStatus {
+    configured: boolean;
+    connected: boolean;
+    address: string;
+    status: string;
+}
+
+export interface GmailMessageSummary {
+    id: string;
+    threadId: string;
+    from: string;
+    subject: string;
+    date: string;
+    snippet: string;
+    labelIds: string[];
+}
+
+export interface GmailMessagePreview {
+    id: string;
+    threadId: string;
+    from: string;
+    replyTo: string;
+    subject: string;
+    date: string;
+    body: string;
+    labelIds: string[];
+    attachments: Array<{
+        filename: string;
+        contentType: string;
+        size: number;
+    }>;
+    linksRemoved: number;
 }
 
 export interface SandboxIssue {
@@ -122,9 +179,54 @@ export interface SandboxCanaryReport {
     notes: string[];
 }
 
+export interface ExeQuickScanSection {
+    name: string;
+    virtual_size: number;
+    raw_size: number;
+    entropy: number;
+    readable: boolean;
+    writable: boolean;
+    executable: boolean;
+}
+
+export interface ExeLocalAnalysis {
+    valid: boolean;
+    format: string;
+    architecture: string;
+    subsystem: string;
+    entry_point_rva: number;
+    section_count: number;
+    sections: ExeQuickScanSection[];
+    signature_present: boolean;
+    overlay_bytes: number;
+    compile_time: string | null;
+    characteristics: number;
+    anomalies: string[];
+    risk_score: number;
+}
+
+export interface ExeProviderDetection {
+    engine: string;
+    threat: string;
+}
+
+export interface ExeProviderResult {
+    name: string;
+    configured: boolean;
+    status: "disabled" | "not_found" | "known" | "queued" | "completed" | "failed";
+    data_id: string | null;
+    progress: number;
+    detected_engines: number;
+    total_engines: number;
+    detections: ExeProviderDetection[];
+    risk_score: number;
+    sample_shared: boolean;
+    error: string | null;
+}
+
 export interface ExeSandboxResult {
     ok: boolean;
-    execution_status: "completed" | "failed";
+    execution_status: "completed" | "queued" | "failed";
     filename: string;
     sha256: string;
     size_bytes: number;
@@ -137,8 +239,16 @@ export interface ExeSandboxResult {
     files_created: Record<string, unknown>[];
     network_attempts: Record<string, unknown>[];
     signature_status?: string;
-    signer?: string;
+    signer?: string | null;
     defender_detections?: Record<string, unknown>[];
+    analysis_mode?: "quick_scan" | "windows_sandbox";
+    dynamic_execution?: boolean;
+    local_analysis?: ExeLocalAnalysis;
+    provider?: ExeProviderResult;
+    provider_available?: boolean;
+    upload_consent_required?: boolean;
+    privacy_notice?: string;
+
     elapsed_ms: number;
 }
 
@@ -175,7 +285,7 @@ export interface ChatRequest {
     question: string;
     context?: {
         content: string;
-        modality: "url" | "email" | "text";
+        modality: "url" | "email" | "sms" | "text";
         operator_context?: string;
         analysis_id?: string;
     };
@@ -221,12 +331,17 @@ export interface PlanInfo {
     label: string; // "FREE" | "PRO" | "TEAM"
     renewsAt?: string; // "02/08/2026"
     dailyScanLimit: number; // 50 | Infinity
+    aiCreditDailyLimit: number;
+    deepScanDailyLimit: number;
+    chatFollowupLimit: number;
+    autoMessageContext: boolean;
+    autoWebContext: boolean;
 }
 
 export interface ScanRecord {
     id: string;
     timestamp: string; // "02/07 18:32"
-    type: "URL" | "Email";
+    type: "URL" | "Email" | "SMS";
     score: number; // 0..100
     riskLevel: RiskLevelKey;
 }

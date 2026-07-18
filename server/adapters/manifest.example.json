@@ -1,0 +1,47 @@
+{
+  "schema_version": "1",
+  "base_model": "Qwen/Qwen3.5-4B",
+  "base_revision": "replace-with-an-exact-commit",
+  "context_length": 4096,
+  "adapters": [
+    {
+      "adapter_id": "message-context-v1",
+      "task": "message-context-adapter",
+      "runtime": "openai_lora",
+      "path": "message-context-adapter/current",
+      "served_model_name": "message-context-adapter",
+      "enabled": true,
+      "priority": 10,
+      "timeout_seconds": 15
+    },
+    {
+      "adapter_id": "web-context-v1",
+      "task": "web-context-adapter",
+      "runtime": "openai_lora",
+      "path": "web-context-adapter/current",
+      "served_model_name": "web-context-adapter",
+      "enabled": true,
+      "priority": 10,
+      "timeout_seconds": 20
+    },
+    {
+      "adapter_id": "explanation-v1",
+      "task": "explanation-adapter",
+      "runtime": "openai_lora",
+      "path": "explanation-adapter/current",
+      "served_model_name": "explanation-adapter",
+      "enabled": true,
+      "priority": 10,
+      "timeout_seconds": 30
+    },
+    {
+      "adapter_id": "phone-provider-v1",
+      "task": "phone-intelligence",
+      "runtime": "http_json",
+      "endpoint": "env:PHONE_INTELLIGENCE_URL",
+      "enabled": false,
+      "priority": 10,
+      "timeout_seconds": 10
+    }
+  ]
+}

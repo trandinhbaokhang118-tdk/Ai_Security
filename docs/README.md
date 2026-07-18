@@ -3,9 +3,12 @@
 - [URL phishing detection](./url-phishing-detection.md)
 - [Live URL sandbox](./url-sandbox.md)
 - [Advanced browser sandbox](./browser-sandbox.md)
+- [Quick EXE Lab](./exe-quick-scan.md)
 - [Account authentication](./authentication.md)
 - [Portable local deployment](./portable-local-deployment.md)
 - [PostgreSQL production design](./postgresql-production-design.md)
+- [Context adapters and multi-LoRA serving](./context-adapters.md)
+- [External integrations and preflight](./external-integrations.md)
 
 Thư mục này gom tài liệu dự án theo hướng dễ đọc hơn các file `.md` rải ở thư mục gốc.
 Các tài liệu gốc vẫn được giữ nguyên để không làm gãy tham chiếu cũ.
@@ -18,6 +21,7 @@ Các tài liệu gốc vẫn được giữ nguyên để không làm gãy tham 
 | Giao diện Home/Web | `../UI_wireframe.md`, `../landingpage.md.md` |
 | Kiến trúc hệ thống | `../design.md`, `../c4-model.md`, `../architecture-review.md` |
 | Model AI và runtime server | `./server-models.md`, `../model_comparison.md` |
+| Cắm LoRA contextual specialist | `./context-adapters.md` |
 | Kế hoạch triển khai | `../roadmap.md`, `../engineering-backlog.md` |
 | Demo và kiểm thử | `../demo-script.md.md`, `../test-plan.md.md` |
 

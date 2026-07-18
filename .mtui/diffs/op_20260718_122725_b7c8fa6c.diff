@@ -1,0 +1,23 @@
+@@ -227,11 +227,17 @@
+     report = provider._normalize(  # noqa: SLF001
+         {
+             "data_id": "abc",
+-            "process_info": {"progress_percentage": 100},
+-            "scan_results": {"total_detected_avs": 2, "total_avs": 30},
+-            "scan_details": {
+-                "EngineA": {"scan_result_i": 1, "threat_found": "Trojan.Test"},
+-                "EngineB": {"scan_result_i": 0, "threat_found": ""},
++            "scan_results": {
++                "progress_percentage": 100,
++                "total_detected_avs": 2,
++                "total_avs": 30,
++                "scan_details": {
++                    "EngineA": {"scan_result_i": 1, "threat_found": "Trojan.Test"},
++                    "EngineB": {
++                        "scan_result_i": 0,
++                        "scan_result_a": "No Threat Detected",
++                    },
++                },
+             },
+         },
+         fallback_status="queued",

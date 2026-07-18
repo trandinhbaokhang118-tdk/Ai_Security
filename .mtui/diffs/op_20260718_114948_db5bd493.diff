@@ -1,0 +1,322 @@
+@@ -42,65 +42,65 @@
+ // ---------------------------------------------------------------------------
+ 
+ /** Metadata tùy chọn kèm theo lời gọi assessText. */
+-export interface AssessMetadata {
+-    modality?: "url" | "email" | "sms" | "text";
++export interface AssessMetadata {
++    modality?: "url" | "email" | "sms" | "text";
+     locale?: string;
+     [key: string]: unknown;
+ }
+ 
+-export interface AssessResult {
++export interface AssessResult {
+     score: number; // 0..100 (từ risk_score*100)
+     riskLevel: RiskLevelKey;
+     confidence: number; // 0..1
+     reasons: string[]; // "Lý do chính" tiếng Việt
+     evidence: Evidence[];
+     explanation?: string; // giải thích ngôn ngữ tự nhiên (Layer 2)
+-    modality: "url" | "email" | "sms" | "text";
++    modality: "url" | "email" | "sms" | "text";
+     modelVersion?: string;
+     latencyMs?: number;
+-    requestId: string;
+-    analysisCoverage?: Record<string, string>;
+-    messageMetadata?: Record<string, unknown>;
+-    embeddedUrlAssessments?: Array<Record<string, unknown>>;
+-    contextualAnalysis?: ContextualAnalysis;
+-}
+-
+-export interface ContextualAnalysis {
+-    task: string;
+-    adapter_id: string;
+-    status: "completed" | "not_configured" | "disabled" | "artifact_missing" | "incompatible" | "timeout" | "error" | "invalid_schema";
+-    scoring_mode: "none" | "shadow" | "active";
+-    confidence?: number | null;
+-    risk_signal?: number | null;
+-    latency_ms?: number;
+-    error?: string;
+-}
+-
+-export interface PhoneAssessResult {
+-    provider: string;
+-    providerStatus: "completed" | "no_hit" | "unavailable";
+-    reputation: "malicious" | "suspicious" | "neutral" | "unknown" | null;
+-    metadata: Record<string, unknown>;
+-    assessment: AssessResult | null;
+-}
+-
+-export interface GmailStatus {
+-    configured: boolean;
+-    connected: boolean;
+-    address: string;
+-    status: string;
+-}
+-
+-export interface GmailMessageSummary {
+-    id: string;
+-    threadId: string;
+-    from: string;
+-    subject: string;
+-    date: string;
+-    snippet: string;
+-    labelIds: string[];
+-}
++    requestId: string;
++    analysisCoverage?: Record<string, string>;
++    messageMetadata?: Record<string, unknown>;
++    embeddedUrlAssessments?: Array<Record<string, unknown>>;
++    contextualAnalysis?: ContextualAnalysis;
++}
+ 
++export interface ContextualAnalysis {
++    task: string;
++    adapter_id: string;
++    status: "completed" | "not_configured" | "disabled" | "artifact_missing" | "incompatible" | "timeout" | "error" | "invalid_schema";
++    scoring_mode: "none" | "shadow" | "active";
++    confidence?: number | null;
++    risk_signal?: number | null;
++    latency_ms?: number;
++    error?: string;
++}
++
++export interface PhoneAssessResult {
++    provider: string;
++    providerStatus: "completed" | "no_hit" | "unavailable";
++    reputation: "malicious" | "suspicious" | "neutral" | "unknown" | null;
++    metadata: Record<string, unknown>;
++    assessment: AssessResult | null;
++}
++
++export interface GmailStatus {
++    configured: boolean;
++    connected: boolean;
++    address: string;
++    status: string;
++}
++
++export interface GmailMessageSummary {
++    id: string;
++    threadId: string;
++    from: string;
++    subject: string;
++    date: string;
++    snippet: string;
++    labelIds: string[];
++}
++
+ export interface SandboxIssue {
+     code: string;
+     severity: Severity;
+@@ -162,54 +162,54 @@
+     notes: string[];
+ }
+ 
+-export interface ExeQuickScanSection {
+-    name: string;
+-    virtual_size: number;
+-    raw_size: number;
+-    entropy: number;
+-    readable: boolean;
+-    writable: boolean;
+-    executable: boolean;
+-}
+-
+-export interface ExeLocalAnalysis {
+-    valid: boolean;
+-    format: string;
+-    architecture: string;
+-    subsystem: string;
+-    entry_point_rva: number;
+-    section_count: number;
+-    sections: ExeQuickScanSection[];
+-    signature_present: boolean;
+-    overlay_bytes: number;
+-    compile_time: string | null;
+-    characteristics: number;
+-    anomalies: string[];
+-    risk_score: number;
+-}
+-
+-export interface ExeProviderDetection {
+-    engine: string;
+-    threat: string;
+-}
+-
+-export interface ExeProviderResult {
+-    name: string;
+-    configured: boolean;
+-    status: "disabled" | "not_found" | "known" | "queued" | "completed" | "failed";
+-    data_id: string | null;
+-    progress: number;
+-    detected_engines: number;
+-    total_engines: number;
+-    detections: ExeProviderDetection[];
+-    risk_score: number;
+-    sample_shared: boolean;
+-    error: string | null;
+-}
++export interface ExeQuickScanSection {
++    name: string;
++    virtual_size: number;
++    raw_size: number;
++    entropy: number;
++    readable: boolean;
++    writable: boolean;
++    executable: boolean;
++}
++
++export interface ExeLocalAnalysis {
++    valid: boolean;
++    format: string;
++    architecture: string;
++    subsystem: string;
++    entry_point_rva: number;
++    section_count: number;
++    sections: ExeQuickScanSection[];
++    signature_present: boolean;
++    overlay_bytes: number;
++    compile_time: string | null;
++    characteristics: number;
++    anomalies: string[];
++    risk_score: number;
++}
++
++export interface ExeProviderDetection {
++    engine: string;
++    threat: string;
++}
++
++export interface ExeProviderResult {
++    name: string;
++    configured: boolean;
++    status: "disabled" | "not_found" | "known" | "queued" | "completed" | "failed";
++    data_id: string | null;
++    progress: number;
++    detected_engines: number;
++    total_engines: number;
++    detections: ExeProviderDetection[];
++    risk_score: number;
++    sample_shared: boolean;
++    error: string | null;
++}
+ 
+ export interface ExeSandboxResult {
+     ok: boolean;
+-    execution_status: "completed" | "failed";
++    execution_status: "completed" | "queued" | "failed";
+     filename: string;
+     sha256: string;
+     size_bytes: number;
+@@ -256,14 +256,14 @@
+     assessment?: AssessResult; // gắn khi assistant trả kết quả đánh giá
+ }
+ 
+-export interface ChatRequest {
+-    question: string;
+-    context?: {
+-        content: string;
+-        modality: "url" | "email" | "sms" | "text";
+-        operator_context?: string;
+-        analysis_id?: string;
+-    };
++export interface ChatRequest {
++    question: string;
++    context?: {
++        content: string;
++        modality: "url" | "email" | "sms" | "text";
++        operator_context?: string;
++        analysis_id?: string;
++    };
+     history: ChatMessageModel[];
+ }
+ 
+@@ -280,7 +280,7 @@
+ // Model: Session, PlanInfo, ScanRecord, ApiKeyInfo
+ // ---------------------------------------------------------------------------
+ 
+-export type PlanTier = "free" | "pro" | "team" | "enterprise";
++export type PlanTier = "free" | "pro" | "team" | "enterprise";
+ 
+ export interface Session {
+     token: string;
+@@ -288,12 +288,12 @@
+     plan: PlanInfo;
+ }
+ 
+-export interface UserProfile {
++export interface UserProfile {
+     id: string;
+     email: string;
+     displayName: string;
+-    avatarUrl?: string;
+-    role?: "user" | "admin";
++    avatarUrl?: string;
++    role?: "user" | "admin";
+ }
+ 
+ export interface PasswordChangeInput {
+@@ -301,36 +301,36 @@
+     newPassword: string;
+ }
+ 
+-export interface PlanInfo {
++export interface PlanInfo {
+     tier: PlanTier; // free | pro | team
+     label: string; // "FREE" | "PRO" | "TEAM"
+     renewsAt?: string; // "02/08/2026"
+-    dailyScanLimit: number; // 50 | Infinity
+-    aiCreditDailyLimit: number;
+-    deepScanDailyLimit: number;
+-    chatFollowupLimit: number;
+-    autoMessageContext: boolean;
+-    autoWebContext: boolean;
+-}
++    dailyScanLimit: number; // 50 | Infinity
++    aiCreditDailyLimit: number;
++    deepScanDailyLimit: number;
++    chatFollowupLimit: number;
++    autoMessageContext: boolean;
++    autoWebContext: boolean;
++}
+ 
+ export interface ScanRecord {
+     id: string;
+     timestamp: string; // "02/07 18:32"
+-    type: "URL" | "Email" | "SMS";
++    type: "URL" | "Email" | "SMS";
+     score: number; // 0..100
+     riskLevel: RiskLevelKey;
+ }
+ 
+-export interface ApiKeyInfo {
+-    key: string;
+-    createdAt: string;
+-    prefix: string;
+-    lastUsedAt?: string | null;
+-    scopes: string[];
+-    status: string;
+-    /** True only in the one-time response immediately after key rotation. */
+-    secretAvailable: boolean;
+-} // dùng cho Team/MCP
++export interface ApiKeyInfo {
++    key: string;
++    createdAt: string;
++    prefix: string;
++    lastUsedAt?: string | null;
++    scopes: string[];
++    status: string;
++    /** True only in the one-time response immediately after key rotation. */
++    secretAvailable: boolean;
++} // dùng cho Team/MCP
+ 
+ // ---------------------------------------------------------------------------
+ // Model: PricingTier (Pricing page)
+@@ -390,4 +390,4 @@
+ /** Lỗi khi đã hết lượt quét trong ngày. */
+ export interface QuotaError extends AppError {
+     error: "quota";
+-}
++}

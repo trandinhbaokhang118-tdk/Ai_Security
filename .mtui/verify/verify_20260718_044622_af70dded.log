@@ -1,0 +1,7 @@
+$ powershell -NoProfile -Command $content=@('alpha ^quoted','beta') -join [Environment]::NewLine; 
+mode: fallback
+exit_code: 0
+duration_ms: 531
+---- stdout ----
+
+---- stderr ----

@@ -1,0 +1,28 @@
+@@ -128,19 +128,26 @@
+             magic = struct.unpack_from("<H", data, optional_offset)[0]
+             if magic == 0x10B:
+                 pe_format = "PE32"
++                minimum_optional_size = 96
+                 data_directory_offset = optional_offset + 96
++                directory_count_offset = optional_offset + 92
+             elif magic == 0x20B:
+                 pe_format = "PE32+"
++                minimum_optional_size = 112
+                 data_directory_offset = optional_offset + 112
++                directory_count_offset = optional_offset + 108
+             else:
+                 raise ValueError(f"Optional header magic không được hỗ trợ: 0x{magic:04x}")
++            if optional_size < minimum_optional_size:
++                raise ValueError("Optional header ngắn hơn kích thước tối thiểu của định dạng PE")
+ 
+             entry_point = struct.unpack_from("<I", data, optional_offset + 16)[0]
+             subsystem = struct.unpack_from("<H", data, optional_offset + 68)[0]
++            directory_count = struct.unpack_from("<I", data, directory_count_offset)[0]
+             signature_offset = 0
+             signature_size = 0
+             security_entry = data_directory_offset + (8 * 4)
+-            if security_entry + 8 <= optional_offset + optional_size:
++            if directory_count > 4 and security_entry + 8 <= optional_offset + optional_size:
+                 signature_offset, signature_size = struct.unpack_from(
+                     "<II", data, security_entry
+                 )

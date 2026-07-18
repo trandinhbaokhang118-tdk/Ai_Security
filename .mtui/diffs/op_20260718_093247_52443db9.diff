@@ -1,0 +1,8 @@
+@@ -1316,6 +1316,7 @@
+     (output_root / "dataset_manifest.json").write_text(
+         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+     )
++    write_json_schemas(output_root)
+     write_supporting_docs(output_root, manifest)
+     copy_training_assets(output_root)
+     write_checksums(output_root)

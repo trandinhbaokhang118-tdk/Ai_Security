@@ -1,0 +1,9 @@
+@@ -1214,7 +1214,7 @@
+         source = source_dir / name
+         if source.is_file():
+             shutil.copy2(source, scripts_dir / name)
+-    for name in ("README_KAGGLE.md", "requirements-kaggle.txt"):
++    for name in ("README_KAGGLE.md", "requirements-kaggle.txt", "prewise_kaggle_train.ipynb"):
+         source = source_dir / name
+         if source.is_file():
+             shutil.copy2(source, output_root / name)

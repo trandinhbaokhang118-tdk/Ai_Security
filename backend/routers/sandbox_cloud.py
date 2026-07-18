@@ -9,9 +9,11 @@ import re
 import secrets
 import time
 from datetime import timedelta
+from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
@@ -20,7 +22,13 @@ from backend.config import settings
 from backend.db import get_db
 from backend.models import CloudSandboxSession, PaymentOrder, SandboxWallet, Subscription
 from backend.routers.auth import CurrentSession
-from backend.security_utils import utcnow
+from backend.security_utils import create_session_token, utcnow
+from backend.services.cloud_sandbox_sample_service import (
+    remove_session_samples,
+    safe_sample_name,
+    store_sample,
+    verify_agent_token,
+)
 from backend.services.cloud_sandbox_service import cloud_sandbox_service
 from security.free_web_sandbox import free_web_sandbox
 
@@ -48,6 +56,16 @@ class CreateSubscriptionPaymentInput(BaseModel):
 
 class CreateSessionInput(BaseModel):
     tier: str = "free"
+
+
+class SandboxAgentReport(BaseModel):
+    status: str = Field(pattern="^(completed|failed)$")
+    verdict: str = Field(default="unknown", max_length=40)
+    summary: str = Field(default="", max_length=2000)
+    process_tree: list[dict] = Field(default_factory=list, max_length=100)
+    file_events: list[dict] = Field(default_factory=list, max_length=200)
+    registry_events: list[dict] = Field(default_factory=list, max_length=200)
+    network_events: list[dict] = Field(default_factory=list, max_length=200)
 
 
 class FreeNavigateInput(BaseModel):
@@ -187,6 +205,13 @@ def session_dict(row: CloudSandboxSession) -> dict:
     return {
         "id": row.id, "tier": row.sandbox_tier, "status": row.status,
         "remoteUrl": row.remote_url, "expiresAt": row.expires_at.isoformat(), "error": row.error,
+        "sample": {
+            "filename": row.sample_filename,
+            "sha256": row.sample_sha256,
+            "size": row.sample_size,
+            "status": row.sample_status,
+            "report": row.sample_report or {},
+        },
     }
 
 
@@ -324,7 +349,7 @@ async def sepay_webhook(
     return {"success": True}
 
 
-async def provision_task(session_id: str) -> None:
+async def provision_task(session_id: str, agent_token: str) -> None:
     from backend.db import SessionLocal
     with SessionLocal() as db:
         row = db.get(CloudSandboxSession, session_id)
@@ -333,7 +358,7 @@ async def provision_task(session_id: str) -> None:
         try:
             instance_id, remote_url = await asyncio.to_thread(
                 cloud_sandbox_service.provision, row.id, row.user_id,
-                row.expires_at.isoformat(), row.sandbox_tier,
+                row.expires_at.isoformat(), row.sandbox_tier, agent_token,
             )
             row.provider_instance_id = instance_id
             row.remote_url = remote_url
@@ -390,8 +415,10 @@ async def create_session(
         if wallet.credits < 1:
             raise HTTPException(402, "Bạn cần mua một lượt Sandbox")
         wallet.credits -= 1
+        agent_token = create_session_token()
         row = CloudSandboxSession(
             user_id=auth.user.id, sandbox_tier=requested, provider="aws",
+            agent_token_hash=hashlib.sha256(agent_token.encode("utf-8")).hexdigest(),
             expires_at=utcnow() + timedelta(minutes=capability["minutes"]),
         )
     db.add(row)
@@ -406,7 +433,7 @@ async def create_session(
             db.commit()
             raise HTTPException(503, f"Không khởi động được Free Sandbox: {exc}") from exc
     else:
-        asyncio.create_task(provision_task(row.id))
+        asyncio.create_task(provision_task(row.id, agent_token))
     return session_dict(row)
 
 
@@ -497,6 +524,99 @@ def get_session(session_id: str, auth: CurrentSession, db: DbSession = Depends(g
     return session_dict(row)
 
 
+def require_exe_session(db: DbSession, session_id: str, user_id: str) -> CloudSandboxSession:
+    row = db.get(CloudSandboxSession, session_id)
+    if row is None or row.user_id != user_id:
+        raise HTTPException(404, "Không tìm thấy phiên")
+    if not TIER_CAPABILITIES.get(row.sandbox_tier, {}).get("exe"):
+        raise HTTPException(403, "Gói hiện tại không có EXE Sandbox")
+    if row.status not in {"provisioning", "ready"} or row.expires_at <= utcnow():
+        raise HTTPException(409, "Phiên EXE Sandbox không còn sẵn sàng")
+    return row
+
+
+@router.post("/sessions/{session_id}/exe")
+async def upload_exe_for_cloud_sandbox(
+    session_id: str,
+    auth: CurrentSession,
+    file: UploadFile = File(...),
+    consent: bool = Form(False),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    row = require_exe_session(db, session_id, auth.user.id)
+    if not consent:
+        raise HTTPException(422, "Cần xác nhận gửi mẫu vào Windows Sandbox Cloud")
+    if not settings.sandbox_public_base_url:
+        raise HTTPException(503, "Sandbox Cloud Agent chưa được cấu hình callback URL")
+    filename = safe_sample_name(file.filename or "sample.exe")
+    if not filename.lower().endswith((".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".ps1")):
+        raise HTTPException(400, "Chỉ chấp nhận tệp thực thi Windows")
+    content = await file.read(settings.max_upload_bytes + 1)
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(413, "File vượt giới hạn kích thước")
+    if not content:
+        raise HTTPException(400, "File rỗng")
+    remove_session_samples(row.id)
+    storage_path, sha256 = await asyncio.to_thread(store_sample, row.id, filename, content)
+    row.sample_filename = filename
+    row.sample_storage_path = storage_path
+    row.sample_sha256 = sha256
+    row.sample_size = len(content)
+    row.sample_status = "queued"
+    row.sample_report = {"consent": True, "queued_at": utcnow().isoformat()}
+    row.sample_uploaded_at = utcnow()
+    row.sample_completed_at = None
+    db.commit()
+    return session_dict(row)
+
+
+def require_agent_session(db: DbSession, session_id: str, token: str | None) -> CloudSandboxSession:
+    row = db.get(CloudSandboxSession, session_id)
+    if row is None or row.expires_at <= utcnow() or not verify_agent_token(row.agent_token_hash, token):
+        raise HTTPException(401, "Sandbox agent không được xác thực")
+    return row
+
+
+@router.get("/agent/sessions/{session_id}/exe")
+def agent_download_exe(
+    session_id: str,
+    x_sandbox_agent_token: str | None = Header(default=None),
+    db: DbSession = Depends(get_db),
+):
+    row = require_agent_session(db, session_id, x_sandbox_agent_token)
+    if row.sample_status not in {"queued", "delivered"} or not row.sample_storage_path:
+        raise HTTPException(404, "Không có mẫu chờ phân tích")
+    path = Path(row.sample_storage_path)
+    if not path.is_file():
+        raise HTTPException(410, "Mẫu đã hết hạn")
+    row.sample_status = "delivered"
+    db.commit()
+    filename = row.sample_filename or "sample.exe"
+    return FileResponse(
+        path,
+        filename=filename,
+        media_type="application/octet-stream",
+        headers={"X-Sandbox-Sample-Filename": filename},
+    )
+
+
+@router.post("/agent/sessions/{session_id}/report")
+def agent_submit_report(
+    session_id: str,
+    payload: SandboxAgentReport,
+    x_sandbox_agent_token: str | None = Header(default=None),
+    db: DbSession = Depends(get_db),
+) -> dict:
+    row = require_agent_session(db, session_id, x_sandbox_agent_token)
+    if row.sample_status not in {"queued", "delivered"}:
+        raise HTTPException(409, "Không có mẫu đang chờ báo cáo")
+    row.sample_status = payload.status
+    row.sample_report = payload.model_dump(mode="json")
+    row.sample_completed_at = utcnow()
+    db.commit()
+    return {"ok": True}
+
+
 @router.delete("/sessions/{session_id}")
 async def stop_session(session_id: str, auth: CurrentSession, db: DbSession = Depends(get_db)) -> dict:
     row = db.get(CloudSandboxSession, session_id)
@@ -508,5 +628,6 @@ async def stop_session(session_id: str, auth: CurrentSession, db: DbSession = De
         await asyncio.to_thread(free_web_sandbox.close, row.id)
     row.status = "terminated"
     row.terminated_at = utcnow()
+    await asyncio.to_thread(remove_session_samples, row.id)
     db.commit()
     return {"ok": True}

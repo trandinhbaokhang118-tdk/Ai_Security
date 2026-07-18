@@ -1,0 +1,8 @@
+@@ -21,7 +21,6 @@
+ 
+ from security.sandbox_worker import _normalize_url
+ 
+-
+ MAX_SECURITY_EVENTS = 30
+ DOWNLOAD_EXTENSIONS = frozenset(
+     {

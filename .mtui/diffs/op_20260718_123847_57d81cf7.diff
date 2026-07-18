@@ -1,0 +1,9 @@
+@@ -609,7 +609,7 @@
+             return self._provider_disabled()
+         try:
+             return self.provider.report(data_id)
+-        except (httpx.HTTPError, ValueError) as exc:
++        except (httpx.HTTPError, ProviderRequestError, ValueError) as exc:
+             return self.provider.failed_result(str(exc))
+ 
+     def _provider_disabled(self) -> dict[str, Any]:

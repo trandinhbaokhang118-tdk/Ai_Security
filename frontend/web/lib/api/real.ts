@@ -31,12 +31,19 @@ import type {
     AssessResult,
     BrowserSandboxResult,
     ExeSandboxResult,
+
+    ExeProviderResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
+    ContextualAnalysis,
     Credentials,
     Evidence,
     PlanInfo,
+    PhoneAssessResult,
+    GmailMessagePreview,
+    GmailMessageSummary,
+    GmailStatus,
     PasswordChangeInput,
     PasswordResetRequestResult,
     RegisterInput,
@@ -104,6 +111,10 @@ interface BackendAssessResponse {
     model_version?: string;
     latency_ms?: number;
     request_id?: string;
+    analysis_coverage?: Record<string, string>;
+    message_metadata?: Record<string, unknown>;
+    embedded_url_assessments?: Array<Record<string, unknown>>;
+    contextual_analysis?: ContextualAnalysis;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +189,7 @@ function clamp(value: number, min: number, max: number): number {
  */
 function mapAssessResponse(
     raw: BackendAssessResponse,
-    modality: "url" | "email" | "text",
+    modality: "url" | "email" | "sms" | "text",
 ): AssessResult {
     const rawScore =
         typeof raw.risk_score === "number" && Number.isFinite(raw.risk_score)
@@ -212,6 +223,10 @@ function mapAssessResponse(
     if (typeof raw.latency_ms === "number") {
         result.latencyMs = raw.latency_ms;
     }
+    if (raw.analysis_coverage) result.analysisCoverage = raw.analysis_coverage;
+    if (raw.message_metadata) result.messageMetadata = raw.message_metadata;
+    if (raw.embedded_url_assessments) result.embeddedUrlAssessments = raw.embedded_url_assessments;
+    if (raw.contextual_analysis) result.contextualAnalysis = raw.contextual_analysis;
 
     return result;
 }
@@ -289,7 +304,7 @@ interface WsChatMessage {
     delta?: string;
     message_id?: string;
     assessment?: BackendAssessResponse;
-    modality?: "url" | "email" | "text";
+    modality?: "url" | "email" | "sms" | "text";
     error?: string;
 }
 
@@ -330,31 +345,143 @@ export class RealApiClient implements ApiClient {
         );
     }
 
-    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
+    async sandboxExecutable(file: File, shareWithProvider = false): Promise<ExeSandboxResult> {
         const form = new FormData();
         form.append("file", file);
-        const response = await fetch(`${getApiBase()}/v1/assess/file/exe-sandbox`,
+        form.append("share_with_provider", shareWithProvider ? "true" : "false");
+        const response = await fetch(`${getApiBase()}/v1/assess/file/exe-quick-scan`,
             withAuthentication({ method: "POST", body: form }));
         if (!response.ok) throw new Error(`Kiểm thử EXE thất bại: ${response.status} — ${await response.text()}`);
         return response.json() as Promise<ExeSandboxResult>;
     }
+    async getExecutableProviderReport(dataId: string): Promise<ExeProviderResult> {
+        return requestJson<ExeProviderResult>(
+            `/v1/assess/file/exe-quick-scan/provider/${encodeURIComponent(dataId)}`,
+            withAuthentication({ method: "GET" }),
+        );
+    }
+
+
 
     async assessText(
         text: string,
         metadata?: AssessMetadata,
     ): Promise<AssessResult> {
-        const rawModality: "url" | "email" | "text" = metadata?.modality ?? "email";
+        const rawModality: "url" | "email" | "sms" | "text" = metadata?.modality ?? "email";
         // Gateway chỉ nhận modality "email" | "text" | "sms" cho endpoint text.
-        const modality: "email" | "text" = rawModality === "url" ? "text" : rawModality;
+        const modality: "email" | "sms" | "text" = rawModality === "url" ? "text" : rawModality;
         const raw = await requestJson<BackendAssessResponse>("/v1/assess/text", {
             ...withAuthentication({ method: "POST" }),
             body: JSON.stringify({
                 text,
                 modality,
                 metadata: metadata ?? null,
+                ai_context: metadata?.analysis_depth === "pro" ? "on" : "auto",
             }),
         });
         return mapAssessResponse(raw, modality);
+    }
+
+    async assessEmailFile(file: File, metadata: AssessMetadata = {}): Promise<AssessResult> {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("analysis_depth", String(metadata.analysis_depth || "balanced"));
+        form.append("operator_context", String(metadata.operator_context || ""));
+        form.append("ai_context", metadata.analysis_depth === "pro" ? "on" : "auto");
+        const response = await fetch(
+            `${getApiBase()}/v1/assess/email-file`,
+            withAuthentication({ method: "POST", body: form }),
+        );
+        if (!response.ok) {
+            throw new Error(`Phân tích Email thất bại: ${response.status} — ${await response.text()}`);
+        }
+        return mapAssessResponse(await response.json() as BackendAssessResponse, "email");
+    }
+
+    async assessPhone(
+        phoneNumber: string,
+        sms: string,
+        countryHint = "VN",
+        metadata: AssessMetadata = {},
+    ): Promise<PhoneAssessResult> {
+        const raw = await requestJson<{
+            provider?: string;
+            provider_status?: PhoneAssessResult["providerStatus"];
+            reputation?: PhoneAssessResult["reputation"];
+            metadata?: Record<string, unknown>;
+            assessment?: BackendAssessResponse | null;
+        }>("/v1/assess/phone", {
+            ...withAuthentication({ method: "POST" }),
+            body: JSON.stringify({
+                phone_number: phoneNumber,
+                country_hint: countryHint,
+                sms,
+                transcript: "",
+                metadata: { ...metadata, modality: "sms" },
+                ai_context: metadata.analysis_depth === "pro" ? "on" : "auto",
+            }),
+        });
+        return {
+            provider: raw.provider ?? "",
+            providerStatus: raw.provider_status ?? "unavailable",
+            reputation: raw.reputation ?? null,
+            metadata: raw.metadata ?? {},
+            assessment: raw.assessment ? mapAssessResponse(raw.assessment, "sms") : null,
+        };
+    }
+
+    async getGmailStatus(): Promise<GmailStatus> {
+        return requestJson<GmailStatus>(
+            "/v1/integrations/gmail/status",
+            withAuthentication({ method: "GET" }),
+        );
+    }
+
+    async connectGmail(): Promise<{authUrl: string}> {
+        return requestJson<{authUrl: string}>(
+            "/v1/integrations/gmail/connect",
+            withAuthentication({ method: "POST" }),
+        );
+    }
+
+    async listGmailMessages(query = "", label = ""): Promise<GmailMessageSummary[]> {
+        const params = new URLSearchParams();
+        params.set("limit", "30");
+        if (query.trim()) params.set("q", query.trim());
+        if (label) params.set("label", label);
+        const raw = await requestJson<{messages: GmailMessageSummary[]}>(
+            `/v1/integrations/gmail/messages?${params.toString()}`,
+            withAuthentication({ method: "GET" }),
+        );
+        return raw.messages;
+    }
+
+    async getGmailMessagePreview(messageId: string): Promise<GmailMessagePreview> {
+        return requestJson<GmailMessagePreview>(
+            `/v1/integrations/gmail/messages/${encodeURIComponent(messageId)}/preview`,
+            withAuthentication({ method: "GET" }),
+        );
+    }
+
+    async assessGmailMessage(messageId: string, metadata: AssessMetadata = {}): Promise<AssessResult> {
+        const raw = await requestJson<BackendAssessResponse>(
+            `/v1/integrations/gmail/messages/${encodeURIComponent(messageId)}/assess`,
+            {
+                ...withAuthentication({ method: "POST" }),
+                body: JSON.stringify({
+                    analysis_depth: metadata.analysis_depth || "balanced",
+                    operator_context: metadata.operator_context || "",
+                }),
+            },
+        );
+        return mapAssessResponse(raw, "email");
+    }
+
+    async disconnectGmail(): Promise<void> {
+        await requestJson<{disconnected: boolean}>(
+            "/v1/integrations/gmail/connection",
+            withAuthentication({ method: "DELETE" }),
+        );
     }
 
     /**
@@ -394,7 +521,11 @@ export class RealApiClient implements ApiClient {
 
         socket.onopen = () => {
             try {
-                socket.send(JSON.stringify(payload));
+                const accessToken = readStoredAccessToken();
+                socket.send(JSON.stringify({
+                    ...payload,
+                    ...(accessToken ? { access_token: accessToken } : {}),
+                }));
             } catch (err) {
                 streamError = err instanceof Error ? err : new Error(String(err));
                 wake();

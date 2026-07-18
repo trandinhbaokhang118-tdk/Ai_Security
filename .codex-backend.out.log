@@ -1,0 +1,107 @@
+INFO:     127.0.0.1:51135 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51136 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59490 - "OPTIONS /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64999 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65021 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65021 - "GET /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:51661 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63436 - "OPTIONS /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63436 - "GET /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "OPTIONS /v1/sandbox-cloud/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "POST /v1/sandbox-cloud/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "OPTIONS /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63312 - "OPTIONS /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/navigate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63312 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/navigate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63172 - "OPTIONS /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63172 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64088 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64088 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64088 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "OPTIONS /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/type HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/type HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59380 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59380 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59380 - "POST /v1/sandbox-cloud/sessions/caedf60f-bd00-4967-abdf-68a511afec27/browser/click HTTP/1.1" 200 OK
+  INFO:     127.0.0.1:58852 - "OPTIONS /v1/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58852 - "POST /v1/auth/logout HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:62751 - "OPTIONS /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62751 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62751 - "OPTIONS /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62751 - "GET /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:55254 - "OPTIONS /v1/sandbox-cloud/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55254 - "POST /v1/sandbox-cloud/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55254 - "GET /v1/sandbox-cloud/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55254 - "OPTIONS /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55254 - "GET /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62789 - "GET /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58941 - "OPTIONS /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/navigate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58941 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/navigate HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:63553 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/navigate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63553 - "OPTIONS /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63553 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:63184 - "OPTIONS /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63184 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:58960 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51359 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51359 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59644 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:56678 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:50883 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50883 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51810 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:64840 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64840 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64840 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64840 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52967 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52967 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:64840 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54571 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/type HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:59655 - "POST /v1/sandbox-cloud/sessions/aec590cf-e2b6-41c9-992e-574113ae6eb1/browser/click HTTP/1.1" 500 Internal Server Error
+    INFO:     127.0.0.1:65357 - "GET /v1/health HTTP/1.1" 200 OK
+     INFO:     127.0.0.1:63475 - "OPTIONS /v1/account/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54128 - "OPTIONS /v1/account/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54128 - "GET /v1/account/history HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:54888 - "GET /v1/account/history HTTP/1.1" 200 OK
+           INFO:     127.0.0.1:52586 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62273 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+        INFO:     127.0.0.1:63761 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61737 - "GET /v1/health HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:55924 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52974 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53001 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+  INFO:     127.0.0.1:63593 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63618 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59951 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:62529 - "GET /admin/specs HTTP/1.1" 200 OK
+      INFO:     127.0.0.1:61734 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:52623 - "OPTIONS /v1/assess/text HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "POST /v1/assess/text HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64342 - "OPTIONS /v1/assess/phone HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64342 - "POST /v1/assess/phone HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52106 - "GET /v1/health HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:59623 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57565 - "POST /v1/assess/text HTTP/1.1" 200 OK
+                                    INFO:     127.0.0.1:52484 - "GET /admin/specs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52484 - "GET /admin/specs HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:49246 - "OPTIONS /v1/assess/email-file HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49246 - "POST /v1/assess/email-file HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:65137 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65153 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:61041 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57620 - "POST /v1/demo/url/analyze HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:57639 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:57671 - "GET /v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57680 - "POST /v1/demo/url/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57969 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57969 - "GET /v1/account/quota HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58077 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58077 - "POST /v1/assess/text HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58077 - "GET /v1/account/quota HTTP/1.1" 200 OK
+  INFO:     127.0.0.1:60181 - "POST /v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60182 - "POST /v1/assess/text HTTP/1.1" 200 OK
+         

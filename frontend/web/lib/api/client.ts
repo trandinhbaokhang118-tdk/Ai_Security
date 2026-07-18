@@ -17,11 +17,17 @@ import type {
     AssessResult,
     BrowserSandboxResult,
     ExeSandboxResult,
+
+    ExeProviderResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
     Credentials,
     PlanInfo,
+    PhoneAssessResult,
+    GmailMessagePreview,
+    GmailMessageSummary,
+    GmailStatus,
     PasswordChangeInput,
     PasswordResetRequestResult,
     RegisterInput,
@@ -43,12 +49,27 @@ export interface ApiClient {
     sandboxUrl(url: string): Promise<SandboxResult>;
 
     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
+    /** Phân tích nhanh PE cục bộ và tùy chọn tra cứu/chia sẻ với provider. */
+    sandboxExecutable(file: File, shareWithProvider?: boolean): Promise<ExeSandboxResult>;
 
-    /** Chạy tệp EXE trong Windows Sandbox thật, không chạy trực tiếp trên máy chủ. */
-    sandboxExecutable(file: File): Promise<ExeSandboxResult>;
+    getExecutableProviderReport(dataId: string): Promise<ExeProviderResult>;
+
 
     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
     assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;
+
+    /** Parse đầy đủ MIME/header/tệp/link từ một Email RFC822 `.eml`. */
+    assessEmailFile(file: File, metadata?: AssessMetadata): Promise<AssessResult>;
+
+    /** Đánh giá SMS cùng thông tin uy tín của số gửi (nếu nhà cung cấp khả dụng). */
+    assessPhone(phoneNumber: string, sms: string, countryHint?: string, metadata?: AssessMetadata): Promise<PhoneAssessResult>;
+
+    getGmailStatus(): Promise<GmailStatus>;
+    connectGmail(): Promise<{authUrl: string}>;
+    listGmailMessages(query?: string, label?: string): Promise<GmailMessageSummary[]>;
+    getGmailMessagePreview(messageId: string): Promise<GmailMessagePreview>;
+    assessGmailMessage(messageId: string, metadata?: AssessMetadata): Promise<AssessResult>;
+    disconnectGmail(): Promise<void>;
 
     /**
      * Mở luồng chat streaming. Trả về async generator phát các đoạn

@@ -1,0 +1,8 @@
+$ python -m ruff check --fix security/exe_quick_scan.py backend/services/exe_quick_scan_service.py backend/routers/assess.py backend/config.py
+mode: fallback
+exit_code: 0
+duration_ms: 424
+---- stdout ----
+Found 1 error (1 fixed, 0 remaining).
+
+---- stderr ----

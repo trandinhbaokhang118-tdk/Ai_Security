@@ -1,0 +1,11 @@
+@@ -27,6 +27,10 @@
+ MISP_BASE_URL=
+ MISP_API_KEY=
+ MISP_VERIFY_TLS=true
++# Optional MetaDefender Cloud for quick EXE hash lookup and consented upload.
++METADEFENDER_API_KEY=
++METADEFENDER_BASE_URL=https://api.metadefender.com/v4
++METADEFENDER_TIMEOUT_SECONDS=20
+ THREAT_FEED_SCHEDULER_ENABLED=false
+ THREAT_FEED_PHISHTANK_ENABLED=false
+ THREAT_FEED_OPENPHISH_ENABLED=false

@@ -3,13 +3,25 @@
 Primary client. Assesses the current page URL and Gmail emails via the local
 Security Gateway, shows a risk badge, and blocks risky link clicks.
 
+## Package and validate
+
+From the repository root:
+
+```powershell
+python scripts/package_extension.py --check
+python scripts/package_extension.py
+```
+
+The second command writes the Chrome Web Store-ready, reproducible ZIP to
+`artifacts/`. See `docs/release-packaging.md` for permissions, checksums, and
+release signing guidance.
+
 ## Load (development)
 
 1. Start the gateway: `uvicorn backend.main:app --port 8000` (from repo root).
 2. Chrome → `chrome://extensions` → enable **Developer mode**.
 3. **Load unpacked** → select `frontend/extension/`.
-4. (Icons) Add PNGs at `icons/icon16.png`, `icon48.png`, `icon128.png`, or remove the
-   `icons`/`action.default_icon` keys from `manifest.json` while developing.
+4. The checked-in manifest references the generated PNG icons in `icons/`.
 
 ## Architecture
 

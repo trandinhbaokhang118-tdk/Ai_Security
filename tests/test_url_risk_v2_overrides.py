@@ -50,3 +50,18 @@ def test_benign_url_has_no_v2_override():
 
     assert risk.effective_override is None
     assert risk.risk_score < 20
+    policy = PolicyEngineV2().decide(risk)
+    assert policy.decision.value == "allow"
+
+
+def test_login_keyword_alone_is_not_a_warning_decision():
+    url = "https://github.com/login"
+    obs = ScanObservations(url)
+    add_offline_url_findings(obs, assess_url(url).evidence)
+    evidence = build_criteria_evidence(obs, default_config())
+    risk = assess_risk_v2(evidence, override_rules=URL_OVERRIDE_RULES)
+    policy = PolicyEngineV2().decide(risk)
+
+    assert risk.risk_score < 20
+    assert policy.decision.value == "allow"
+    assert policy.next_action.value == "deep_scan"

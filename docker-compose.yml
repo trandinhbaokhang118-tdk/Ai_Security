@@ -12,8 +12,16 @@ services:
       - DATABASE_URL=sqlite:////app/.aisec-data/armor.db
       - DATABASE_AUTO_CREATE=true
       - SEED_DEMO_USER=true
+      - ADAPTER_REGISTRY_ENABLED=${ADAPTER_REGISTRY_ENABLED:-true}
+      - ADAPTER_MANIFEST_PATH=/app/server/adapters/manifest.json
+      - ADAPTER_BASE_URL=${ADAPTER_BASE_URL:-}
+      - ADAPTER_API_KEY=${ADAPTER_API_KEY:-}
+      - ADAPTER_TIMEOUT_SECONDS=${ADAPTER_TIMEOUT_SECONDS:-15}
+      - ADAPTER_MAX_RISK_CONTRIBUTION=${ADAPTER_MAX_RISK_CONTRIBUTION:-0.25}
+      - PHONE_INTELLIGENCE_URL=${PHONE_INTELLIGENCE_URL:-}
     volumes:
       - ./server/models:/app/server/models:ro
+      - ./server/adapters:/app/server/adapters:ro
       - ./data:/app/data
       - armor-data:/app/.aisec-data
     networks:

@@ -1,0 +1,52 @@
+@@ -162,6 +162,51 @@
+     notes: string[];
+ }
+ 
++export interface ExeQuickScanSection {
++    name: string;
++    virtual_size: number;
++    raw_size: number;
++    entropy: number;
++    readable: boolean;
++    writable: boolean;
++    executable: boolean;
++}
++
++export interface ExeLocalAnalysis {
++    valid: boolean;
++    format: string;
++    architecture: string;
++    subsystem: string;
++    entry_point_rva: number;
++    section_count: number;
++    sections: ExeQuickScanSection[];
++    signature_present: boolean;
++    overlay_bytes: number;
++    compile_time: string | null;
++    characteristics: number;
++    anomalies: string[];
++    risk_score: number;
++}
++
++export interface ExeProviderDetection {
++    engine: string;
++    threat: string;
++}
++
++export interface ExeProviderResult {
++    name: string;
++    configured: boolean;
++    status: "disabled" | "not_found" | "known" | "queued" | "completed" | "failed";
++    data_id: string | null;
++    progress: number;
++    detected_engines: number;
++    total_engines: number;
++    detections: ExeProviderDetection[];
++    risk_score: number;
++    sample_shared: boolean;
++    error: string | null;
++}
++
+ export interface ExeSandboxResult {
+     ok: boolean;
+     execution_status: "completed" | "failed";

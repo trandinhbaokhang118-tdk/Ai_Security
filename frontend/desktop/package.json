@@ -1,22 +1,22 @@
 {
   "name": "ai-security-armor-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Ứng dụng desktop AI Security Armor — Browser Cover",
+  "author": "Prewise",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "build": "tsc && vite build && tsc -p electron/tsconfig.json",
+    "release:dir": "npm run build && electron-builder --dir --win --x64",
+    "release:windows": "npm run build && electron-builder --win nsis portable --x64",
     "start": "electron .",
     "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "electron": "latest",
     "lucide-react": "^0.468.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "vite": "latest"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
@@ -24,7 +24,11 @@
     "@types/react-dom": "18.3.1",
     "concurrently": "latest",
     "cross-env": "latest",
+    "@vitejs/plugin-react": "latest",
+    "electron": "latest",
+    "electron-builder": "^26.0.12",
     "typescript": "5.6.3",
+    "vite": "latest",
     "wait-on": "latest"
   }
 }

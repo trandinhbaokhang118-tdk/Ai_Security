@@ -1,0 +1,10 @@
+@@ -497,6 +497,9 @@
+                                     type="file"
+                                     accept=".exe,application/vnd.microsoft.portable-executable"
+                                     disabled={busy}
++                                    onClick={(event) => {
++                                        event.currentTarget.value = "";
++                                    }}
+                                     onChange={(event) => void scanExe(event.target.files?.[0])}
+                                 />
+                                 {busy ? "Đang phân tích…" : "Chọn EXE"}

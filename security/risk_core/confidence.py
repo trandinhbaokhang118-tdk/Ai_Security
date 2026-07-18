@@ -26,11 +26,28 @@ def compute_confidence(
     ]
     denominator = sum(c.coverage_weight for c in applicable)
     completed = {CriterionStatus.CLEAN, CriterionStatus.SUSPICIOUS, CriterionStatus.MALICIOUS}
-    coverage = (
+    internal_coverage = (
         sum(c.coverage_weight for c in applicable if c.status in completed) / denominator
         if denominator
         else 0.0
     )
+    external_ids = {str(value) for value in range(51, 65)}
+    external_completed = {
+        item.source_id
+        for item in evidence
+        if item.source_id in external_ids
+        and item.provider_verdict
+        in {
+            ProviderVerdict.CLEAN,
+            ProviderVerdict.NO_HIT,
+            ProviderVerdict.SUSPICIOUS,
+            ProviderVerdict.MALICIOUS,
+        }
+    }
+    external_coverage = len(external_completed) / len(external_ids)
+    # Internal detectors remain useful without paid providers, but unavailable
+    # corroboration must be visible in the confidence value.
+    coverage = internal_coverage * (0.85 + 0.15 * external_coverage)
     sm = sb = 0.0
     family_support = {}
     freshness_num = freshness_den = 0.0
@@ -56,11 +73,14 @@ def compute_confidence(
     volume = sm + sb
     consensus = max(sm, sb) / volume if volume else 0.0
     independent = sum(1 for value in family_support.values() if value >= 0.5)
+    evidence_volume = min(1.0, volume / 2)
+    source_diversity = min(1.0, independent / 3)
     agreement = (
-        consensus * (0.25 + 0.45 * min(1.0, independent / 3) + 0.30 * min(1.0, volume / 2))
+        consensus * (0.15 + 0.35 * source_diversity + 0.50 * evidence_volume)
         if volume
         else 0.0
     )
-    freshness = freshness_num / freshness_den if freshness_den else 0.0
-    score = 100 * (0.45 * coverage + 0.35 * agreement + 0.20 * freshness)
+    raw_freshness = freshness_num / freshness_den if freshness_den else 0.0
+    freshness = raw_freshness * evidence_volume * min(1.0, independent / 2)
+    score = 100 * (0.60 * coverage + 0.30 * agreement + 0.10 * freshness)
     return ConfidenceComponents(coverage, agreement, freshness, max(0.0, min(100.0, score)))

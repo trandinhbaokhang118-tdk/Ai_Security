@@ -59,10 +59,10 @@ export default function AccountHistoryPage(): JSX.Element {
         <div className="flex flex-col gap-6">
             <header className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold tracking-tight">
-                    Lịch sử scan
+                    Lịch sử tài khoản
                 </h1>
                 <p className="text-sm text-neutral-600">
-                    Xem lại các lần quét URL và email của bạn.
+                    Các lần quét URL và email được tải từ tài khoản trên máy chủ, không phải lịch sử cục bộ của trình duyệt.
                 </p>
             </header>
 

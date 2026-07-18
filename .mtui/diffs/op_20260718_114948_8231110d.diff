@@ -1,0 +1,9 @@
+@@ -222,7 +222,7 @@
+     files_created: Record<string, unknown>[];
+     network_attempts: Record<string, unknown>[];
+     signature_status?: string;
+-    signer?: string;
++    signer?: string | null;
+     defender_detections?: Record<string, unknown>[];
+     elapsed_ms: number;
+ }

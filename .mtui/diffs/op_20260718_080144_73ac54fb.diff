@@ -1,0 +1,9 @@
+@@ -96,7 +96,7 @@
+         return False
+     expected = "sha256=" + hmac.new(
+         secret.encode("utf-8"),
+-        f"{signed_timestamp}.".encode("utf-8") + raw_body,
++        f"{signed_timestamp}.".encode() + raw_body,
+         hashlib.sha256,
+     ).hexdigest()
+     return hmac.compare_digest(signature.strip(), expected)

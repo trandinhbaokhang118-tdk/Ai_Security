@@ -13,6 +13,8 @@ import "./hero-cta.css";
 import "./evidence-effects.css";
 import "./gaze-safe.css";
 import "./sandbox-session.css";
+import "./landing-readability-step-1.css";
+import "./app-readability-step-2.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import AppChrome from "@/components/AppChrome";

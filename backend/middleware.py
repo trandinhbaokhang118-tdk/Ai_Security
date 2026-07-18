@@ -10,12 +10,100 @@ from __future__ import annotations
 import time
 import unicodedata
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 _ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff"), None)
+
+
+class RequestBodyTooLarge(Exception):
+    pass
+
+
+class RequestSizeLimitMiddleware:
+    """Reject oversized upload bodies before multipart parsing/spooling."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        max_body_bytes: int,
+        paths: tuple[str, ...] = (),
+        exact_paths: tuple[str, ...] = (),
+    ) -> None:
+        self.app = app
+        self.max_body_bytes = max(1, int(max_body_bytes))
+        self.paths = paths
+        self.exact_paths = exact_paths
+
+    async def __call__(
+        self,
+        scope: dict[str, Any],
+        receive: Callable[[], Awaitable[dict[str, Any]]],
+        send: Callable[[dict[str, Any]], Awaitable[None]],
+    ) -> None:
+        request_path = str(scope.get("path", ""))
+        protected = request_path in self.exact_paths or any(
+            request_path.startswith(path) for path in self.paths
+        )
+        if scope.get("type") != "http" or not protected:
+            await self.app(scope, receive, send)
+            return
+
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        raw_length = headers.get(b"content-length")
+        if raw_length:
+            try:
+                content_length = int(raw_length)
+                if content_length < 0:
+                    raise ValueError
+                if content_length > self.max_body_bytes:
+                    await self._reject(scope, receive, send)
+                    return
+            except ValueError:
+                await JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})(
+                    scope, receive, send
+                )
+                return
+
+        received = 0
+
+        async def limited_receive() -> dict[str, Any]:
+            nonlocal received
+            message = await receive()
+            if message.get("type") == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    raise RequestBodyTooLarge
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            await self._reject(scope, receive, send)
+
+    @staticmethod
+    async def _reject(scope, receive, send) -> None:
+        await JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large"},
+        )(scope, receive, send)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        if request.url.path.startswith(("/v1/assess", "/v1/integrations/gmail")):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
 
 
 def sanitize_text(text: str) -> str:
@@ -30,11 +118,26 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.limit = limit_per_min
         self._buckets: dict[str, deque[float]] = defaultdict(deque)
+        self._last_prune = time.time()
+
+    def _prune_stale_buckets(self, now: float) -> None:
+        """Bound memory when many short-lived client addresses hit the service."""
+
+        if now - self._last_prune < 60:
+            return
+        cutoff = now - 60
+        for client, bucket in list(self._buckets.items()):
+            while bucket and bucket[0] <= cutoff:
+                bucket.popleft()
+            if not bucket:
+                self._buckets.pop(client, None)
+        self._last_prune = now
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith("/v1/") and request.url.path != "/v1/health":
             client = request.client.host if request.client else "unknown"
             now = time.time()
+            self._prune_stale_buckets(now)
             bucket = self._buckets[client]
             while bucket and now - bucket[0] > 60:
                 bucket.popleft()

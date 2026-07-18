@@ -1,0 +1,8 @@
+@@ -17,7 +17,6 @@
+ 
+ import httpx
+ 
+-
+ PRIVACY_NOTICE = (
+     "Nếu bật chia sẻ mẫu, tệp sẽ được gửi đến MetaDefender Cloud và có thể được "
+     "lưu hoặc chia sẻ với các nhà cung cấp bảo mật. Không gửi tệp riêng tư, mã "

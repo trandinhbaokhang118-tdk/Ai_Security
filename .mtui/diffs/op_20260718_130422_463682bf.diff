@@ -1,0 +1,9 @@
+@@ -13,7 +13,7 @@
+ 
+ 
+ def main() -> None:
+-    before = shutil.disk_usage(r"C:\").free
++    before = shutil.disk_usage("C:/").free
+     removed = []
+     for path in ALLOWLIST:
+         if path.is_file():
