@@ -5,13 +5,13 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -52,6 +52,17 @@ class User(Base):
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class SessionRecord(Base):
     __tablename__ = "sessions"
 
@@ -76,7 +87,14 @@ class ApiKey(Base):
     key_prefix: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     key_tail: Mapped[str] = mapped_column(String(8), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    scopes: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["scan"], nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(
+        JSON,
+        default=lambda: [
+            "assess:url", "assess:content", "assess:prompt", "assess:file",
+            "assess:action", "mcp:invoke",
+        ],
+        nullable=False,
+    )
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
     expires_at: Mapped[object | None] = mapped_column(DateTime)
     last_used_at: Mapped[object | None] = mapped_column(DateTime)
@@ -85,6 +103,63 @@ class ApiKey(Base):
     revoked_at: Mapped[object | None] = mapped_column(DateTime)
 
     user: Mapped[User] = relationship(back_populates="api_keys", foreign_keys=[user_id])
+
+
+class OAuthClient(Base):
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    client_secret_hash: Mapped[str | None] = mapped_column(String(64))
+    client_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthAuthorizationRequest(Base):
+    __tablename__ = "oauth_authorization_requests"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str | None] = mapped_column(Text)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(180), nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    consumed_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthAuthorizationCode(Base):
+    __tablename__ = "oauth_authorization_codes"
+
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(180), nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    used_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class OAuthTokenRecord(Base):
+    __tablename__ = "oauth_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    family_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    access_token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    refresh_token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    resource: Mapped[str | None] = mapped_column(Text)
+    access_expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    refresh_expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    revoked_at: Mapped[object | None] = mapped_column(DateTime)
+    rotated_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class Plan(Base):
@@ -165,6 +240,11 @@ class ScanEvent(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     model_version: Mapped[str] = mapped_column(String(200), nullable=False)
     latency_ms: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    schema_version: Mapped[str | None] = mapped_column(String(16))
+    scoring_version: Mapped[str | None] = mapped_column(String(64))
+    raw_score: Mapped[float | None] = mapped_column(Float)
+    final_score: Mapped[float | None] = mapped_column(Float)
+    risk_core_trace: Mapped[dict | None] = mapped_column(JSON)
     source_ip_hash: Mapped[str | None] = mapped_column(String(64))
     user_agent_hash: Mapped[str | None] = mapped_column(String(64))
     extra_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict, nullable=False)
@@ -190,6 +270,62 @@ class ScanEvidence(Base):
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     scan_event: Mapped[ScanEvent] = relationship(back_populates="evidence")
+
+
+class AssessmentCache(Base):
+    __tablename__ = "assessment_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    modality: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    response: Mapped[dict] = mapped_column(JSON, nullable=False)
+    expires_at: Mapped[object] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class PaymentOrder(Base):
+    __tablename__ = "payment_orders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    reference: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    amount_vnd: Mapped[int] = mapped_column(Integer, nullable=False)
+    credits: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Null for sandbox-credit orders; set for a fixed subscription package.
+    plan_tier: Mapped[str | None] = mapped_column(String(32), index=True)
+    billing_period: Mapped[str | None] = mapped_column(String(16))
+    expires_at: Mapped[object | None] = mapped_column(DateTime, index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), default="sepay", nullable=False)
+    provider_transaction_id: Mapped[str | None] = mapped_column(String(160), unique=True)
+    provider_payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    paid_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class SandboxWallet(Base):
+    __tablename__ = "sandbox_wallets"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    credits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class CloudSandboxSession(Base):
+    __tablename__ = "cloud_sandbox_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="provisioning", index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(24), default="aws", nullable=False)
+    sandbox_tier: Mapped[str] = mapped_column(String(24), default="pro", index=True, nullable=False)
+    provider_instance_id: Mapped[str | None] = mapped_column(String(100), unique=True)
+    remote_url: Mapped[str | None] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[object] = mapped_column(DateTime, nullable=False)
+    terminated_at: Mapped[object | None] = mapped_column(DateTime)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class SandboxRun(Base):

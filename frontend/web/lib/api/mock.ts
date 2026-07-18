@@ -27,6 +27,7 @@ import type {
     AssessMetadata,
     AssessResult,
     BrowserSandboxResult,
+    ExeSandboxResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
@@ -452,6 +453,7 @@ function buildPlanInfo(tier: PlanTier): PlanInfo {
         free: "FREE",
         pro: "PRO",
         team: "TEAM",
+        enterprise: "ENTERPRISE",
     };
     return {
         tier,
@@ -603,6 +605,10 @@ export class MockApiClient implements ApiClient {
         };
     }
 
+    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
+        return { ok: false, execution_status: "failed", filename: file.name, sha256: "", size_bytes: file.size, sandbox: "mock", network: "disabled", verdict: "unknown", risk_score: 0, issues: ["Hãy đặt NEXT_PUBLIC_API_MODE=real để chạy Windows Sandbox thật."], processes: [], files_created: [], network_attempts: [], elapsed_ms: 0 };
+    }
+
     async assessText(
         text: string,
         _metadata?: AssessMetadata,
@@ -661,6 +667,12 @@ export class MockApiClient implements ApiClient {
         return session;
     }
 
+    async requestPasswordReset(): Promise<{ok:boolean;message:string;resetToken?:string}> {
+        return {ok:true,message:"Đã tạo yêu cầu đặt lại mật khẩu trong chế độ demo.",resetToken:"mock-reset-token-1234567890"};
+    }
+
+    async resetPassword(): Promise<void> {}
+
     async logout(): Promise<void> {
         this.session = null;
         if (hasBrowserStorage()) {
@@ -672,8 +684,30 @@ export class MockApiClient implements ApiClient {
         }
     }
 
+    async updateProfile(displayName: string): Promise<Session["user"]> {
+        if (!this.session) throw new Error("Bạn cần đăng nhập.");
+        this.session = {
+            ...this.session,
+            user: { ...this.session.user, displayName: displayName.trim() },
+        };
+        writeStored(MOCK_SESSION_KEY, this.session);
+        return this.session.user;
+    }
+
+    async changePassword(): Promise<void> {
+        if (!this.session) throw new Error("Bạn cần đăng nhập.");
+    }
+
     async getPlan(): Promise<PlanInfo> {
         return this.session?.plan ?? buildPlanInfo("free");
+    }
+
+    async cancelSubscription(): Promise<PlanInfo> {
+        if (!this.session) throw new Error("Bạn cần đăng nhập.");
+        const plan = buildPlanInfo("free");
+        this.session = { ...this.session, plan };
+        writeStored(MOCK_SESSION_KEY, this.session);
+        return plan;
     }
 
     async getScanHistory(): Promise<ScanRecord[]> {
@@ -715,9 +749,15 @@ export class MockApiClient implements ApiClient {
     /** Tạo một ApiKeyInfo giả lập mới. */
     private createApiKey(): ApiKeyInfo {
         const raw = generateId().replace(/-/g, "");
+        const key = `pw_live_mock_${raw}`;
         return {
-            key: `sk-mock-${raw}`,
+            key,
             createdAt: formatScanTimestamp(new Date()),
+            prefix: key.slice(0, 16),
+            lastUsedAt: null,
+            scopes: ["mcp:invoke"],
+            status: "active",
+            secretAvailable: true,
         };
     }
 

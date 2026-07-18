@@ -8,9 +8,15 @@ tools = MCPTools()
 def test_tool_definitions_schema():
     names = {t["name"] for t in TOOL_DEFINITIONS}
     assert names == {
-        "check_url_before_click",
-        "check_content_before_processing",
-        "check_action_before_execution",
+        "prewise_connection_test",
+        "assess_url",
+        "assess_text",
+        "assess_tool_output",
+        "scan_prompt_injection",
+        "assess_action",
+        "assess_page",
+        "assess_file_static",
+        "summarize_risk_safely",
     }
 
 
@@ -50,3 +56,29 @@ def test_check_action_ask_confirm_or_block():
 def test_dispatch_unknown_tool():
     r = tools.dispatch("nope", {})
     assert r["error"] == "invalid_input"
+
+
+def test_dispatch_rejects_extra_or_wrong_typed_input():
+    extra = tools.dispatch("assess_url", {"url": "https://example.com", "unexpected": True})
+    wrong_type = tools.dispatch("assess_text", {"content": 123, "content_type": "text"})
+    assert extra["error"] == "invalid_input"
+    assert wrong_type["error"] == "invalid_input"
+
+
+def test_file_tool_cannot_escape_sandbox(tmp_path):
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    (tmp_path / "secret.txt").write_text("secret", encoding="utf-8")
+    isolated_tools = MCPTools(sandbox_dir=sandbox)
+    result = isolated_tools.dispatch("assess_file_static", {"path": "../secret.txt"})
+    assert result["error"] == "invalid_input"
+
+
+def test_file_tool_assesses_file_inside_sandbox(tmp_path):
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    (sandbox / "sample.ps1").write_bytes(b"powershell -Command Invoke-WebRequest")
+    isolated_tools = MCPTools(sandbox_dir=sandbox)
+    result = isolated_tools.dispatch("assess_file_static", {"path": "sample.ps1"})
+    assert result["risk_score"] > 0.1
+    assert result["evidence"]

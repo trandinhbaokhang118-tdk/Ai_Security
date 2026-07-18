@@ -8,26 +8,54 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db import SessionLocal, get_db
-from backend.models import AdminJob, AdminJobEvent, ModelVersion
+from backend.models import AdminJob, AdminJobEvent, ModelVersion, ScanEvent, User
+from backend.routers.auth import require_admin
 from backend.security_utils import utcnow
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+SPECS_DIR = Path(".kiro/specs").resolve()
+TRAINING_DATA_DIR = Path("data").resolve()
 
 
 class SpecExecutionRequest(BaseModel):
-    specId: str
+    specId: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     mode: Literal["all", "remaining"] = "remaining"
 
 
 class ModelTrainingRequest(BaseModel):
     dataPath: str
-    models: list[Literal["text", "prompt", "url"]] = ["text", "prompt", "url"]
+    models: list[Literal["text", "prompt", "url"]] = Field(min_length=1, max_length=1)
+
+
+class UserStatusRequest(BaseModel):
+    status: Literal["active", "suspended"]
+
+
+def _contained_file(base: Path, candidate: Path, *, suffixes: set[str]) -> Path:
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(base) or resolved.suffix.lower() not in suffixes:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    if not resolved.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return resolved
+
+
+def _spec_tasks_file(spec_id: str) -> Path:
+    return _contained_file(SPECS_DIR, SPECS_DIR / spec_id / "tasks.md", suffixes={".md"})
+
+
+def _training_data_file(data_path: str) -> Path:
+    candidate = Path(data_path)
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    return _contained_file(TRAINING_DATA_DIR, candidate, suffixes={".csv", ".jsonl"})
 
 
 def _job_payload(job: AdminJob | None, *, spec_id: str | None = None) -> dict:
@@ -94,7 +122,7 @@ def _add_job_event(job_id: str, message: str, level: str = "info", metadata: dic
 
 @router.get("/specs")
 async def list_specs():
-    specs_dir = Path(".kiro/specs")
+    specs_dir = SPECS_DIR
     if not specs_dir.exists():
         return {"specs": []}
 
@@ -129,15 +157,64 @@ async def list_specs():
     return {"specs": specs}
 
 
+@router.get("/overview")
+def get_overview(db: DbSession = Depends(get_db)) -> dict:
+    """Compact operational snapshot used by the desktop administration console."""
+    users_total = db.scalar(select(func.count()).select_from(User)) or 0
+    active_users = db.scalar(select(func.count()).select_from(User).where(User.status == "active")) or 0
+    scans_total = db.scalar(select(func.count()).select_from(ScanEvent)) or 0
+    dangerous_scans = db.scalar(select(func.count()).select_from(ScanEvent).where(ScanEvent.risk_level == "danger")) or 0
+    avg_latency = db.scalar(select(func.avg(ScanEvent.latency_ms))) or 0
+    return {
+        "metrics": {"usersTotal": users_total, "activeUsers": active_users, "scansTotal": scans_total,
+                    "dangerousScans": dangerous_scans, "averageLatencyMs": round(float(avg_latency))},
+        "recentScans": [
+            {"id": scan.id, "createdAt": scan.created_at.isoformat(), "modality": scan.modality,
+             "riskLevel": scan.risk_level, "score": round(scan.risk_score), "target": scan.normalized_url or scan.input_preview or "Nội dung đã ẩn"}
+            for scan in db.execute(select(ScanEvent).order_by(ScanEvent.created_at.desc()).limit(8)).scalars()
+        ],
+        "recentJobs": [
+            {"id": job.id, "type": job.job_type, "status": job.status, "progress": job.progress,
+             "message": job.message or job.current_step, "createdAt": job.created_at.isoformat()}
+            for job in db.execute(select(AdminJob).order_by(AdminJob.created_at.desc()).limit(6)).scalars()
+        ],
+        "models": [
+            {"id": model.id, "name": model.model_name, "modality": model.modality, "status": model.status,
+             "f1": model.f1, "accuracy": model.accuracy, "createdAt": model.created_at.isoformat()}
+            for model in db.execute(select(ModelVersion).order_by(ModelVersion.created_at.desc()).limit(8)).scalars()
+        ],
+    }
+
+
+@router.get("/users")
+def list_users(db: DbSession = Depends(get_db)) -> dict:
+    return {"users": [
+        {"id": user.id, "displayName": user.display_name, "email": user.email, "role": user.role,
+         "status": user.status, "createdAt": user.created_at.isoformat(),
+         "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None}
+        for user in db.execute(select(User).order_by(User.created_at.desc()).limit(100)).scalars()
+    ]}
+
+
+@router.patch("/users/{user_id}/status")
+def update_user_status(user_id: str, payload: UserStatusRequest, auth=Depends(require_admin), db: DbSession = Depends(get_db)) -> dict:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+    if user.id == auth.user.id and payload.status != "active":
+        raise HTTPException(status_code=400, detail="Không thể tự khóa tài khoản quản trị đang dùng.")
+    user.status = payload.status
+    db.commit()
+    return {"id": user.id, "status": user.status}
+
+
 @router.post("/specs/execute")
 async def execute_spec_tasks(
     request: SpecExecutionRequest,
     background_tasks: BackgroundTasks,
     db: DbSession = Depends(get_db),
 ):
-    spec_path = Path(".kiro/specs") / request.specId / "tasks.md"
-    if not spec_path.exists():
-        raise HTTPException(status_code=404, detail="Spec not found")
+    spec_path = _spec_tasks_file(request.specId)
 
     job = AdminJob(
         job_type="spec_execution",
@@ -172,9 +249,7 @@ async def train_models(
     background_tasks: BackgroundTasks,
     db: DbSession = Depends(get_db),
 ):
-    data_path = Path(request.dataPath)
-    if not data_path.exists():
-        raise HTTPException(status_code=404, detail="Data file not found")
+    data_path = _training_data_file(request.dataPath)
 
     job = AdminJob(
         job_type="model_training",
@@ -268,19 +343,29 @@ async def run_model_training(job_id: str, data_path: str, models: list[str]) -> 
         import subprocess
         import sys
 
+        candidate_dir = Path(".aisec-data/model-candidates") / job_id
+        candidate_dir.mkdir(parents=True, exist_ok=True)
+
         training_scripts = {
-            "text": "ai/training/train_real_text_classifier.py",
-            "prompt": "ai/training/train_real_prompt_classifier.py",
-            "url": "ai/training/train_url_lgbm.py",
+            "text": (
+                "ai/training/train_real_text_classifier.py",
+                ["--train", data_path, "--validation", data_path, "--test", data_path],
+            ),
+            "prompt": (
+                "ai/training/train_real_prompt_classifier.py",
+                ["--train", data_path, "--validation", data_path, "--test", data_path],
+            ),
+            "url": ("ai/training/train_url_lgbm.py", ["--data", data_path]),
         }
 
         results: list[dict] = []
         total = len(models)
         for idx, model_name in enumerate(models, 1):
-            script_path = training_scripts.get(model_name)
-            if not script_path or not Path(script_path).exists():
+            script = training_scripts.get(model_name)
+            if not script or not Path(script[0]).exists():
                 results.append({"model": model_name, "status": "missing_script"})
                 continue
+            script_path, script_args = script
 
             _update_job(
                 job_id,
@@ -294,7 +379,7 @@ async def run_model_training(job_id: str, data_path: str, models: list[str]) -> 
 
             try:
                 result = subprocess.run(
-                    [sys.executable, script_path, "--data", data_path],
+                    [sys.executable, script_path, *script_args, "--out", str(candidate_dir)],
                     capture_output=True,
                     text=True,
                     timeout=1800,
@@ -317,7 +402,7 @@ async def run_model_training(job_id: str, data_path: str, models: list[str]) -> 
                                 model_name=model_name,
                                 modality="url" if model_name == "url" else "text",
                                 status="candidate",
-                                artifact_uri=f"server/models/{model_name}",
+                                artifact_uri=str(candidate_dir),
                                 training_dataset_uri=data_path,
                                 metrics=metrics,
                                 f1=metrics.get("f1_score") or metrics.get("f1"),

@@ -32,12 +32,24 @@ def _ensure_sqlite_parent() -> None:
 
 _ensure_sqlite_parent()
 
+
+def _engine_options() -> dict:
+    if settings.database_url.startswith("sqlite"):
+        return {"connect_args": _connect_args()}
+    return {
+        "pool_pre_ping": True,
+        "pool_size": settings.database_pool_size,
+        "max_overflow": settings.database_max_overflow,
+        "pool_timeout": settings.database_pool_timeout,
+        "pool_recycle": settings.database_pool_recycle,
+    }
+
+
 engine = create_engine(
     settings.database_url,
-    connect_args=_connect_args(),
     echo=settings.database_echo,
     future=True,
-    pool_pre_ping=not settings.database_url.startswith("sqlite"),
+    **_engine_options(),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 _init_lock = Lock()
@@ -117,15 +129,48 @@ def initialize_database() -> None:
                         )
                     )
 
+            # Upgrade legacy development keys to the explicit Agent Shield scopes.
+            default_scopes = [
+                "assess:url", "assess:content", "assess:prompt", "assess:file",
+                "assess:action", "mcp:invoke",
+            ]
+            for legacy_key in db.execute(select(ApiKey)).scalars():
+                if not legacy_key.scopes or legacy_key.scopes == ["scan"]:
+                    legacy_key.scopes = default_scopes
+
+            # Every account owns at least one active integration credential.
+            # Existing databases are backfilled idempotently during local/dev startup.
+            for user in db.execute(select(User)).scalars():
+                active_key = db.execute(
+                    select(ApiKey).where(ApiKey.user_id == user.id, ApiKey.status == "active")
+                ).scalar_one_or_none()
+                if active_key is None:
+                    key = create_api_key_value()
+                    db.add(
+                        ApiKey(
+                            user_id=user.id,
+                            key_prefix=key[:16],
+                            key_tail=key[-4:],
+                            key_hash=hash_api_key(key),
+                            scopes=default_scopes,
+                            created_at=utcnow(),
+                        )
+                    )
+
             demo = db.execute(select(User).where(User.email == "demo@aisec.local")).scalar_one_or_none()
-            if demo is None:
+            # The demo account is an end-user account.  It must never grant
+            # access to system administration merely because it is convenient
+            # for local development.
+            if settings.seed_demo_user and demo is not None and demo.role != "user":
+                demo.role = "user"
+            if settings.seed_demo_user and demo is None:
                 salt = create_password_salt()
                 demo = User(
                     email="demo@aisec.local",
                     display_name="Demo User",
                     password_salt=salt,
                     password_hash=hash_password("Demo@123456", salt),
-                    role="admin",
+                    role="user",
                 )
                 db.add(demo)
                 db.flush()
@@ -134,7 +179,7 @@ def initialize_database() -> None:
                 db.add(
                     ApiKey(
                         user_id=demo.id,
-                        key_prefix=key[:12],
+                        key_prefix=key[:16],
                         key_tail=key[-4:],
                         key_hash=hash_api_key(key),
                         created_at=utcnow(),

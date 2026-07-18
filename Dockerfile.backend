@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# The browser sandbox uses Chromium in a temporary Playwright profile.  Keep the
+# browser and its OS libraries in the image so deep analysis does not silently
+# fall back to HTTP-only inspection after deployment.
+RUN python -m playwright install --with-deps chromium
+
 # Source
 COPY backend/ ./backend/
 COPY ai/ ./ai/
@@ -17,6 +22,8 @@ COPY security/ ./security/
 COPY shared/ ./shared/
 COPY mcp_server/ ./mcp_server/
 COPY server/ ./server/
+COPY migrations/ ./migrations/
+COPY alembic.ini ./alembic.ini
 
 RUN useradd -m armor && mkdir -p /app/.aisec-data && chown -R armor /app
 USER armor

@@ -17,7 +17,7 @@ from backend.security_utils import hash_metadata, utcnow
 
 def _identity(actor: ActorContext, request: Request) -> tuple[str | None, str | None, str | None]:
     if actor.api_key is not None:
-        return None, actor.api_key.id, None
+        return actor.user.id if actor.user is not None else None, actor.api_key.id, None
     if actor.user is not None:
         return actor.user.id, None, None
     source = actor.anonymous_id

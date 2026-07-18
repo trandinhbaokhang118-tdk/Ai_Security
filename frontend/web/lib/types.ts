@@ -122,6 +122,26 @@ export interface SandboxCanaryReport {
     notes: string[];
 }
 
+export interface ExeSandboxResult {
+    ok: boolean;
+    execution_status: "completed" | "failed";
+    filename: string;
+    sha256: string;
+    size_bytes: number;
+    sandbox: string;
+    network: string;
+    verdict: "dangerous" | "suspicious" | "no_obvious_theft_detected" | "unknown";
+    risk_score: number;
+    issues: string[];
+    processes: Record<string, unknown>[];
+    files_created: Record<string, unknown>[];
+    network_attempts: Record<string, unknown>[];
+    signature_status?: string;
+    signer?: string;
+    defender_detections?: Record<string, unknown>[];
+    elapsed_ms: number;
+}
+
 export interface BrowserSandboxResult {
     ok: boolean;
     execution_status: "completed" | "failed";
@@ -153,7 +173,12 @@ export interface ChatMessageModel {
 
 export interface ChatRequest {
     question: string;
-    context?: { content: string; modality: "url" | "email" | "text" };
+    context?: {
+        content: string;
+        modality: "url" | "email" | "text";
+        operator_context?: string;
+        analysis_id?: string;
+    };
     history: ChatMessageModel[];
 }
 
@@ -170,7 +195,7 @@ export interface ChatFinal {
 // Model: Session, PlanInfo, ScanRecord, ApiKeyInfo
 // ---------------------------------------------------------------------------
 
-export type PlanTier = "free" | "pro" | "team";
+export type PlanTier = "free" | "pro" | "team" | "enterprise";
 
 export interface Session {
     token: string;
@@ -183,6 +208,12 @@ export interface UserProfile {
     email: string;
     displayName: string;
     avatarUrl?: string;
+    role?: "user" | "admin";
+}
+
+export interface PasswordChangeInput {
+    currentPassword: string;
+    newPassword: string;
 }
 
 export interface PlanInfo {
@@ -203,6 +234,12 @@ export interface ScanRecord {
 export interface ApiKeyInfo {
     key: string;
     createdAt: string;
+    prefix: string;
+    lastUsedAt?: string | null;
+    scopes: string[];
+    status: string;
+    /** True only in the one-time response immediately after key rotation. */
+    secretAvailable: boolean;
 } // dùng cho Team/MCP
 
 // ---------------------------------------------------------------------------
@@ -231,6 +268,12 @@ export interface PricingFeature {
 export interface Credentials {
     email: string;
     password: string;
+}
+
+export interface PasswordResetRequestResult {
+    ok: boolean;
+    message: string;
+    resetToken?: string;
 }
 
 export interface RegisterInput {

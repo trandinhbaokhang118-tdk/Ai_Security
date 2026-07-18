@@ -35,6 +35,8 @@ server/models/*.onnx
 server/models/_ckpt/
 server/models/_checkpoints/
 server/models/*_tokenizer/
+server/llm-models/current/*
+!server/llm-models/current/.gitkeep
 data/*.csv
 data/**/*.csv
 data/raw/

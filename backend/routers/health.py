@@ -32,6 +32,12 @@ def health(
         "ready": deepfake.available,
         "model_version": deepfake.model_version,
     }
+    model_status["llm"] = {
+        "configured": expl.configured,
+        "ready": expl.available,
+        "model": expl.model,
+        "last_error": expl.last_error,
+    }
     return HealthResponse(
         status="ok",
         models_loaded=svc.models_loaded,

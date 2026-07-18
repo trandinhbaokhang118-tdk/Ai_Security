@@ -42,6 +42,8 @@ const DEFAULT_PLAN_TIER: PlanTier = "free";
 export interface AuthContextValue {
     /** Phiên hiện tại, hoặc null khi chưa đăng nhập. */
     session: Session | null;
+    /** Đã nạp xong phiên lưu trên trình duyệt. */
+    isHydrated: boolean;
     /** Thông tin gói suy ra từ phiên; null khi chưa đăng nhập. */
     plan: PlanInfo | null;
     /** QuotaGuard gắn với gói hiện tại (mặc định "free" khi chưa đăng nhập). */
@@ -120,6 +122,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     // Khởi tạo null để server và client render nhất quán (tránh hydration mismatch);
     // phiên thực được nạp trong useEffect sau khi mount.
     const [session, setSessionState] = useState<Session | null>(null);
+    const [isHydrated, setIsHydrated] = useState(false);
 
     // Gói suy ra từ phiên (nguồn duy nhất là session.plan).
     const plan: PlanInfo | null = session?.plan ?? null;
@@ -144,7 +147,16 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         const stored = readStoredSession();
         if (stored !== null) {
             setSessionState(stored);
+            // Admin đăng nhập từ luồng mặc định được đưa vào control center.
+            // Không ép chuyển khi họ chủ động mở một công cụ hoặc trang khác.
+            if (
+                stored.user.role === "admin" &&
+                window.location.pathname === "/analyze"
+            ) {
+                window.location.replace("/admin");
+            }
         }
+        setIsHydrated(true);
     }, []);
 
     // Đặt phiên mới và bền hóa vào localStorage.
@@ -165,8 +177,8 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     }, []);
 
     const value = useMemo<AuthContextValue>(
-        () => ({ session, plan, quota, setSession, logout }),
-        [session, plan, quota, setSession, logout],
+        () => ({ session, isHydrated, plan, quota, setSession, logout }),
+        [session, isHydrated, plan, quota, setSession, logout],
     );
 
     return (

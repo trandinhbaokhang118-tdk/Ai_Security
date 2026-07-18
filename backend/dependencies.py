@@ -25,7 +25,19 @@ def get_inference_service() -> InferenceService:
 
 @lru_cache
 def get_explanation_service() -> ExplanationService:
-    return ExplanationService(model=settings.ollama_model, base_url=settings.ollama_base_url)
+    base_url = settings.llm_base_url
+    model = settings.llm_model
+    if not base_url:
+        base_url = settings.ollama_base_url.rstrip("/") + "/v1"
+    if not model:
+        model = settings.ollama_model
+    return ExplanationService(
+        model=model,
+        base_url=base_url,
+        api_key=settings.llm_api_key,
+        timeout_seconds=settings.llm_timeout_seconds,
+        max_tokens=settings.llm_max_tokens,
+    )
 
 
 @lru_cache
