@@ -30,17 +30,21 @@ import type {
     AssessMetadata,
     AssessResult,
     BrowserSandboxResult,
+    ExeSandboxResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
     Credentials,
     Evidence,
     PlanInfo,
+    PasswordChangeInput,
+    PasswordResetRequestResult,
     RegisterInput,
     SandboxResult,
     ScanRecord,
     Session,
     Severity,
+    UserProfile,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -326,6 +330,21 @@ export class RealApiClient implements ApiClient {
         );
     }
 
+    async sandboxExecutable(file: File): Promise<ExeSandboxResult> {
+        const form = new FormData();
+        form.append("file", file);
+        const response = await fetch(
+            `${getApiBase()}/v1/assess/file/exe-sandbox`,
+            withAuthentication({ method: "POST", body: form }),
+        );
+        if (!response.ok) {
+            throw new Error(
+                `Kiểm thử EXE thất bại: ${response.status} — ${await response.text()}`,
+            );
+        }
+        return response.json() as Promise<ExeSandboxResult>;
+    }
+
     async assessText(
         text: string,
         metadata?: AssessMetadata,
@@ -478,6 +497,22 @@ export class RealApiClient implements ApiClient {
         });
     }
 
+    async requestPasswordReset(
+        email: string,
+    ): Promise<PasswordResetRequestResult> {
+        return requestJson<PasswordResetRequestResult>(
+            "/v1/auth/password/forgot",
+            { method: "POST", body: JSON.stringify({ email }) },
+        );
+    }
+
+    async resetPassword(token: string, newPassword: string): Promise<void> {
+        await requestJson<unknown>("/v1/auth/password/reset", {
+            method: "POST",
+            body: JSON.stringify({ token, newPassword }),
+        });
+    }
+
     /** Đăng xuất qua REST `POST /v1/auth/logout`. */
     async logout(): Promise<void> {
         await requestJson<unknown>(
@@ -515,6 +550,33 @@ export class RealApiClient implements ApiClient {
         return requestJson<ApiKeyInfo>(
             "/v1/account/api-key/rotate",
             withAuthentication({ method: "POST" }),
+        );
+    }
+
+    async cancelSubscription(): Promise<PlanInfo> {
+        return requestJson<PlanInfo>(
+            "/v1/account/subscription/cancel",
+            withAuthentication({ method: "POST" }),
+        );
+    }
+
+    async updateProfile(displayName: string): Promise<UserProfile> {
+        return requestJson<UserProfile>(
+            "/v1/account/profile",
+            withAuthentication({
+                method: "PATCH",
+                body: JSON.stringify({ displayName }),
+            }),
+        );
+    }
+
+    async changePassword(input: PasswordChangeInput): Promise<void> {
+        await requestJson<unknown>(
+            "/v1/account/password",
+            withAuthentication({
+                method: "POST",
+                body: JSON.stringify(input),
+            }),
         );
     }
 }

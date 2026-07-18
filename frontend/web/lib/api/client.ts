@@ -16,15 +16,19 @@ import type {
     AssessMetadata,
     AssessResult,
     BrowserSandboxResult,
+    ExeSandboxResult,
     ChatChunk,
     ChatFinal,
     ChatRequest,
     Credentials,
     PlanInfo,
+    PasswordChangeInput,
+    PasswordResetRequestResult,
     RegisterInput,
     SandboxResult,
     ScanRecord,
     Session,
+    UserProfile,
 } from "@/lib/types";
 
 /**
@@ -39,6 +43,9 @@ export interface ApiClient {
     sandboxUrl(url: string): Promise<SandboxResult>;
 
     browserSandboxUrl(url: string): Promise<BrowserSandboxResult>;
+
+    /** Chạy tệp EXE trong Windows Sandbox thật, không chạy trực tiếp trên máy chủ. */
+    sandboxExecutable(file: File): Promise<ExeSandboxResult>;
 
     /** Đánh giá rủi ro cho một đoạn văn bản/email, kèm metadata tùy chọn. */
     assessText(text: string, metadata?: AssessMetadata): Promise<AssessResult>;
@@ -57,12 +64,23 @@ export interface ApiClient {
 
     /** Đăng ký tài khoản mới; trả về Session cho tài khoản mới. */
     register(cred: RegisterInput): Promise<Session>;
+    requestPasswordReset(email: string): Promise<PasswordResetRequestResult>;
+    resetPassword(token: string, newPassword: string): Promise<void>;
 
     /** Đăng xuất; xóa phiên hiện tại. */
     logout(): Promise<void>;
 
+    /** Cập nhật tên hiển thị của tài khoản hiện tại. */
+    updateProfile(displayName: string): Promise<UserProfile>;
+
+    /** Đổi mật khẩu sau khi xác minh mật khẩu hiện tại. */
+    changePassword(input: PasswordChangeInput): Promise<void>;
+
     /** Lấy thông tin gói hiện tại. */
     getPlan(): Promise<PlanInfo>;
+
+    /** Hủy gói trả phí hiện tại và trả về gói có hiệu lực mới. */
+    cancelSubscription(): Promise<PlanInfo>;
 
     /** Lấy lịch sử các lần quét. */
     getScanHistory(): Promise<ScanRecord[]>;

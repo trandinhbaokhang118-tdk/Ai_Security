@@ -85,7 +85,7 @@ function AIAnalyst({ record, modality }: { record: StoredRecord | null; modality
     } finally { setBusy(false); }
   }
 
-  function useSuggestion(value: string) {
+  function applySuggestion(value: string) {
     setQuestion(value);
   }
 
@@ -93,7 +93,7 @@ function AIAnalyst({ record, modality }: { record: StoredRecord | null; modality
     <header><div><span>CONTEXTUAL AI · REMOTE INFERENCE</span><h2 id="ai-analyst-title">Hỏi trợ lý về kết quả này</h2><p>Risk Core được chạy lại tại backend; LLM chỉ nhận bản tóm tắt và bằng chứng đã làm sạch.</p></div><i className={busy ? "thinking" : ""}>{busy ? "ĐANG SUY LUẬN" : "SẴN SÀNG"}</i></header>
     <div className="analyst-context"><b>Ngữ cảnh bạn cung cấp</b><p>{record?.llmContext || "Chưa có ngữ cảnh bổ sung cho lần phân tích này."}</p><span>{record?.llmContext ? `${record.llmContext.length}/2000 ký tự` : "Không gửi thêm dữ liệu"}</span></div>
     {messages.length > 0 && <div className="analyst-log" aria-live="polite">{messages.map((message) => <article className={message.role} key={message.id}><span>{message.role === "user" ? "BẠN" : "PREWISE AI"}</span><p>{message.text || "Đang kết nối tới mô hình…"}</p></article>)}</div>}
-    {messages.length === 0 && <div className="analyst-suggestions"><button type="button" onClick={() => useSuggestion("Giải thích ngắn gọn vì sao kết quả này có mức rủi ro như vậy.")}>Vì sao có mức rủi ro này?</button><button type="button" onClick={() => useSuggestion("Tôi nên thực hiện những bước nào tiếp theo?")}>Tôi nên làm gì tiếp theo?</button><button type="button" onClick={() => useSuggestion("Bằng chứng nào quan trọng nhất trong kết quả này?")}>Bằng chứng nào quan trọng nhất?</button></div>}
+    {messages.length === 0 && <div className="analyst-suggestions"><button type="button" onClick={() => applySuggestion("Giải thích ngắn gọn vì sao kết quả này có mức rủi ro như vậy.")}>Vì sao có mức rủi ro này?</button><button type="button" onClick={() => applySuggestion("Tôi nên thực hiện những bước nào tiếp theo?")}>Tôi nên làm gì tiếp theo?</button><button type="button" onClick={() => applySuggestion("Bằng chứng nào quan trọng nhất trong kết quả này?")}>Bằng chứng nào quan trọng nhất?</button></div>}
     <form onSubmit={ask}><label htmlFor="analyst-question" className="sr-only">Câu hỏi cho trợ lý AI</label><textarea id="analyst-question" value={question} maxLength={500} disabled={!record?.content || busy} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void ask(); } }} placeholder={record?.content ? "Hỏi về điểm rủi ro, bằng chứng hoặc bước xử lý tiếp theo…" : "Không tìm thấy dữ liệu phân tích để tạo context…"} /><button type="submit" disabled={!canAsk || !question.trim()}>{busy ? "Đang trả lời…" : "Gửi câu hỏi →"}</button></form>
     {error && <p className="analyst-error" role="alert">⚠ {error}</p>}
   </section>;

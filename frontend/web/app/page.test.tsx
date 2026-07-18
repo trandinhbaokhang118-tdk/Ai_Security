@@ -1,8 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import fc from "fast-check";
 import HomePage from "./page";
 import { AuthProvider } from "@/context/AuthContext";
+
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({
+        push: vi.fn(),
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+    }),
+}));
 
 describe("Toolchain smoke test", () => {
     it("renders the home page heading (Vitest + RTL + jsdom)", () => {
@@ -13,7 +24,9 @@ describe("Toolchain smoke test", () => {
             </AuthProvider>
         );
         expect(
-            screen.getByRole("heading", { name: /AI Security Armor/i })
+            screen.getByRole("heading", {
+                name: /Bạn có chắc mình đang thấy toàn bộ sự thật/i,
+            })
         ).toBeInTheDocument();
     });
 
