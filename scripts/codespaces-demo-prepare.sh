@@ -48,6 +48,31 @@ ensure_env_default() {
   fi
 }
 
+ensure_json_array_value() {
+  local key="$1"
+  local value="$2"
+  local current
+
+  current="$(grep -m1 "^${key}=" "$ENV_FILE" | cut -d= -f2- || true)"
+  if [[ -z "$current" ]]; then
+    upsert_env_value "$key" "[\"${value}\"]"
+    return
+  fi
+  if [[ "$current" == *"\"${value}\""* ]]; then
+    return
+  fi
+  if [[ "$current" != \[*\] ]]; then
+    echo "Refusing to modify invalid JSON array in ${key}."
+    exit 1
+  fi
+  current="${current%]}"
+  if [[ "$current" == "[" ]]; then
+    upsert_env_value "$key" "[\"${value}\"]"
+  else
+    upsert_env_value "$key" "${current},\"${value}\"]"
+  fi
+}
+
 if [[ ! -f .env.codespaces ]]; then
   umask 077
   random_secret() {
@@ -66,7 +91,7 @@ WEB_PORT=3000
 MCP_PORT=3001
 NEXT_PUBLIC_API_BASE_URL=https://api.prewise.site
 NEXT_PUBLIC_WS_BASE_URL=wss://api.prewise.site
-CORS_ALLOW_ORIGINS=["https://prewise.site","https://www.prewise.site"]
+CORS_ALLOW_ORIGINS=["https://prewise.site","https://www.prewise.site","null"]
 ADAPTER_REGISTRY_ENABLED=true
 LLM_PROVIDER=${LLM_PROVIDER:-auto}
 ADAPTER_BASE_URL=${ADAPTER_BASE_URL:-}
@@ -78,6 +103,10 @@ MCP_PUBLIC_URL=https://api.prewise.site
 MCP_ALLOWED_HOSTS=api.prewise.site,api.prewise.site:*
 EOF
 fi
+
+# Packaged Electron loads from file:// and Chromium sends Origin: null.
+# Preserve existing origins while allowing the signed desktop renderer.
+ensure_json_array_value CORS_ALLOW_ORIGINS "null"
 
 # GitHub exposes Codespaces secrets as process environment variables. Sync them
 # on every prepare/start so an existing .env.codespaces is not left stale after
