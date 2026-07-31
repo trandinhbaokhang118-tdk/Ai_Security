@@ -65,7 +65,6 @@ import type {
     UserAISettings,
     UserAISettingsInput,
 } from "@/lib/types";
-import { trustedPopularResult } from "@/lib/trusted-popular-domains";
 
 // ---------------------------------------------------------------------------
 // Cấu hình base URL
@@ -75,6 +74,8 @@ const DEFAULT_API_BASE = "http://localhost:8000";
 const DEFAULT_WS_BASE = "ws://localhost:8000";
 const PRODUCTION_API_BASE = "https://api.prewise.site";
 const PRODUCTION_WS_BASE = "wss://api.prewise.site";
+const SAME_ORIGIN_API_BASE = "/api/backend";
+const CODESPACES_PREVIEW_SUFFIX = ".app.github.dev";
 const PRODUCTION_WEB_HOSTS = new Set(["prewise.site", "www.prewise.site"]);
 
 /** Bỏ dấu `/` thừa ở cuối để nối path an toàn. */
@@ -83,7 +84,11 @@ function trimTrailingSlash(url: string): string {
 }
 
 export function resolveApiBase(configured: string | undefined, hostname: string): string {
-    const fallback = PRODUCTION_WEB_HOSTS.has(hostname.toLowerCase())
+    const normalizedHostname = hostname.trim().toLowerCase();
+    if (normalizedHostname.endsWith(CODESPACES_PREVIEW_SUFFIX)) {
+        return SAME_ORIGIN_API_BASE;
+    }
+    const fallback = PRODUCTION_WEB_HOSTS.has(normalizedHostname)
         ? PRODUCTION_API_BASE
         : DEFAULT_API_BASE;
     return trimTrailingSlash(configured?.trim() || fallback);
@@ -402,8 +407,6 @@ export class RealApiClient implements ApiClient {
     /** Đánh giá rủi ro cho một URL qua REST `POST /v1/assess/url`.
      *  Khớp contract gateway: body `{ url, context }`. */
     async assessUrl(url: string): Promise<AssessResult> {
-        const trusted = trustedPopularResult(url);
-        if (trusted) return trusted;
         const raw = await requestJson<BackendAssessResponse>("/v1/assess/url", {
             ...withAuthentication({ method: "POST" }),
             body: JSON.stringify({ url, context: "" }),

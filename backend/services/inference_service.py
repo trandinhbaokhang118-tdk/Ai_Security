@@ -554,13 +554,6 @@ class InferenceService:
         sandbox_reports: tuple[tuple[object, bool], ...] = (),
         context_ai_mode: Literal["off", "shadow", "active"] = "shadow",
     ) -> AssessResponse:
-        # Direct service consumers (including MCP) receive the same product
-        # policy result without DNS, threat-intelligence, model, or sandbox work.
-        from shared.trusted_popular_domains import trusted_popular_assessment
-
-        trusted_result = trusted_popular_assessment(url)
-        if trusted_result is not None:
-            return trusted_result
         t0 = time.perf_counter()
         metadata = dict(metadata or {})
         cache_material = url if not context else f"{url}\n{context}"

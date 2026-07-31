@@ -22,7 +22,6 @@ import type { ApiClient } from "@/lib/api/client";
 import { sortEvidenceBySeverity } from "@/lib/evidence";
 import { getRiskLevel } from "@/lib/risk";
 import { formatScanTimestamp } from "@/lib/time";
-import { trustedPopularResult } from "@/lib/trusted-popular-domains";
 import type {
     ApiKeyInfo,
     AssessMetadata,
@@ -290,8 +289,6 @@ function buildResult(
  * tất định với cùng `url`.
  */
 export function mockAssessUrl(url: string): AssessResult {
-    const trusted = trustedPopularResult(url);
-    if (trusted) return trusted;
     const evidence: Evidence[] = [];
     let score = 5;
 

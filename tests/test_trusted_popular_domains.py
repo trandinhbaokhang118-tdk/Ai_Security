@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from mcp_server.tools import MCPTools, URLInput
-from shared.schemas import Decision
+from shared.schemas import AssessResponse, Decision, Modality, RiskLevel
 from shared.trusted_popular_domains import (
     TRUSTED_POPULAR_DOMAINS,
-    trusted_popular_assessment,
     trusted_popular_domain,
 )
 
@@ -26,22 +25,26 @@ def test_lookalike_and_non_http_urls_are_not_trusted() -> None:
     assert trusted_popular_domain("javascript:https://youtube.com") is None
 
 
-def test_trusted_assessment_is_an_immediate_safe_policy_result() -> None:
-    result = trusted_popular_assessment("https://www.youtube.com/")
-    assert result is not None
-    assert result.risk_score == 0
-    assert result.decision is Decision.ALLOW
-    assert result.latency_ms == 0
-    assert result.model_version == "trusted-popular-domains-v1"
+def test_mcp_runs_inference_service_for_trusted_domain() -> None:
+    class RecordingService:
+        calls = 0
 
-
-def test_mcp_bypasses_inference_service_for_trusted_domain() -> None:
-    class FailingService:
         def assess_url(self, *_args, **_kwargs):
-            raise AssertionError("trusted domain must not reach inference")
+            self.calls += 1
+            return AssessResponse(
+                risk_score=0.0,
+                risk_level=RiskLevel.SAFE,
+                decision=Decision.ALLOW,
+                confidence=0.9,
+                modality=Modality.URL,
+                request_id="server-scan",
+                model_version="risk-core-test",
+            )
 
-    response = MCPTools(service=FailingService()).assess_url(
+    service = RecordingService()
+    response = MCPTools(service=service).assess_url(
         URLInput(url="https://chatgpt.com/", context="")
     )
+    assert service.calls == 1
     assert response["risk_score"] == 0
     assert response["verdict"] == "ALLOW"

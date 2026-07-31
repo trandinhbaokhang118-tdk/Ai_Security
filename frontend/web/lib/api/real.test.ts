@@ -33,6 +33,32 @@ describe("RealApiClient authentication", () => {
         );
     });
 
+    it("sends trusted domains to the server for the authoritative Risk Core verdict", async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                risk_score: 0,
+                risk_level: "safe",
+                confidence: 0.91,
+                reasons: [],
+                evidence: [],
+                request_id: "server-scan",
+                risk_core: { final_score: 0, confidence: 91, decision: "allow" },
+            }),
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        await new RealApiClient().assessUrl("https://web.telegram.org/");
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            "http://localhost:8000/v1/assess/url",
+            expect.objectContaining({
+                method: "POST",
+                body: JSON.stringify({ url: "https://web.telegram.org/", context: "" }),
+            }),
+        );
+    });
+
     it("reads the server-authoritative account quota", async () => {
         window.localStorage.setItem(
             SESSION_STORAGE_KEY,
@@ -260,6 +286,16 @@ describe("RealApiClient authentication", () => {
 });
 
 describe("production API base resolution", () => {
+    it("uses the same-origin backend proxy for a Codespaces preview", () => {
+        const hostname =
+            "glowing-computing-machine-jjwjqj44wgwfqpj4-3000.app.github.dev";
+
+        expect(resolveApiBase(undefined, hostname)).toBe("/api/backend");
+        expect(resolveApiBase("https://api.prewise.site", hostname)).toBe(
+            "/api/backend",
+        );
+    });
+
     it("never falls back to localhost on the public Prewise domains", () => {
         expect(resolveApiBase(undefined, "www.prewise.site")).toBe("https://api.prewise.site");
         expect(resolveApiBase("", "prewise.site")).toBe("https://api.prewise.site");

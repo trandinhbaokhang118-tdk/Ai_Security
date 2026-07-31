@@ -1,16 +1,13 @@
-"""Product-policy allowlist for popular web services.
+"""Informational matching for well-known web-service domains.
 
-These domains intentionally bypass URL intelligence and model evaluation.  Keep
-matching label-aware so lookalikes such as ``youtube.com.attacker.example`` do
-not inherit an allowlisted verdict.
+Membership never bypasses URL intelligence, model evaluation, Risk Core v2, or
+requested sandbox checks. Matching remains label-aware so lookalikes such as
+``youtube.com.attacker.example`` do not inherit the known-domain label.
 """
 
 from __future__ import annotations
 
 from urllib.parse import urlsplit
-from uuid import uuid4
-
-from shared.schemas import AssessResponse, Decision, Evidence, Modality, RiskLevel, Severity
 
 TRUSTED_POPULAR_DOMAINS: tuple[str, ...] = (
     "google.com", "youtube.com", "facebook.com", "instagram.com", "x.com",
@@ -37,8 +34,8 @@ TRUSTED_POPULAR_DOMAINS: tuple[str, ...] = (
 
 # Platforms that hand out subdomains to arbitrary users. The organisation is
 # trustworthy, but ``attacker.wordpress.com`` is not: it is attacker-controlled
-# content on a trusted parent. For these, only the apex and ``www`` skip the
-# engine; every other label is scanned normally.
+# content on a known parent. For these, only the apex and ``www`` receive the
+# informational label; every other label remains user-controlled content.
 USER_CONTENT_PARENT_DOMAINS: frozenset[str] = frozenset(
     {
         "wordpress.com",
@@ -64,7 +61,7 @@ USER_CONTENT_PARENT_DOMAINS: frozenset[str] = frozenset(
 
 # Query parameters that carry a second URL. A trusted host used as an open
 # redirector (``google.com/url?q=...``) is a real phishing delivery path, so a
-# URL carrying a nested absolute URL is never short-circuited.
+# URL carrying a nested absolute URL is not classified as a known service URL.
 _NESTED_URL_MARKERS = ("http://", "https://", "%3a%2f%2f")
 
 
@@ -74,7 +71,7 @@ def _has_nested_url(parsed) -> bool:
 
 
 def trusted_popular_domain(url: str) -> str | None:
-    """Return the matching policy domain for an HTTP(S) URL, if any."""
+    """Return the matching known-service domain for an HTTP(S) URL, if any."""
     try:
         parsed = urlsplit(url)
     except ValueError:
@@ -98,34 +95,3 @@ def trusted_popular_domain(url: str) -> str | None:
             continue
         return domain
     return None
-
-
-def trusted_popular_assessment(url: str) -> AssessResponse | None:
-    """Build the shared zero-latency policy verdict without scanning the URL."""
-    domain = trusted_popular_domain(url)
-    if domain is None:
-        return None
-    reason = f"{domain} nằm trong danh sách 100 dịch vụ phổ biến được tin cậy sẵn."
-    return AssessResponse(
-        risk_score=0.0,
-        risk_level=RiskLevel.SAFE,
-        decision=Decision.ALLOW,
-        confidence=1.0,
-        modality=Modality.URL,
-        reasons=[reason],
-        evidence=[Evidence(
-            source="trusted_popular_domains",
-            message=reason,
-            severity=Severity.INFO,
-            feature="popular_domain_policy",
-        )],
-        explanation="Kết quả được trả trực tiếp theo chính sách tên miền phổ biến; hệ thống không truy xét độ an toàn của URL này.",
-        recommended_agent_behavior="Cho phép tiếp tục theo chính sách tên miền phổ biến.",
-        model_version="trusted-popular-domains-v1",
-        latency_ms=0.0,
-        request_id=str(uuid4()),
-        raw_score=0.0,
-        final_score=0.0,
-        cache_hit=True,
-        cache_status="hit",
-    )

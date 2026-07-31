@@ -1,4 +1,11 @@
 services:
+  web:
+    build:
+      args:
+        # Keep Codespaces previews on the authenticated port-3000 origin.
+        # The Next.js route proxies REST calls to the private backend network.
+        NEXT_PUBLIC_API_BASE_URL: /api/backend
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
