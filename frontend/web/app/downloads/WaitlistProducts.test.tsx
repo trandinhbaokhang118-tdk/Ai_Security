@@ -11,10 +11,10 @@ describe("WaitlistProducts",()=>{
    {status:200,headers:{"Content-Type":"application/json"}},
   ));
   render(<WaitlistProducts/>);
-  fireEvent.change(screen.getByLabelText("Email nhận thông báo",{selector:"#waitlist-windows"}),{target:{value:"user@example.com"}});
-  fireEvent.click(screen.getByRole("button",{name:"Thông báo khi phát hành"}));
+  fireEvent.change(screen.getByLabelText("Email nhận thông báo",{selector:"#waitlist-browser_extension"}),{target:{value:"user@example.com"}});
+  fireEvent.click(screen.getByRole("button",{name:"Tham gia danh sách chờ"}));
   await waitFor(()=>expect(screen.getByText(/Đã đăng ký\. Prewise/)).toBeInTheDocument());
-  expect(request).toHaveBeenCalledWith("http://localhost:8000/v1/waitlist",expect.objectContaining({body:JSON.stringify({email:"user@example.com",product:"windows"})}));
+  expect(request).toHaveBeenCalledWith("http://localhost:8000/v1/waitlist",expect.objectContaining({body:JSON.stringify({email:"user@example.com",product:"browser_extension"})}));
  });
 
  it("explains duplicate registrations without presenting an error",async()=>{
@@ -33,9 +33,9 @@ describe("WaitlistProducts",()=>{
    ?new Response(JSON.stringify({releases:{}}),{status:200,headers:{"Content-Type":"application/json"}})
    :new Response(null,{status:503}));
   render(<WaitlistProducts/>);
-  fireEvent.change(screen.getByLabelText("Email nhận thông báo",{selector:"#waitlist-windows"}),{target:{value:"user@example.com"}});
-  fireEvent.click(screen.getByRole("button",{name:"Thông báo khi phát hành"}));
+  fireEvent.change(screen.getByLabelText("Email nhận thông báo",{selector:"#waitlist-browser_extension"}),{target:{value:"user@example.com"}});
+  fireEvent.click(screen.getByRole("button",{name:"Tham gia danh sách chờ"}));
   await waitFor(()=>expect(screen.getByText(/Không thể đăng ký lúc này/)).toBeInTheDocument());
-  expect(screen.getByRole("button",{name:"Thông báo khi phát hành"})).toBeEnabled();
+  expect(screen.getByRole("button",{name:"Tham gia danh sách chờ"})).toBeEnabled();
  });
 });

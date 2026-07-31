@@ -25,7 +25,7 @@ from backend.security_utils import utcnow
 from backend.services.release_email_service import email_configured, send_release_email
 
 router = APIRouter(prefix="/v1/waitlist", tags=["waitlist"])
-ProductKey = Literal["windows", "browser_extension"]
+ProductKey = Literal["browser_extension"]
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _SHA256_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$")
 
@@ -191,7 +191,7 @@ def publish_release(payload: ReleaseInput, admin: Annotated[AuthenticatedSession
     result = {"configured": configured, "attempted": 0, "sent": 0, "failed": 0}
     if payload.notify and configured:
         entries = db.execute(select(ProductWaitlistEntry).where(ProductWaitlistEntry.product == payload.product, ProductWaitlistEntry.unsubscribed_at.is_(None))).scalars().all()
-        product_name = "Prewise cho Windows" if payload.product == "windows" else "Tiện ích trình duyệt Prewise"
+        product_name = "Tiện ích trình duyệt Prewise"
         for entry in entries:
             result["attempted"] += 1
             token = _unsubscribe_token(entry.id)

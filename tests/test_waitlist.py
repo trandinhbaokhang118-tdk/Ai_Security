@@ -30,7 +30,7 @@ def make_client() -> tuple[TestClient, sessionmaker]:
 
 def test_waitlist_persists_normalized_subscription_and_is_idempotent():
     client, sessions = make_client()
-    payload = {"email": "  User@Example.COM ", "product": "windows"}
+    payload = {"email": "  User@Example.COM ", "product": "browser_extension"}
 
     first = client.post("/v1/waitlist", json=payload)
     duplicate = client.post("/v1/waitlist", json=payload)
@@ -38,7 +38,7 @@ def test_waitlist_persists_normalized_subscription_and_is_idempotent():
     assert first.status_code == 200
     assert first.json() == {
         "email": "user@example.com",
-        "product": "windows",
+        "product": "browser_extension",
         "registered": True,
     }
     assert duplicate.status_code == 200
@@ -48,22 +48,21 @@ def test_waitlist_persists_normalized_subscription_and_is_idempotent():
         assert len(entries) == 1
 
 
-def test_waitlist_allows_one_email_to_follow_each_product():
+def test_waitlist_accepts_browser_extension_product():
     client, _ = make_client()
-    for product in ("windows", "browser_extension"):
-        response = client.post(
-            "/v1/waitlist",
-            json={"email": "person@example.com", "product": product},
-        )
-        assert response.status_code == 200
-        assert response.json()["registered"] is True
+    response = client.post(
+        "/v1/waitlist",
+        json={"email": "person@example.com", "product": "browser_extension"},
+    )
+    assert response.status_code == 200
+    assert response.json()["registered"] is True
 
 
 def test_waitlist_rejects_invalid_email_and_product():
     client, _ = make_client()
     assert client.post(
-        "/v1/waitlist", json={"email": "not-an-email", "product": "windows"}
+        "/v1/waitlist", json={"email": "not-an-email", "product": "browser_extension"}
     ).status_code == 422
     assert client.post(
-        "/v1/waitlist", json={"email": "ok@example.com", "product": "mac"}
+        "/v1/waitlist", json={"email": "ok@example.com", "product": "windows"}
     ).status_code == 422

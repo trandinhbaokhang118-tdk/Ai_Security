@@ -22,8 +22,6 @@ npm --prefix frontend/web audit --omit=dev --audit-level=high
 npm --prefix frontend/web run typecheck
 npm --prefix frontend/web test -- --run
 npm --prefix frontend/web run build
-npm --prefix frontend/desktop audit --omit=dev --audit-level=high
-npm --prefix frontend/desktop run typecheck
 ```
 
 - The tracked tree must contain no `.env`, private key, cloud credential, or
@@ -31,8 +29,7 @@ npm --prefix frontend/desktop run typecheck
   deleting a secret only from the latest commit does not revoke it.
 - Keep `APP_ENV=production`, demo seeding and schema auto-create disabled, and
   use unique 32-byte-or-longer values for the API and telemetry peppers.
-- Limit `CORS_ALLOW_ORIGINS` to the deployed Web origins plus the packaged
-  desktop origin only when that client is shipped. Do not use `*`.
+- Limit `CORS_ALLOW_ORIGINS` to the deployed Web origins. Do not use `*`.
 - Terminate TLS at the public proxy, preserve the backend security headers, and
   expose the Web/API containers only through that proxy. The Compose defaults
   bind application ports to loopback for this reason.
@@ -48,23 +45,16 @@ include HSTS. Sending a real release email is required only when the Cloudflare
 integration is enabled, but a partially configured integration must fail the
 production configuration check.
 
-## Public ingress and desktop signing
+## Public ingress
 
 The Cloudflare Tunnel public hostname for `api.prewise.site` must target the
 production backend listener (the Compose default is
 `http://127.0.0.1:18080`), not the Next.js listener. Keep the tunnel token in
 the deployment secret manager, confirm the connector is healthy in Cloudflare,
 and require `https://api.prewise.site/v1/health` and `/v1/ready` to return HTTP
-200 before publishing desktop or extension downloads. Cloudflare error 1033 or
+200 before publishing extension downloads. Cloudflare error 1033 or
 HTTP 530 is a hard release blocker; a Quick Tunnel URL is not a production
 fallback.
-
-Windows installers must be signed with the verified Prewise publisher identity
-and a trusted timestamp. Supply the certificate and password through protected
-`CSC_LINK` and `CSC_KEY_PASSWORD` secrets, rebuild the Setup and Portable
-artifacts, and verify `Get-AuthenticodeSignature` reports `Valid` before
-regenerating `SHA256SUMS.txt`. Never publish an unsigned replacement under an
-existing checksum manifest.
 
 ## Database migration and backup
 

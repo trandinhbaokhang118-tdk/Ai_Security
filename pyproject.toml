@@ -69,7 +69,6 @@ extend-exclude = [
     ".tomny",
     ".tunnel-client",
     "artifacts",
-    "frontend/desktop/release",
     "frontend/web/.next*",
     "tools/dataset_collection",
     "tunnel-client-*",

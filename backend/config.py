@@ -293,12 +293,6 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
-        # Desktop renderer served by Vite during Electron development.
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        # Packaged Electron loads its renderer from a local file, which sends
-        # the literal Origin header "null" for requests to the Core API.
-        "null",
     ]
     # Chromium Private Network Access (PNA) is required when the local web UI
     # calls a backend bound to localhost. Keep disabled by default so a public

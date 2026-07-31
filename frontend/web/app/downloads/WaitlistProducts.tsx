@@ -1,15 +1,14 @@
 "use client";
 
 import {FormEvent, useEffect, useState} from "react";
-import {MonitorDown, Puzzle} from "lucide-react";
+import {Puzzle} from "lucide-react";
 import styles from "./downloads.module.css";
 
-type ProductKey="windows"|"browser_extension";
+type ProductKey="browser_extension";
 type FormState={email:string;status:"idle"|"submitting"|"success"|"error";message:string};
 type Release={version:string;downloadUrl:string;checksumSha256:string;signatureNote?:string|null};
 
 const products=[
- {key:"windows" as const,icon:MonitorDown,name:"Prewise cho Windows",detail:"Ứng dụng bảo vệ trên máy tính, kiểm tra liên kết và tệp trước khi mở.",action:"Thông báo khi phát hành"},
  {key:"browser_extension" as const,icon:Puzzle,name:"Tiện ích trình duyệt",detail:"Cảnh báo website đáng ngờ trực tiếp trên Chrome, Edge và các trình duyệt Chromium.",action:"Tham gia danh sách chờ"},
 ];
 
@@ -18,7 +17,7 @@ const initialState:FormState={email:"",status:"idle",message:""};
 function apiBase():string{return (process.env.NEXT_PUBLIC_API_BASE_URL??"http://localhost:8000").replace(/\/+$/,"");}
 
 export function WaitlistProducts(){
- const [forms,setForms]=useState<Record<ProductKey,FormState>>({windows:{...initialState},browser_extension:{...initialState}});
+ const [forms,setForms]=useState<Record<ProductKey,FormState>>({browser_extension:{...initialState}});
  const [releases,setReleases]=useState<Partial<Record<ProductKey,Release>>>({});
  useEffect(()=>{void fetch(`${apiBase()}/v1/waitlist/releases`,{cache:"no-store"}).then(response=>response.ok?response.json():Promise.reject()).then((data:{releases?:Partial<Record<ProductKey,Release>>})=>setReleases(data.releases??{})).catch(()=>undefined);},[]);
  const update=(product:ProductKey,change:Partial<FormState>)=>setForms(current=>({...current,[product]:{...current[product],...change}}));

@@ -19,8 +19,8 @@ export const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "Minh bạch": "Transparency",
   "Mở thông tin minh bạch": "Open transparency information",
   "Quản lý API key": "Manage API key",
-  "Tải ứng dụng & tiện ích": "Download apps & extensions",
-  "Tải ứng dụng và tiện ích mở rộng": "Download apps and browser extensions",
+  "Tiện ích trình duyệt": "Browser extension",
+  "Tải tiện ích mở rộng cho trình duyệt": "Download the browser extension",
   "Môi trường giả lập Windows": "Windows sandbox",
   "Mở môi trường giả lập Windows": "Open Windows sandbox",
   "Mở menu tài khoản": "Open account menu",
@@ -337,15 +337,11 @@ export const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "Bắt đầu Sandbox": "Start Sandbox",
   "Kết thúc phiên": "End session",
 
-  "Tải lớp bảo vệ": "Bring protection",
-  "đến thiết bị của bạn.": "to your device.",
-  "Ứng dụng và extension hiện chưa có bản phát hành công khai. Trang này sẽ là nơi cung cấp bộ cài đã ký và liên kết cửa hàng chính thức.": "The app and extension are not publicly available yet. This page will provide signed installers and links to official stores.",
+  "Đưa lớp bảo vệ": "Bring protection",
+  "vào trình duyệt.": "to your browser.",
+  "Extension hiện chưa có bản phát hành công khai. Đăng ký để nhận thông báo khi liên kết cửa hàng chính thức sẵn sàng.": "The extension is not publicly available yet. Sign up to be notified when the official store link is ready.",
   "Sản phẩm có thể tải": "Downloadable products",
-  "Prewise cho Windows": "Prewise for Windows",
   "Sắp ra mắt": "Coming soon",
-  "Ứng dụng bảo vệ trên máy tính, kiểm tra liên kết và tệp trước khi mở.": "Desktop protection that inspects links and files before you open them.",
-  "Thông báo khi phát hành": "Notify me at launch",
-  "Tiện ích trình duyệt": "Browser extension",
   "Cảnh báo website đáng ngờ trực tiếp trên Chrome, Edge và các trình duyệt Chromium.": "Warn about suspicious websites directly in Chrome, Edge, and Chromium browsers.",
   "Tham gia danh sách chờ": "Join the waitlist",
   "Chỉ tải từ nguồn chính thức": "Download only from official sources",
@@ -476,7 +472,7 @@ export const ENGLISH_TRANSLATIONS: Record<string, string> = {
   "Yêu cầu dữ liệu nhạy cảm": "Requests sensitive data",
   "Biểu mẫu đích yêu cầu thông tin đăng nhập và mã xác thực.": "The destination form requests sign-in details and verification codes.",
   "Tải xuống · Prewise": "Downloads · Prewise",
-  "Tải ứng dụng Prewise và tiện ích mở rộng trình duyệt.": "Download the Prewise app and browser extension."
+  "Đăng ký nhận thông báo về tiện ích trình duyệt Prewise.": "Sign up for updates about the Prewise browser extension."
 };
 
 const normalizedTranslations = new Map(

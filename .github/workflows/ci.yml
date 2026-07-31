@@ -72,26 +72,6 @@ jobs:
           path: artifacts/prewise-armor-extension-*.zip
           if-no-files-found: error
 
-  desktop:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: frontend/desktop
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/desktop/package-lock.json
-      - run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build renderer and Electron runtime
-        run: npm run build
-      - name: Smoke-test Windows packaging
-        run: npm run release:dir
-
   production-gate:
     needs: [backend, web]
     runs-on: ubuntu-latest

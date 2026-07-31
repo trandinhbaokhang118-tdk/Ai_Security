@@ -17,7 +17,6 @@
 artifacts
 benchmarks
 docs
-frontend/desktop
 frontend/extension
 frontend/web/.next*
 frontend/web/node_modules
